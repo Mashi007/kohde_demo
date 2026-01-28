@@ -55,3 +55,6 @@ uploads/
 # OS
 .DS_Store
 Thumbs.db
+
+# Carpeta duplicada (archivos están en raíz)
+kohde_demo/
