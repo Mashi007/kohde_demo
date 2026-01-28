@@ -1,0 +1,164 @@
+"""
+Lógica de negocio para gestión de recetas.
+"""
+from typing import List, Optional, Dict
+from sqlalchemy.orm import Session
+from models import Receta, RecetaIngrediente, Item
+
+class RecetaService:
+    """Servicio para gestión de recetas."""
+    
+    @staticmethod
+    def crear_receta(db: Session, datos: Dict) -> Receta:
+        """
+        Crea una nueva receta con sus ingredientes.
+        
+        Args:
+            db: Sesión de base de datos
+            datos: Diccionario con datos de la receta
+            
+        Returns:
+            Receta creada
+        """
+        ingredientes_data = datos.pop('ingredientes', [])
+        
+        receta = Receta(**datos)
+        db.add(receta)
+        db.flush()  # Para obtener el ID
+        
+        # Crear ingredientes
+        for ing_data in ingredientes_data:
+            item = db.query(Item).filter(Item.id == ing_data['item_id']).first()
+            if not item:
+                raise ValueError(f"Item {ing_data['item_id']} no encontrado")
+            
+            ingrediente = RecetaIngrediente(
+                receta_id=receta.id,
+                item_id=item.id,
+                cantidad=float(ing_data['cantidad']),
+                unidad=ing_data.get('unidad', item.unidad)
+            )
+            db.add(ingrediente)
+        
+        # Calcular totales
+        receta.calcular_totales()
+        
+        db.commit()
+        db.refresh(receta)
+        return receta
+    
+    @staticmethod
+    def obtener_receta(db: Session, receta_id: int) -> Optional[Receta]:
+        """Obtiene una receta por ID."""
+        return db.query(Receta).filter(Receta.id == receta_id).first()
+    
+    @staticmethod
+    def listar_recetas(
+        db: Session,
+        activa: Optional[bool] = None,
+        busqueda: Optional[str] = None,
+        skip: int = 0,
+        limit: int = 100
+    ) -> List[Receta]:
+        """
+        Lista recetas con filtros opcionales.
+        
+        Args:
+            db: Sesión de base de datos
+            activa: Filtrar por estado activa
+            busqueda: Búsqueda por nombre
+            skip: Número de registros a saltar
+            limit: Límite de registros
+            
+        Returns:
+            Lista de recetas
+        """
+        from sqlalchemy import or_
+        
+        query = db.query(Receta)
+        
+        if activa is not None:
+            query = query.filter(Receta.activa == activa)
+        
+        if busqueda:
+            query = query.filter(Receta.nombre.ilike(f'%{busqueda}%'))
+        
+        return query.offset(skip).limit(limit).all()
+    
+    @staticmethod
+    def actualizar_receta(db: Session, receta_id: int, datos: Dict) -> Receta:
+        """
+        Actualiza una receta existente.
+        
+        Args:
+            db: Sesión de base de datos
+            receta_id: ID de la receta
+            datos: Datos a actualizar
+            
+        Returns:
+            Receta actualizada
+        """
+        receta = RecetaService.obtener_receta(db, receta_id)
+        if not receta:
+            raise ValueError("Receta no encontrada")
+        
+        # Si se actualizan ingredientes, eliminar los antiguos y crear nuevos
+        if 'ingredientes' in datos:
+            # Eliminar ingredientes existentes
+            db.query(RecetaIngrediente).filter(
+                RecetaIngrediente.receta_id == receta_id
+            ).delete()
+            
+            # Crear nuevos ingredientes
+            for ing_data in datos['ingredientes']:
+                ingrediente = RecetaIngrediente(
+                    receta_id=receta_id,
+                    item_id=ing_data['item_id'],
+                    cantidad=float(ing_data['cantidad']),
+                    unidad=ing_data.get('unidad', 'unidad')
+                )
+                db.add(ingrediente)
+            
+            datos.pop('ingredientes')
+        
+        # Actualizar otros campos
+        for key, value in datos.items():
+            if hasattr(receta, key) and key != 'id':
+                setattr(receta, key, value)
+        
+        # Recalcular totales
+        receta.calcular_totales()
+        
+        db.commit()
+        db.refresh(receta)
+        return receta
+    
+    @staticmethod
+    def duplicar_receta(db: Session, receta_id: int, nuevo_nombre: str) -> Receta:
+        """
+        Duplica una receta existente.
+        
+        Args:
+            db: Sesión de base de datos
+            receta_id: ID de la receta a duplicar
+            nuevo_nombre: Nombre para la nueva receta
+            
+        Returns:
+            Receta duplicada
+        """
+        receta_original = RecetaService.obtener_receta(db, receta_id)
+        if not receta_original:
+            raise ValueError("Receta no encontrada")
+        
+        datos = receta_original.to_dict()
+        datos['nombre'] = nuevo_nombre
+        datos['ingredientes'] = [
+            {
+                'item_id': ing.item_id,
+                'cantidad': float(ing.cantidad),
+                'unidad': ing.unidad
+            }
+            for ing in receta_original.ingredientes
+        ]
+        
+        return RecetaService.crear_receta(db, datos)

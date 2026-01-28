@@ -1,0 +1,39 @@
+services:
+  # Web Service - Aplicación Flask
+  - type: web
+    name: erp-restaurantes
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: false
+      - key: GOOGLE_CLOUD_PROJECT
+        sync: false
+      - key: GOOGLE_CREDENTIALS_PATH
+        sync: false
+      - key: WHATSAPP_ACCESS_TOKEN
+        sync: false
+      - key: WHATSAPP_PHONE_NUMBER_ID
+        sync: false
+      - key: WHATSAPP_VERIFY_TOKEN
+        sync: false
+      - key: SENDGRID_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        value: noreply@restaurantes.com
+      - key: STOCK_MINIMUM_THRESHOLD_PERCENTAGE
+        value: 0.2
+      - key: IVA_PERCENTAGE
+        value: 0.15
+
+  # PostgreSQL Database
+  - type: pgsql
+    name: erp-restaurantes-db
+    databaseName: erp_restaurantes
+    user: erp_user
+    plan: free  # Cambiar a 'starter' o superior para producción
