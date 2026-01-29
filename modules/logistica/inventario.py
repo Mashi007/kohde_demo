@@ -3,7 +3,8 @@ Lógica de negocio para gestión de inventario.
 """
 from typing import List, Optional, Dict
 from sqlalchemy.orm import Session
-from models import Inventario, Item
+from sqlalchemy import desc, func
+from models import Inventario, Item, Factura, FacturaItem, Requerimiento, RequerimientoItem
 from utils.helpers import verificar_stock_suficiente
 
 class InventarioService:
@@ -138,3 +139,88 @@ class InventarioService:
             float(inventario.cantidad_actual),
             float(inventario.cantidad_minima)
         )
+    
+    @staticmethod
+    def obtener_inventario_completo_con_movimientos(db: Session) -> List[Dict]:
+        """
+        Obtiene el inventario completo con información de últimos movimientos.
+        
+        Returns:
+            Lista de diccionarios con información completa del inventario
+        """
+        inventarios = db.query(Inventario).all()
+        resultado = []
+        
+        for inv in inventarios:
+            item_dict = inv.to_dict()
+            
+            # Obtener último ingreso (factura aprobada más reciente con este item)
+            ultimo_ingreso = db.query(FacturaItem).join(Factura).filter(
+                FacturaItem.item_id == inv.item_id,
+                Factura.estado == 'aprobada',
+                Factura.tipo == 'proveedor'
+            ).order_by(desc(Factura.fecha_aprobacion)).first()
+            
+            # Obtener último egreso (requerimiento entregado más reciente con este item)
+            ultimo_egreso = db.query(RequerimientoItem).join(Requerimiento).filter(
+                RequerimientoItem.item_id == inv.item_id,
+                Requerimiento.estado == 'entregado',
+                RequerimientoItem.cantidad_entregada.isnot(None)
+            ).order_by(desc(Requerimiento.fecha)).first()
+            
+            # Calcular stock disponible (cantidad_actual - cantidad_minima)
+            stock_disponible = max(0, float(inv.cantidad_actual) - float(inv.cantidad_minima))
+            
+            item_dict['ultimo_ingreso'] = {
+                'fecha': ultimo_ingreso.factura.fecha_aprobacion.isoformat() if ultimo_ingreso and ultimo_ingreso.factura.fecha_aprobacion else None,
+                'cantidad': float(ultimo_ingreso.cantidad) if ultimo_ingreso else None,
+                'factura_numero': ultimo_ingreso.factura.numero_factura if ultimo_ingreso else None,
+                'proveedor': ultimo_ingreso.factura.proveedor.nombre if ultimo_ingreso and ultimo_ingreso.factura.proveedor else None,
+            } if ultimo_ingreso else None
+            
+            item_dict['ultimo_egreso'] = {
+                'fecha': ultimo_egreso.requerimiento.fecha.isoformat() if ultimo_egreso and ultimo_egreso.requerimiento.fecha else None,
+                'cantidad': float(ultimo_egreso.cantidad_entregada) if ultimo_egreso and ultimo_egreso.cantidad_entregada else None,
+                'requerimiento_id': ultimo_egreso.requerimiento_id if ultimo_egreso else None,
+            } if ultimo_egreso else None
+            
+            item_dict['stock_disponible'] = stock_disponible
+            item_dict['stock_seguridad'] = float(inv.cantidad_minima)
+            
+            resultado.append(item_dict)
+        
+        return resultado
+    
+    @staticmethod
+    def obtener_resumen_dashboard(db: Session) -> Dict:
+        """
+        Obtiene un resumen tipo dashboard para el inventario.
+        
+        Returns:
+            Diccionario con métricas del inventario
+        """
+        total_items = db.query(Inventario).count()
+        items_stock_bajo = db.query(Inventario).filter(
+            Inventario.cantidad_actual < Inventario.cantidad_minima
+        ).count()
+        
+        # Calcular valor total del inventario
+        inventarios = db.query(Inventario).all()
+        valor_total = sum(
+            float(inv.cantidad_actual) * float(inv.ultimo_costo_unitario or 0)
+            for inv in inventarios
+        )
+        
+        # Items críticos (stock muy bajo)
+        items_criticos = db.query(Inventario).filter(
+            Inventario.cantidad_actual < (Inventario.cantidad_minima * 0.5)
+        ).count()
+        
+        return {
+            'total_items': total_items,
+            'items_stock_bajo': items_stock_bajo,
+            'items_criticos': items_criticos,
+            'items_stock_ok': total_items - items_stock_bajo,
+            'valor_total_inventario': valor_total,
+            'porcentaje_stock_bajo': round((items_stock_bajo / total_items * 100) if total_items > 0 else 0, 2),
+        }

@@ -288,6 +288,33 @@ def verificar_disponibilidad(item_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
+@bp.route('/inventario/completo', methods=['GET'])
+def obtener_inventario_completo():
+    """Obtiene inventario completo con últimos movimientos."""
+    try:
+        inventario = InventarioService.obtener_inventario_completo_con_movimientos(db.session)
+        return jsonify(inventario), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/inventario/dashboard', methods=['GET'])
+def obtener_dashboard_inventario():
+    """Obtiene resumen tipo dashboard del inventario."""
+    try:
+        resumen = InventarioService.obtener_resumen_dashboard(db.session)
+        return jsonify(resumen), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/inventario/silos', methods=['GET'])
+def obtener_silos_inventario():
+    """Obtiene los top 10 items más comprados para visualización tipo silos."""
+    try:
+        silos = InventarioService.obtener_top_10_items_mas_comprados(db.session)
+        return jsonify(silos), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 # ========== RUTAS DE REQUERIMIENTOS ==========
 
 @bp.route('/requerimientos', methods=['GET'])
