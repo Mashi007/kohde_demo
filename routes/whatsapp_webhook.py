@@ -68,49 +68,43 @@ def handle_image_message(sender_id: str, image_data: dict):
         image_data: Datos de la imagen del mensaje
     """
     try:
-        # Obtener URL de la imagen
+        # Obtener ID de la imagen
         image_id = image_data.get('id')
         
         if not image_id:
             return
         
-        # Descargar imagen desde WhatsApp API
-        image_url = download_image_from_whatsapp(image_id)
+        # Usar el servicio de configuración para procesar
+        from modules.configuracion.whatsapp import WhatsAppConfigService
         
-        if not image_url:
-            return
-        
-        # Guardar imagen localmente
-        response = requests.get(image_url)
-        if response.status_code != 200:
-            return
-        
-        filename = f"factura_{sender_id}_{image_id}.jpg"
-        filepath = os.path.join(Config.UPLOAD_FOLDER, filename)
-        
-        with open(filepath, 'wb') as f:
-            f.write(response.content)
-        
-        # Procesar factura con OCR
-        factura = FacturaService.procesar_factura_desde_imagen(
-            db.session,
-            filepath,
-            tipo='proveedor'
+        resultado = WhatsAppConfigService.procesar_imagen_recibida(
+            image_id,
+            sender_id,
+            tipo='factura'
         )
         
-        # Enviar confirmación al remitente
-        from modules.notificaciones.whatsapp import whatsapp_service
-        mensaje = (
-            f"✅ Factura recibida\n\n"
-            f"Número: {factura.numero_factura}\n"
-            f"Total: ${factura.total:,.2f}\n\n"
-            f"La factura está pendiente de aprobación en el sistema."
-        )
-        
-        whatsapp_service.enviar_mensaje(sender_id, mensaje)
+        if resultado.get('exito'):
+            # Enviar confirmación al remitente
+            from modules.notificaciones.whatsapp import whatsapp_service
+            mensaje = (
+                f"✅ Factura recibida\n\n"
+                f"Número: {resultado.get('numero_factura', 'N/A')}\n"
+                f"Total: ${resultado.get('total', 0):,.2f}\n\n"
+                f"La factura está pendiente de aprobación en el sistema."
+            )
+            whatsapp_service.enviar_mensaje(sender_id, mensaje)
+        else:
+            # Enviar mensaje de error
+            from modules.notificaciones.whatsapp import whatsapp_service
+            whatsapp_service.enviar_mensaje(
+                sender_id,
+                f"❌ Error al procesar la factura: {resultado.get('mensaje', 'Error desconocido')}"
+            )
         
     except Exception as e:
         print(f"Error al procesar imagen: {e}")
+        import traceback
+        traceback.print_exc()
         # Enviar mensaje de error al usuario
         try:
             from modules.notificaciones.whatsapp import whatsapp_service
@@ -144,17 +138,10 @@ def download_image_from_whatsapp(image_id: str) -> str:
         URL temporal de la imagen o None
     """
     try:
-        url = f"{Config.WHATSAPP_API_URL}/{image_id}"
-        headers = {
-            "Authorization": f"Bearer {Config.WHATSAPP_ACCESS_TOKEN}"
-        }
-        
-        response = requests.get(url, headers=headers)
-        if response.status_code == 200:
-            data = response.json()
-            return data.get('url')
-        
-        return None
+        # Usar el servicio de configuración para descargar
+        from modules.configuracion.whatsapp import WhatsAppConfigService
+        filepath = WhatsAppConfigService.descargar_imagen_whatsapp(image_id)
+        return filepath
     except Exception as e:
         print(f"Error al descargar imagen: {e}")
         return None
