@@ -169,7 +169,7 @@ class WhatsAppConfigService:
             
             # Procesar según el tipo
             if tipo == 'factura':
-                from modules.contabilidad.ingreso_facturas import FacturaService
+                from modules.logistica.facturas import FacturaService
                 from models import db
                 
                 factura = FacturaService.procesar_factura_desde_imagen(

@@ -6,7 +6,7 @@ from datetime import date, datetime
 from sqlalchemy.orm import Session
 from models import ProgramacionMenu, ProgramacionMenuItem, Receta, Inventario
 from modules.logistica.inventario import InventarioService
-from modules.compras.pedidos import PedidoCompraService
+from modules.logistica.pedidos import PedidoCompraService
 
 class ProgramacionMenuService:
     """Servicio para gestión de programación de menús."""
