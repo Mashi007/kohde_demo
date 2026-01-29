@@ -57,7 +57,9 @@ class EmailService:
                 'headers': response.headers
             }
         except Exception as e:
-            print(f"Error al enviar email: {e}")
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error al enviar email: {e}", exc_info=True)
             raise
     
     def enviar_factura(self, destinatario: str, factura_info: Dict) -> Dict:
@@ -161,7 +163,9 @@ class EmailService:
                 'headers': response.headers
             }
         except Exception as e:
-            print(f"Error al enviar email con adjunto: {e}")
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error al enviar email con adjunto: {e}", exc_info=True)
             raise
     
     def enviar_resumen_tickets(self, destinatario: str, tickets: List[Dict]) -> Dict:

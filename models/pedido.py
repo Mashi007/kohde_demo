@@ -20,7 +20,7 @@ class PedidoCompra(db.Model):
     __tablename__ = 'pedidos_compra'
     
     id = Column(Integer, primary_key=True)
-    proveedor_id = Column(Integer, ForeignKey('proveedores.id'), nullable=False)
+    proveedor_id = Column(Integer, ForeignKey('proveedores.id', ondelete='RESTRICT'), nullable=False)
     fecha_pedido = Column(DateTime, default=datetime.utcnow, nullable=False)
     fecha_entrega_esperada = Column(DateTime, nullable=True)
     estado = Column(Enum(EstadoPedido), default=EstadoPedido.BORRADOR, nullable=False)

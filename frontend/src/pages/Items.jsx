@@ -1,18 +1,34 @@
 import { useQuery } from '@tanstack/react-query'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import api from '../config/api'
+import { debounce } from '../utils/debounce'
 import { ShoppingCart, Plus, Search, X } from 'lucide-react'
 import Modal from '../components/Modal'
 import ItemForm from '../components/ItemForm'
+import LoadingSpinner from '../components/LoadingSpinner'
+import SkeletonLoader from '../components/SkeletonLoader'
+import EmptyState from '../components/EmptyState'
 
 export default function Items() {
   const [showModal, setShowModal] = useState(false)
   const [busqueda, setBusqueda] = useState('')
+  const [busquedaDebounced, setBusquedaDebounced] = useState('')
+  
+  // Debounce de búsqueda
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      setBusquedaDebounced(busqueda)
+    }, 300)
+    
+    return () => {
+      clearTimeout(timeoutId)
+    }
+  }, [busqueda])
   
   const { data: items, isLoading } = useQuery({
-    queryKey: ['items', busqueda],
+    queryKey: ['items', busquedaDebounced],
     queryFn: () => {
-      const params = busqueda ? { busqueda } : {}
+      const params = busquedaDebounced ? { busqueda: busquedaDebounced } : {}
       return api.get('/logistica/items', { params }).then(res => res.data)
     },
   })
@@ -74,33 +90,21 @@ export default function Items() {
       </Modal>
       <div className="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
         {isLoading ? (
-          <div className="p-8 text-center text-slate-400">
-            <p>Cargando items...</p>
+          <div className="p-8">
+            <SkeletonLoader type="table" lines={5} />
           </div>
         ) : !items || items.length === 0 ? (
-          <div className="p-8 text-center">
-            <p className="text-slate-400 mb-2">
-              {busqueda ? 'No se encontraron items' : 'No hay items registrados'}
-            </p>
-            {busqueda ? (
-              <p className="text-xs text-slate-500">
-                Intenta con otro término de búsqueda o{' '}
-                <button
-                  onClick={() => setBusqueda('')}
-                  className="text-purple-400 hover:text-purple-300 underline"
-                >
-                  limpiar la búsqueda
-                </button>
-              </p>
-            ) : (
-              <button
-                onClick={() => setShowModal(true)}
-                className="text-purple-400 hover:text-purple-300 underline text-sm"
-              >
-                Crear tu primer item
-              </button>
-            )}
-          </div>
+          <EmptyState
+            icon={ShoppingCart}
+            title={busqueda ? 'No se encontraron items' : 'No hay items registrados'}
+            description={
+              busqueda
+                ? 'Intenta con otro término de búsqueda o limpia el filtro para ver todos los items.'
+                : 'Comienza agregando tu primer item al sistema.'
+            }
+            action={busqueda ? () => setBusqueda('') : () => setShowModal(true)}
+            actionLabel={busqueda ? 'Limpiar búsqueda' : 'Crear primer item'}
+          />
         ) : (
           <table className="w-full">
             <thead className="bg-slate-700">

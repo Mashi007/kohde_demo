@@ -7,6 +7,11 @@ from werkzeug.utils import secure_filename
 import os
 from sqlalchemy import and_, exists
 from models import db
+from utils.route_helpers import (
+    handle_db_transaction, parse_date, parse_datetime, require_field,
+    validate_positive_int, validate_file_upload, success_response,
+    error_response, paginated_response
+)
 from modules.logistica.items import ItemService
 from modules.logistica.inventario import InventarioService
 from modules.logistica.requerimientos import RequerimientoService
@@ -15,7 +20,12 @@ from modules.logistica.pedidos import PedidoCompraService
 from modules.logistica.pedidos_internos import PedidoInternoService
 from modules.logistica.compras_stats import ComprasStatsService
 from modules.logistica.costos import CostoService
-from models import ItemLabel
+from models import ItemLabel, Factura, FacturaItem, Receta
+from models.factura import EstadoFactura, TipoFactura
+from models.requerimiento import EstadoRequerimiento
+from models.receta import TipoReceta
+from modules.logistica.pedidos_automaticos import PedidosAutomaticosService
+from modules.planificacion.requerimientos import RequerimientosService
 from config import Config
 from datetime import datetime
 
@@ -30,8 +40,8 @@ def listar_items():
         categoria = request.args.get('categoria')
         activo = request.args.get('activo')
         busqueda = request.args.get('busqueda')
-        skip = int(request.args.get('skip', 0))
-        limit = int(request.args.get('limit', 100))
+        skip = validate_positive_int(request.args.get('skip', 0), 'skip')
+        limit = validate_positive_int(request.args.get('limit', 100), 'limit')
         
         activo_bool = None if activo is None else activo.lower() == 'true'
         
@@ -52,62 +62,72 @@ def listar_items():
             item_dict['costo_unitario_promedio'] = costo_promedio
             items_con_costo.append(item_dict)
         
-        return jsonify(items_con_costo), 200
+        return paginated_response(items_con_costo, skip=skip, limit=limit)
+    except ValueError as e:
+        return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
-        return jsonify({'error': str(e)}), 400
+        return error_response(str(e), 500, 'INTERNAL_ERROR')
 
 @bp.route('/items', methods=['POST'])
+@handle_db_transaction
 def crear_item():
     """Crea un nuevo item."""
-    try:
-        datos = request.get_json()
-        item = ItemService.crear_item(db.session, datos)
-        return jsonify(item.to_dict()), 201
-    except ValueError as e:
-        return jsonify({'error': str(e)}), 400
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    datos = request.get_json()
+    if not datos:
+        return error_response('Datos JSON requeridos', 400, 'VALIDATION_ERROR')
+    
+    item = ItemService.crear_item(db.session, datos)
+    db.session.commit()
+    return success_response(item.to_dict(), 201, 'Item creado correctamente')
 
 @bp.route('/items/<int:item_id>', methods=['GET'])
 def obtener_item(item_id):
     """Obtiene un item por ID con costo promedio calculado."""
     try:
+        validate_positive_int(item_id, 'item_id')
         item = ItemService.obtener_item(db.session, item_id)
         if not item:
-            return jsonify({'error': 'Item no encontrado'}), 404
+            return error_response('Item no encontrado', 404, 'NOT_FOUND')
         
         item_dict = item.to_dict()
         costo_promedio = ItemService.calcular_costo_unitario_promedio(db.session, item_id)
         item_dict['costo_unitario_promedio'] = costo_promedio
         
-        return jsonify(item_dict), 200
+        return success_response(item_dict)
+    except ValueError as e:
+        return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
-        return jsonify({'error': str(e)}), 400
+        return error_response(str(e), 500, 'INTERNAL_ERROR')
 
 @bp.route('/items/<int:item_id>', methods=['PUT'])
+@handle_db_transaction
 def actualizar_item(item_id):
     """Actualiza un item existente."""
-    try:
-        datos = request.get_json()
-        item = ItemService.actualizar_item(db.session, item_id, datos)
-        return jsonify(item.to_dict()), 200
-    except ValueError as e:
-        return jsonify({'error': str(e)}), 400
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    validate_positive_int(item_id, 'item_id')
+    datos = request.get_json()
+    if not datos:
+        return error_response('Datos JSON requeridos', 400, 'VALIDATION_ERROR')
+    
+    item = ItemService.actualizar_item(db.session, item_id, datos)
+    db.session.commit()
+    return success_response(item.to_dict(), message='Item actualizado correctamente')
 
 @bp.route('/items/<int:item_id>/costo', methods=['PUT'])
+@handle_db_transaction
 def actualizar_costo_item(item_id):
     """Actualiza el costo unitario de un item."""
-    try:
-        datos = request.get_json()
-        costo = float(datos.get('costo'))
-        item = ItemService.actualizar_costo_unitario(db.session, item_id, costo)
-        return jsonify(item.to_dict()), 200
-    except ValueError as e:
-        return jsonify({'error': str(e)}), 400
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    validate_positive_int(item_id, 'item_id')
+    datos = request.get_json()
+    if not datos:
+        return error_response('Datos JSON requeridos', 400, 'VALIDATION_ERROR')
+    
+    costo = require_field(datos, 'costo', float)
+    if costo < 0:
+        return error_response('El costo debe ser un número positivo', 400, 'VALIDATION_ERROR')
+    
+    item = ItemService.actualizar_costo_unitario(db.session, item_id, costo)
+    db.session.commit()
+    return success_response(item.to_dict(), message='Costo actualizado correctamente')
 
 # ========== RUTAS DE LABELS ==========
 
@@ -142,87 +162,75 @@ def listar_categorias_labels():
         return jsonify({'error': str(e)}), 400
 
 @bp.route('/labels', methods=['POST'])
+@handle_db_transaction
 def crear_label():
     """Crea una nueva label/clasificación de alimentos."""
-    try:
-        from models.item_label import ItemLabel
-        
-        datos = request.get_json()
-        
-        # Validar campos requeridos
-        if not datos.get('nombre_es'):
-            return jsonify({'error': 'El nombre en español es requerido'}), 400
-        if not datos.get('categoria_principal'):
-            return jsonify({'error': 'La categoría principal es requerida'}), 400
-        
-        # Generar código si no se proporciona
-        codigo = datos.get('codigo')
-        if not codigo:
-            # Generar código basado en categoría y nombre
-            categoria_prefijo = datos['categoria_principal'][:3].upper().replace(' ', '_')
-            nombre_prefijo = datos['nombre_es'][:5].upper().replace(' ', '_')
-            codigo = f'{categoria_prefijo}_{nombre_prefijo}'
-        
-        # Verificar si ya existe una label con el mismo código
-        existing = ItemLabel.query.filter_by(codigo=codigo).first()
-        if existing:
-            return jsonify({'error': f'Ya existe una clasificación con el código {codigo}'}), 400
-        
-        # Crear nueva label
-        nueva_label = ItemLabel(
-            codigo=codigo,
-            nombre_es=datos['nombre_es'],
-            nombre_en=datos.get('nombre_en', datos['nombre_es']),
-            categoria_principal=datos['categoria_principal'],
-            descripcion=datos.get('descripcion', ''),
-            activo=datos.get('activo', True)
-        )
-        
-        db.session.add(nueva_label)
-        db.session.commit()
-        
-        return jsonify(nueva_label.to_dict()), 201
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 400
+    datos = request.get_json()
+    if not datos:
+        return error_response('Datos JSON requeridos', 400, 'VALIDATION_ERROR')
+    
+    # Validar campos requeridos
+    nombre_es = require_field(datos, 'nombre_es', str)
+    categoria_principal = require_field(datos, 'categoria_principal', str)
+    
+    # Generar código si no se proporciona
+    codigo = datos.get('codigo')
+    if not codigo:
+        # Generar código basado en categoría y nombre
+        categoria_prefijo = categoria_principal[:3].upper().replace(' ', '_')
+        nombre_prefijo = nombre_es[:5].upper().replace(' ', '_')
+        codigo = f'{categoria_prefijo}_{nombre_prefijo}'
+    
+    # Verificar si ya existe una label con el mismo código
+    existing = ItemLabel.query.filter_by(codigo=codigo).first()
+    if existing:
+        return error_response(f'Ya existe una clasificación con el código {codigo}', 400, 'DUPLICATE_ERROR')
+    
+    # Crear nueva label
+    nueva_label = ItemLabel(
+        codigo=codigo,
+        nombre_es=nombre_es,
+        nombre_en=datos.get('nombre_en', nombre_es),
+        categoria_principal=categoria_principal,
+        descripcion=datos.get('descripcion', ''),
+        activo=datos.get('activo', True)
+    )
+    
+    db.session.add(nueva_label)
+    db.session.commit()
+    
+    return success_response(nueva_label.to_dict(), 201, 'Label creada correctamente')
 
 # ========== RUTAS DE PEDIDOS AUTOMÁTICOS ==========
 
 @bp.route('/pedidos/aprobar/<int:pedido_id>', methods=['POST'])
+@handle_db_transaction
 def aprobar_pedido(pedido_id):
     """Aprueba un pedido y programa el envío automático 1 hora después."""
-    try:
-        from modules.logistica.pedidos_automaticos import PedidosAutomaticosService
-        datos = request.get_json()
-        usuario_id = datos.get('usuario_id', 1)
-        
-        pedido = PedidosAutomaticosService.aprobar_y_programar_envio(
-            db.session,
-            pedido_id,
-            usuario_id
-        )
-        
-        return jsonify({
-            'mensaje': 'Pedido aprobado. Se enviará automáticamente en 1 hora.',
-            'pedido': pedido.to_dict()
-        }), 200
-    except ValueError as e:
-        return jsonify({'error': str(e)}), 400
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    validate_positive_int(pedido_id, 'pedido_id')
+    datos = request.get_json() or {}
+    usuario_id = datos.get('usuario_id', 1)
+    
+    pedido = PedidosAutomaticosService.aprobar_y_programar_envio(
+        db.session,
+        pedido_id,
+        usuario_id
+    )
+    db.session.commit()
+    
+    return success_response(
+        pedido.to_dict(),
+        message='Pedido aprobado. Se enviará automáticamente en 1 hora.'
+    )
 
 @bp.route('/pedidos/requerimientos-quincenales', methods=['GET'])
 def calcular_requerimientos_quincenales():
     """Calcula requerimientos quincenales basados en programación."""
     try:
-        from modules.planificacion.requerimientos import RequerimientosService
-        from datetime import date, timedelta
+        from datetime import date
         
-        fecha_inicio = request.args.get('fecha_inicio')
-        if fecha_inicio:
-            fecha_inicio = datetime.strptime(fecha_inicio, '%Y-%m-%d').date()
-        else:
-            fecha_inicio = date.today()
+        fecha_inicio_str = request.args.get('fecha_inicio')
+        fecha_inicio = parse_date(fecha_inicio_str) if fecha_inicio_str else date.today()
         
         resultado = RequerimientosService.calcular_requerimientos_quincenales(
             db.session,
@@ -247,9 +255,11 @@ def calcular_requerimientos_quincenales():
         
         resultado['requerimientos'] = requerimientos_dict
         
-        return jsonify(resultado), 200
+        return success_response(resultado)
+    except ValueError as e:
+        return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
-        return jsonify({'error': str(e)}), 400
+        return error_response(str(e), 500, 'INTERNAL_ERROR')
 
 # ========== RUTAS DE INVENTARIO ==========
 
@@ -258,26 +268,36 @@ def listar_inventario():
     """Lista el inventario completo o de un item específico."""
     try:
         item_id = request.args.get('item_id', type=int)
+        if item_id:
+            validate_positive_int(item_id, 'item_id')
         inventario = InventarioService.obtener_inventario(db.session, item_id=item_id)
-        return jsonify([inv.to_dict() for inv in inventario]), 200
+        return success_response([inv.to_dict() for inv in inventario])
+    except ValueError as e:
+        return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
-        return jsonify({'error': str(e)}), 400
+        return error_response(str(e), 500, 'INTERNAL_ERROR')
 
 @bp.route('/inventario/stock-bajo', methods=['GET'])
 def obtener_stock_bajo():
     """Obtiene items con stock bajo."""
     try:
         items = InventarioService.obtener_stock_bajo(db.session)
-        return jsonify(items), 200
+        return success_response(items)
     except Exception as e:
-        return jsonify({'error': str(e)}), 400
+        return error_response(str(e), 500, 'INTERNAL_ERROR')
 
 @bp.route('/inventario/<int:item_id>/verificar', methods=['POST'])
 def verificar_disponibilidad(item_id):
     """Verifica disponibilidad de stock para un item."""
     try:
+        validate_positive_int(item_id, 'item_id')
         datos = request.get_json()
-        cantidad_necesaria = float(datos.get('cantidad_necesaria', 0))
+        if not datos:
+            return error_response('Datos JSON requeridos', 400, 'VALIDATION_ERROR')
+        
+        cantidad_necesaria = require_field(datos, 'cantidad_necesaria', float)
+        if cantidad_necesaria < 0:
+            return error_response('La cantidad necesaria debe ser positiva', 400, 'VALIDATION_ERROR')
         
         disponibilidad = InventarioService.verificar_disponibilidad(
             db.session,
@@ -285,36 +305,38 @@ def verificar_disponibilidad(item_id):
             cantidad_necesaria
         )
         
-        return jsonify(disponibilidad), 200
+        return success_response(disponibilidad)
+    except ValueError as e:
+        return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
-        return jsonify({'error': str(e)}), 400
+        return error_response(str(e), 500, 'INTERNAL_ERROR')
 
 @bp.route('/inventario/completo', methods=['GET'])
 def obtener_inventario_completo():
     """Obtiene inventario completo con últimos movimientos."""
     try:
         inventario = InventarioService.obtener_inventario_completo_con_movimientos(db.session)
-        return jsonify(inventario), 200
+        return success_response(inventario)
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return error_response(str(e), 500, 'INTERNAL_ERROR')
 
 @bp.route('/inventario/dashboard', methods=['GET'])
 def obtener_dashboard_inventario():
     """Obtiene resumen tipo dashboard del inventario."""
     try:
         resumen = InventarioService.obtener_resumen_dashboard(db.session)
-        return jsonify(resumen), 200
+        return success_response(resumen)
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return error_response(str(e), 500, 'INTERNAL_ERROR')
 
 @bp.route('/inventario/silos', methods=['GET'])
 def obtener_silos_inventario():
     """Obtiene los top 10 items más comprados para visualización tipo silos."""
     try:
         silos = InventarioService.obtener_top_10_items_mas_comprados(db.session)
-        return jsonify(silos), 200
+        return success_response(silos)
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return error_response(str(e), 500, 'INTERNAL_ERROR')
 
 # ========== RUTAS DE REQUERIMIENTOS ==========
 
@@ -323,8 +345,8 @@ def listar_requerimientos():
     """Lista requerimientos con filtros opcionales."""
     try:
         estado = request.args.get('estado')
-        skip = int(request.args.get('skip', 0))
-        limit = int(request.args.get('limit', 100))
+        skip = validate_positive_int(request.args.get('skip', 0), 'skip')
+        limit = validate_positive_int(request.args.get('limit', 100), 'limit')
         
         requerimientos = RequerimientoService.listar_requerimientos(
             db.session,
@@ -333,35 +355,35 @@ def listar_requerimientos():
             limit=limit
         )
         
-        return jsonify([r.to_dict() for r in requerimientos]), 200
+        return paginated_response([r.to_dict() for r in requerimientos], skip=skip, limit=limit)
+    except ValueError as e:
+        return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
-        return jsonify({'error': str(e)}), 400
+        return error_response(str(e), 500, 'INTERNAL_ERROR')
 
 @bp.route('/requerimientos', methods=['POST'])
+@handle_db_transaction
 def crear_requerimiento():
     """Crea un nuevo requerimiento."""
-    try:
-        datos = request.get_json()
-        requerimiento = RequerimientoService.crear_requerimiento(db.session, datos)
-        return jsonify(requerimiento.to_dict()), 201
-    except ValueError as e:
-        return jsonify({'error': str(e)}), 400
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    datos = request.get_json()
+    if not datos:
+        return error_response('Datos JSON requeridos', 400, 'VALIDATION_ERROR')
+    
+    requerimiento = RequerimientoService.crear_requerimiento(db.session, datos)
+    db.session.commit()
+    return success_response(requerimiento.to_dict(), 201, 'Requerimiento creado correctamente')
 
 @bp.route('/requerimientos/<int:requerimiento_id>/procesar', methods=['POST'])
+@handle_db_transaction
 def procesar_requerimiento(requerimiento_id):
     """Procesa un requerimiento entregando items y actualizando inventario."""
-    try:
-        requerimiento = RequerimientoService.procesar_requerimiento(
-            db.session,
-            requerimiento_id
-        )
-        return jsonify(requerimiento.to_dict()), 200
-    except ValueError as e:
-        return jsonify({'error': str(e)}), 400
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    validate_positive_int(requerimiento_id, 'requerimiento_id')
+    requerimiento = RequerimientoService.procesar_requerimiento(
+        db.session,
+        requerimiento_id
+    )
+    db.session.commit()
+    return success_response(requerimiento.to_dict(), message='Requerimiento procesado correctamente')
 
 # ========== RUTAS DE FACTURAS ==========
 
@@ -369,14 +391,17 @@ def procesar_requerimiento(requerimiento_id):
 def listar_facturas():
     """Lista facturas con filtros opcionales."""
     try:
-        from models import Factura
-        
         proveedor_id = request.args.get('proveedor_id', type=int)
         cliente_id = request.args.get('cliente_id', type=int)
         estado = request.args.get('estado')
         pendiente_confirmacion = request.args.get('pendiente_confirmacion', 'false').lower() == 'true'
-        skip = int(request.args.get('skip', 0))
-        limit = int(request.args.get('limit', 100))
+        skip = validate_positive_int(request.args.get('skip', 0), 'skip')
+        limit = validate_positive_int(request.args.get('limit', 100), 'limit')
+        
+        if proveedor_id:
+            validate_positive_int(proveedor_id, 'proveedor_id')
+        if cliente_id:
+            validate_positive_int(cliente_id, 'cliente_id')
         
         query = db.session.query(Factura)
         
@@ -387,40 +412,35 @@ def listar_facturas():
             query = query.filter(Factura.cliente_id == cliente_id)
         
         if estado:
-            from models.factura import EstadoFactura
-            try:
-                # Normalizar el estado: convertir a minúsculas y luego buscar en el enum
-                estado_normalizado = estado.lower()
-                # Mapear valores comunes a los valores del enum
-                estado_map = {
-                    'pendiente': EstadoFactura.PENDIENTE,
-                    'parcial': EstadoFactura.PARCIAL,
-                    'aprobada': EstadoFactura.APROBADA,
-                    'rechazada': EstadoFactura.RECHAZADA
-                }
-                if estado_normalizado in estado_map:
-                    estado_enum = estado_map[estado_normalizado]
+            # Normalizar el estado: convertir a minúsculas y luego buscar en el enum
+            estado_normalizado = estado.lower()
+            # Mapear valores comunes a los valores del enum
+            estado_map = {
+                'pendiente': EstadoFactura.PENDIENTE,
+                'parcial': EstadoFactura.PARCIAL,
+                'aprobada': EstadoFactura.APROBADA,
+                'rechazada': EstadoFactura.RECHAZADA
+            }
+            if estado_normalizado in estado_map:
+                estado_enum = estado_map[estado_normalizado]
+                query = query.filter(Factura.estado == estado_enum)
+            else:
+                # Intentar con el valor directamente en mayúsculas
+                try:
+                    estado_enum = EstadoFactura[estado.upper()]
                     query = query.filter(Factura.estado == estado_enum)
-                else:
-                    # Intentar con el valor directamente en mayúsculas
-                    try:
-                        estado_enum = EstadoFactura[estado.upper()]
-                        query = query.filter(Factura.estado == estado_enum)
-                    except KeyError:
-                        return jsonify({'error': f'Estado inválido: {estado}. Estados válidos: pendiente, parcial, aprobada, rechazada'}), 400
-            except Exception as e:
-                import traceback
-                print(f"Error al filtrar por estado en facturas: {str(e)}")
-                print(traceback.format_exc())
-                return jsonify({'error': f'Error al procesar filtro de estado: {str(e)}'}), 500
+                except KeyError:
+                    return error_response(
+                        f'Estado inválido: {estado}. Estados válidos: pendiente, parcial, aprobada, rechazada',
+                        400,
+                        'VALIDATION_ERROR'
+                    )
         
         # Filtrar facturas pendientes de confirmación (con items sin cantidad_aprobada)
         if pendiente_confirmacion:
-            from models import FacturaItem
-            from models.factura import EstadoFactura as EstadoFacturaConfirmacion
             # Usar exists y and_ que ya están importados al inicio del archivo
             query = query.filter(
-                Factura.estado == EstadoFacturaConfirmacion.PENDIENTE,
+                Factura.estado == EstadoFactura.PENDIENTE,
                 exists().where(
                     and_(
                         FacturaItem.factura_id == Factura.id,
@@ -431,167 +451,153 @@ def listar_facturas():
         
         facturas = query.order_by(Factura.fecha_recepcion.desc()).offset(skip).limit(limit).all()
         
-        return jsonify([f.to_dict() for f in facturas]), 200
-    except KeyError as e:
-        import traceback
-        print(f"Error de clave en listar_facturas: {str(e)}")
-        print(traceback.format_exc())
-        return jsonify({'error': f'Error al procesar filtros: {str(e)}'}), 400
+        return paginated_response([f.to_dict() for f in facturas], skip=skip, limit=limit)
+    except ValueError as e:
+        return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
-        import traceback
-        print(f"Error inesperado en listar_facturas: {str(e)}")
-        print(traceback.format_exc())
-        return jsonify({'error': str(e)}), 500
+        return error_response(str(e), 500, 'INTERNAL_ERROR')
 
 @bp.route('/facturas/ultima', methods=['GET'])
 def obtener_ultima_factura():
     """Obtiene la última factura ingresada."""
     try:
-        from models import Factura
         factura = db.session.query(Factura).order_by(Factura.fecha_recepcion.desc()).first()
         if not factura:
-            return jsonify(None), 200  # Retornar null en lugar de error 404
+            return success_response(None)  # Retornar null en lugar de error 404
         try:
             factura_dict = factura.to_dict()
-            return jsonify(factura_dict), 200
+            return success_response(factura_dict)
         except Exception as e:
-            import traceback
-            print(f"Error al serializar factura en obtener_ultima_factura: {str(e)}")
-            print(traceback.format_exc())
             # Retornar datos básicos si hay error en to_dict()
-            return jsonify({
+            return success_response({
                 'id': factura.id,
                 'numero_factura': factura.numero_factura,
                 'estado': factura.estado.value if factura.estado else None,
-                'error': 'Error al serializar datos completos'
-            }), 200
+                'warning': 'Error al serializar datos completos'
+            })
     except Exception as e:
-        import traceback
-        print(f"Error en obtener_ultima_factura: {str(e)}")
-        print(traceback.format_exc())
-        return jsonify({'error': str(e)}), 500
+        return error_response(str(e), 500, 'INTERNAL_ERROR')
 
 @bp.route('/facturas/ingresar-imagen', methods=['POST'])
+@handle_db_transaction
 def ingresar_factura_imagen():
     """Ingresa una factura desde una imagen usando OCR."""
-    try:
-        if 'imagen' not in request.files:
-            return jsonify({'error': 'No se proporcionó imagen'}), 400
-        
-        archivo = request.files['imagen']
-        tipo = request.form.get('tipo', 'proveedor')
-        
-        if archivo.filename == '':
-            return jsonify({'error': 'Archivo vacío'}), 400
-        
-        # Guardar archivo temporalmente
-        filename = secure_filename(archivo.filename)
-        temp_path = os.path.join(Config.UPLOAD_FOLDER, f"temp_{filename}")
-        archivo.save(temp_path)
-        
-        try:
-            # Procesar factura
-            factura = FacturaService.procesar_factura_desde_imagen(
-                db.session,
-                temp_path,
-                tipo=tipo
-            )
-            
-            return jsonify(factura.to_dict()), 201
-        finally:
-            # Eliminar archivo temporal
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
+    if 'imagen' not in request.files:
+        return error_response('No se proporcionó imagen', 400, 'VALIDATION_ERROR')
     
+    archivo = request.files['imagen']
+    tipo = request.form.get('tipo', 'proveedor')
+    
+    if tipo not in ('proveedor', 'cliente'):
+        return error_response('Tipo inválido. Use "proveedor" o "cliente"', 400, 'VALIDATION_ERROR')
+    
+    # Validar y guardar archivo
+    try:
+        filename, temp_path = validate_file_upload(archivo)
     except ValueError as e:
-        return jsonify({'error': str(e)}), 400
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return error_response(str(e), 400, 'VALIDATION_ERROR')
+    
+    try:
+        # Procesar factura
+        factura = FacturaService.procesar_factura_desde_imagen(
+            db.session,
+            temp_path,
+            tipo=tipo
+        )
+        db.session.commit()
+        
+        return success_response(factura.to_dict(), 201, 'Factura procesada correctamente')
+    finally:
+        # Eliminar archivo temporal
+        if os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except Exception:
+                pass  # Ignorar errores al eliminar archivo temporal
 
 @bp.route('/facturas/<int:factura_id>', methods=['GET'])
 def obtener_factura(factura_id):
     """Obtiene una factura por ID."""
-    from models import Factura
-    factura = db.session.query(Factura).filter(Factura.id == factura_id).first()
-    if not factura:
-        return jsonify({'error': 'Factura no encontrada'}), 404
-    return jsonify(factura.to_dict()), 200
+    try:
+        validate_positive_int(factura_id, 'factura_id')
+        factura = db.session.query(Factura).filter(Factura.id == factura_id).first()
+        if not factura:
+            return error_response('Factura no encontrada', 404, 'NOT_FOUND')
+        return success_response(factura.to_dict())
+    except ValueError as e:
+        return error_response(str(e), 400, 'VALIDATION_ERROR')
+    except Exception as e:
+        return error_response(str(e), 500, 'INTERNAL_ERROR')
 
 @bp.route('/facturas/<int:factura_id>/aprobar', methods=['POST'])
+@handle_db_transaction
 def aprobar_factura(factura_id):
     """Aprueba una factura y actualiza inventario."""
-    try:
-        datos = request.get_json()
-        items_aprobados = datos.get('items_aprobados', [])
-        usuario_id = datos.get('usuario_id')
-        aprobar_parcial = datos.get('aprobar_parcial', False)
-        observaciones = datos.get('observaciones')
-        
-        if not usuario_id:
-            return jsonify({'error': 'usuario_id requerido'}), 400
-        
-        factura = FacturaService.aprobar_factura(
-            db.session,
-            factura_id,
-            items_aprobados,
-            usuario_id,
-            aprobar_parcial,
-            observaciones
-        )
-        
-        return jsonify(factura.to_dict()), 200
-    except ValueError as e:
-        return jsonify({'error': str(e)}), 400
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    validate_positive_int(factura_id, 'factura_id')
+    datos = request.get_json()
+    if not datos:
+        return error_response('Datos JSON requeridos', 400, 'VALIDATION_ERROR')
+    
+    items_aprobados = datos.get('items_aprobados', [])
+    usuario_id = require_field(datos, 'usuario_id', int)
+    aprobar_parcial = datos.get('aprobar_parcial', False)
+    observaciones = datos.get('observaciones')
+    
+    factura = FacturaService.aprobar_factura(
+        db.session,
+        factura_id,
+        items_aprobados,
+        usuario_id,
+        aprobar_parcial,
+        observaciones
+    )
+    db.session.commit()
+    
+    return success_response(factura.to_dict(), message='Factura aprobada correctamente')
 
 @bp.route('/facturas/<int:factura_id>/rechazar', methods=['POST'])
+@handle_db_transaction
 def rechazar_factura(factura_id):
     """Rechaza una factura."""
-    try:
-        datos = request.get_json()
-        usuario_id = datos.get('usuario_id')
-        motivo = datos.get('motivo', 'Factura rechazada')
-        
-        if not usuario_id:
-            return jsonify({'error': 'usuario_id requerido'}), 400
-        
-        factura = FacturaService.rechazar_factura(
-            db.session,
-            factura_id,
-            usuario_id,
-            motivo
-        )
-        
-        return jsonify(factura.to_dict()), 200
-    except ValueError as e:
-        return jsonify({'error': str(e)}), 400
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    validate_positive_int(factura_id, 'factura_id')
+    datos = request.get_json()
+    if not datos:
+        return error_response('Datos JSON requeridos', 400, 'VALIDATION_ERROR')
+    
+    usuario_id = require_field(datos, 'usuario_id', int)
+    motivo = datos.get('motivo', 'Factura rechazada')
+    
+    factura = FacturaService.rechazar_factura(
+        db.session,
+        factura_id,
+        usuario_id,
+        motivo
+    )
+    db.session.commit()
+    
+    return success_response(factura.to_dict(), message='Factura rechazada correctamente')
 
 @bp.route('/facturas/<int:factura_id>/revision', methods=['POST'])
+@handle_db_transaction
 def enviar_a_revision(factura_id):
     """Envía una factura a revisión."""
-    try:
-        datos = request.get_json()
-        usuario_id = datos.get('usuario_id')
-        observaciones = datos.get('observaciones', '')
-        
-        if not usuario_id:
-            return jsonify({'error': 'usuario_id requerido'}), 400
-        
-        factura = FacturaService.enviar_a_revision(
-            db.session,
-            factura_id,
-            usuario_id,
-            observaciones
-        )
-        
-        return jsonify(factura.to_dict()), 200
-    except ValueError as e:
-        return jsonify({'error': str(e)}), 400
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    validate_positive_int(factura_id, 'factura_id')
+    datos = request.get_json()
+    if not datos:
+        return error_response('Datos JSON requeridos', 400, 'VALIDATION_ERROR')
+    
+    usuario_id = require_field(datos, 'usuario_id', int)
+    observaciones = datos.get('observaciones', '')
+    
+    factura = FacturaService.enviar_a_revision(
+        db.session,
+        factura_id,
+        usuario_id,
+        observaciones
+    )
+    db.session.commit()
+    
+    return success_response(factura.to_dict(), message='Factura enviada a revisión correctamente')
 
 # ========== RUTAS DE PEDIDOS ==========
 
@@ -601,8 +607,11 @@ def listar_pedidos():
     try:
         proveedor_id = request.args.get('proveedor_id', type=int)
         estado = request.args.get('estado')
-        skip = int(request.args.get('skip', 0))
-        limit = int(request.args.get('limit', 100))
+        skip = validate_positive_int(request.args.get('skip', 0), 'skip')
+        limit = validate_positive_int(request.args.get('limit', 100), 'limit')
+        
+        if proveedor_id:
+            validate_positive_int(proveedor_id, 'proveedor_id')
         
         pedidos = PedidoCompraService.listar_pedidos(
             db.session,
@@ -612,55 +621,52 @@ def listar_pedidos():
             limit=limit
         )
         
-        return jsonify([p.to_dict() for p in pedidos]), 200
+        return paginated_response([p.to_dict() for p in pedidos], skip=skip, limit=limit)
+    except ValueError as e:
+        return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
-        return jsonify({'error': str(e)}), 400
+        return error_response(str(e), 500, 'INTERNAL_ERROR')
 
 @bp.route('/pedidos', methods=['POST'])
+@handle_db_transaction
 def crear_pedido():
     """Crea un nuevo pedido de compra."""
-    try:
-        datos = request.get_json()
-        pedido = PedidoCompraService.crear_pedido(db.session, datos)
-        return jsonify(pedido.to_dict()), 201
-    except ValueError as e:
-        return jsonify({'error': str(e)}), 400
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    datos = request.get_json()
+    if not datos:
+        return error_response('Datos JSON requeridos', 400, 'VALIDATION_ERROR')
+    
+    pedido = PedidoCompraService.crear_pedido(db.session, datos)
+    db.session.commit()
+    return success_response(pedido.to_dict(), 201, 'Pedido creado correctamente')
 
 @bp.route('/pedidos/automatico', methods=['POST'])
+@handle_db_transaction
 def generar_pedido_automatico():
     """Genera pedidos automáticos agrupados por proveedor."""
-    try:
-        datos = request.get_json()
-        items_necesarios = datos.get('items_necesarios', [])
-        usuario_id = datos.get('usuario_id')
-        
-        if not usuario_id:
-            return jsonify({'error': 'usuario_id requerido'}), 400
-        
-        pedidos = PedidoCompraService.generar_pedido_automatico(
-            db.session,
-            items_necesarios,
-            usuario_id
-        )
-        
-        return jsonify([p.to_dict() for p in pedidos]), 201
-    except ValueError as e:
-        return jsonify({'error': str(e)}), 400
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    datos = request.get_json()
+    if not datos:
+        return error_response('Datos JSON requeridos', 400, 'VALIDATION_ERROR')
+    
+    items_necesarios = datos.get('items_necesarios', [])
+    usuario_id = require_field(datos, 'usuario_id', int)
+    
+    pedidos = PedidoCompraService.generar_pedido_automatico(
+        db.session,
+        items_necesarios,
+        usuario_id
+    )
+    db.session.commit()
+    
+    return success_response([p.to_dict() for p in pedidos], 201, f'{len(pedidos)} pedidos generados correctamente')
 
 @bp.route('/pedidos/<int:pedido_id>/enviar', methods=['POST'])
+@handle_db_transaction
 def enviar_pedido(pedido_id):
     """Envía un pedido al proveedor."""
-    try:
-        pedido = PedidoCompraService.enviar_pedido(db.session, pedido_id)
-        return jsonify(pedido.to_dict()), 200
-    except ValueError as e:
-        return jsonify({'error': str(e)}), 400
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    validate_positive_int(pedido_id, 'pedido_id')
+    pedido = PedidoCompraService.enviar_pedido(db.session, pedido_id)
+    db.session.commit()
+    return success_response(pedido.to_dict(), message='Pedido enviado correctamente')
 
 # ========== RUTAS DE ESTADÍSTICAS DE COMPRAS ==========
 
@@ -671,13 +677,8 @@ def resumen_compras():
         fecha_desde = request.args.get('fecha_desde')
         fecha_hasta = request.args.get('fecha_hasta')
         
-        fecha_desde_obj = None
-        fecha_hasta_obj = None
-        
-        if fecha_desde:
-            fecha_desde_obj = datetime.strptime(fecha_desde, '%Y-%m-%d').date()
-        if fecha_hasta:
-            fecha_hasta_obj = datetime.strptime(fecha_hasta, '%Y-%m-%d').date()
+        fecha_desde_obj = parse_date(fecha_desde) if fecha_desde else None
+        fecha_hasta_obj = parse_date(fecha_hasta) if fecha_hasta else None
         
         resumen = ComprasStatsService.obtener_resumen_general(
             db.session,
@@ -685,9 +686,11 @@ def resumen_compras():
             fecha_hasta=fecha_hasta_obj
         )
         
-        return jsonify(resumen), 200
+        return success_response(resumen)
+    except ValueError as e:
+        return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
-        return jsonify({'error': str(e)}), 400
+        return error_response(str(e), 500, 'INTERNAL_ERROR')
 
 @bp.route('/compras/por-item', methods=['GET'])
 def compras_por_item():
@@ -695,15 +698,10 @@ def compras_por_item():
     try:
         fecha_desde = request.args.get('fecha_desde')
         fecha_hasta = request.args.get('fecha_hasta')
-        limite = int(request.args.get('limite', 20))
+        limite = validate_positive_int(request.args.get('limite', 20), 'limite')
         
-        fecha_desde_obj = None
-        fecha_hasta_obj = None
-        
-        if fecha_desde:
-            fecha_desde_obj = datetime.strptime(fecha_desde, '%Y-%m-%d').date()
-        if fecha_hasta:
-            fecha_hasta_obj = datetime.strptime(fecha_hasta, '%Y-%m-%d').date()
+        fecha_desde_obj = parse_date(fecha_desde) if fecha_desde else None
+        fecha_hasta_obj = parse_date(fecha_hasta) if fecha_hasta else None
         
         resumen = ComprasStatsService.obtener_resumen_por_item(
             db.session,
@@ -712,9 +710,11 @@ def compras_por_item():
             limite=limite
         )
         
-        return jsonify(resumen), 200
+        return success_response(resumen)
+    except ValueError as e:
+        return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
-        return jsonify({'error': str(e)}), 400
+        return error_response(str(e), 500, 'INTERNAL_ERROR')
 
 @bp.route('/compras/por-proveedor', methods=['GET'])
 def compras_por_proveedor():
@@ -722,15 +722,10 @@ def compras_por_proveedor():
     try:
         fecha_desde = request.args.get('fecha_desde')
         fecha_hasta = request.args.get('fecha_hasta')
-        limite = int(request.args.get('limite', 20))
+        limite = validate_positive_int(request.args.get('limite', 20), 'limite')
         
-        fecha_desde_obj = None
-        fecha_hasta_obj = None
-        
-        if fecha_desde:
-            fecha_desde_obj = datetime.strptime(fecha_desde, '%Y-%m-%d').date()
-        if fecha_hasta:
-            fecha_hasta_obj = datetime.strptime(fecha_hasta, '%Y-%m-%d').date()
+        fecha_desde_obj = parse_date(fecha_desde) if fecha_desde else None
+        fecha_hasta_obj = parse_date(fecha_hasta) if fecha_hasta else None
         
         resumen = ComprasStatsService.obtener_resumen_por_proveedor(
             db.session,
@@ -739,9 +734,11 @@ def compras_por_proveedor():
             limite=limite
         )
         
-        return jsonify(resumen), 200
+        return success_response(resumen)
+    except ValueError as e:
+        return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
-        return jsonify({'error': str(e)}), 400
+        return error_response(str(e), 500, 'INTERNAL_ERROR')
 
 @bp.route('/compras/por-proceso', methods=['GET'])
 def compras_por_proceso():
@@ -750,13 +747,8 @@ def compras_por_proceso():
         fecha_desde = request.args.get('fecha_desde')
         fecha_hasta = request.args.get('fecha_hasta')
         
-        fecha_desde_obj = None
-        fecha_hasta_obj = None
-        
-        if fecha_desde:
-            fecha_desde_obj = datetime.strptime(fecha_desde, '%Y-%m-%d').date()
-        if fecha_hasta:
-            fecha_hasta_obj = datetime.strptime(fecha_hasta, '%Y-%m-%d').date()
+        fecha_desde_obj = parse_date(fecha_desde) if fecha_desde else None
+        fecha_hasta_obj = parse_date(fecha_hasta) if fecha_hasta else None
         
         resumen = ComprasStatsService.obtener_compras_por_proceso(
             db.session,
@@ -764,9 +756,11 @@ def compras_por_proceso():
             fecha_hasta=fecha_hasta_obj
         )
         
-        return jsonify(resumen), 200
+        return success_response(resumen)
+    except ValueError as e:
+        return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
-        return jsonify({'error': str(e)}), 400
+        return error_response(str(e), 500, 'INTERNAL_ERROR')
 
 # ========== RUTAS DE COSTOS ESTANDARIZADOS ==========
 
@@ -776,8 +770,11 @@ def listar_costos():
     try:
         label_id = request.args.get('label_id', type=int)
         categoria = request.args.get('categoria')
-        skip = int(request.args.get('skip', 0))
-        limit = int(request.args.get('limit', 100))
+        skip = validate_positive_int(request.args.get('skip', 0), 'skip')
+        limit = validate_positive_int(request.args.get('limit', 100), 'limit')
+        
+        if label_id:
+            validate_positive_int(label_id, 'label_id')
         
         costos = CostoService.listar_costos_estandarizados(
             db.session,
@@ -787,59 +784,55 @@ def listar_costos():
             limit=limit
         )
         
-        return jsonify([c.to_dict() for c in costos]), 200
+        return paginated_response([c.to_dict() for c in costos], skip=skip, limit=limit)
+    except ValueError as e:
+        return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
-        return jsonify({'error': str(e)}), 400
+        return error_response(str(e), 500, 'INTERNAL_ERROR')
 
 @bp.route('/costos/<int:item_id>', methods=['GET'])
 def obtener_costo_item(item_id):
     """Obtiene el costo estandarizado de un item específico."""
     try:
+        validate_positive_int(item_id, 'item_id')
         costo = CostoService.obtener_costo_estandarizado(db.session, item_id)
         if not costo:
-            return jsonify({'error': 'Costo no encontrado para este item'}), 404
-        return jsonify(costo.to_dict()), 200
+            return error_response('Costo no encontrado para este item', 404, 'NOT_FOUND')
+        return success_response(costo.to_dict())
+    except ValueError as e:
+        return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
-        return jsonify({'error': str(e)}), 400
+        return error_response(str(e), 500, 'INTERNAL_ERROR')
 
 @bp.route('/costos/<int:item_id>/calcular', methods=['POST'])
+@handle_db_transaction
 def calcular_costo_item(item_id):
     """Calcula y almacena el costo estandarizado de un item."""
-    try:
-        costo = CostoService.calcular_y_almacenar_costo_estandarizado(db.session, item_id)
-        if not costo:
-            return jsonify({'error': 'No hay suficientes facturas aprobadas para calcular el costo'}), 404
-        return jsonify(costo.to_dict()), 200
-    except Exception as e:
-        return jsonify({'error': str(e)}), 400
+    validate_positive_int(item_id, 'item_id')
+    costo = CostoService.calcular_y_almacenar_costo_estandarizado(db.session, item_id)
+    if not costo:
+        return error_response('No hay suficientes facturas aprobadas para calcular el costo', 404, 'NOT_FOUND')
+    db.session.commit()
+    return success_response(costo.to_dict(), message='Costo calculado correctamente')
 
 @bp.route('/costos/recalcular-todos', methods=['POST'])
+@handle_db_transaction
 def recalcular_todos_costos():
     """Recalcula todos los costos estandarizados de items y recetas."""
-    try:
-        estadisticas = CostoService.recalcular_todos_los_costos(db.session)
-        return jsonify({
-            'mensaje': 'Recálculo completado',
-            'estadisticas': estadisticas
-        }), 200
-    except Exception as e:
-        import traceback
-        print(f"Error en recalcular_todos_costos: {str(e)}")
-        print(traceback.format_exc())
-        return jsonify({'error': str(e)}), 500
+    estadisticas = CostoService.recalcular_todos_los_costos(db.session)
+    db.session.commit()
+    return success_response(estadisticas, message='Recálculo completado')
 
 @bp.route('/costos/recetas', methods=['GET'])
+@handle_db_transaction
 def listar_costos_recetas():
     """Lista costos de recetas con filtros opcionales."""
     try:
-        from models import Receta
-        from models.receta import TipoReceta
-        
         tipo = request.args.get('tipo')
         activa = request.args.get('activa')
         busqueda = request.args.get('busqueda')
-        skip = int(request.args.get('skip', 0))
-        limit = int(request.args.get('limit', 100))
+        skip = validate_positive_int(request.args.get('skip', 0), 'skip')
+        limit = validate_positive_int(request.args.get('limit', 100), 'limit')
         
         query = db.session.query(Receta)
         
@@ -865,7 +858,7 @@ def listar_costos_recetas():
         for receta in recetas:
             receta.calcular_totales()
         
-        db.commit()
+        db.session.commit()
         
         resultado = []
         for receta in recetas:
@@ -891,12 +884,11 @@ def listar_costos_recetas():
             }
             resultado.append(receta_dict)
         
-        return jsonify(resultado), 200
+        return paginated_response(resultado, skip=skip, limit=limit)
+    except ValueError as e:
+        return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
-        import traceback
-        print(f"Error en listar_costos_recetas: {str(e)}")
-        print(traceback.format_exc())
-        return jsonify({'error': str(e)}), 500
+        return error_response(str(e), 500, 'INTERNAL_ERROR')
 
 # ========== RUTAS DE PEDIDOS INTERNOS (BODEGA → COCINA) ==========
 
@@ -907,16 +899,11 @@ def listar_pedidos_internos():
         estado = request.args.get('estado')
         fecha_desde = request.args.get('fecha_desde')
         fecha_hasta = request.args.get('fecha_hasta')
-        skip = int(request.args.get('skip', 0))
-        limit = int(request.args.get('limit', 100))
+        skip = validate_positive_int(request.args.get('skip', 0), 'skip')
+        limit = validate_positive_int(request.args.get('limit', 100), 'limit')
         
-        fecha_desde_dt = None
-        fecha_hasta_dt = None
-        
-        if fecha_desde:
-            fecha_desde_dt = datetime.fromisoformat(fecha_desde.replace('Z', '+00:00'))
-        if fecha_hasta:
-            fecha_hasta_dt = datetime.fromisoformat(fecha_hasta.replace('Z', '+00:00'))
+        fecha_desde_dt = parse_datetime(fecha_desde) if fecha_desde else None
+        fecha_hasta_dt = parse_datetime(fecha_hasta) if fecha_hasta else None
         
         pedidos = PedidoInternoService.listar_pedidos_internos(
             db.session,
@@ -927,75 +914,64 @@ def listar_pedidos_internos():
             limit=limit
         )
         
-        return jsonify([p.to_dict() for p in pedidos]), 200
+        return paginated_response([p.to_dict() for p in pedidos], skip=skip, limit=limit)
+    except ValueError as e:
+        return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
-        import traceback
-        print(f"Error en listar_pedidos_internos: {str(e)}")
-        print(traceback.format_exc())
-        return jsonify({'error': str(e)}), 500
+        return error_response(str(e), 500, 'INTERNAL_ERROR')
 
 @bp.route('/pedidos-internos', methods=['POST'])
+@handle_db_transaction
 def crear_pedido_interno():
     """Crea un nuevo pedido interno."""
-    try:
-        datos = request.get_json()
-        pedido = PedidoInternoService.crear_pedido_interno(db.session, datos)
-        return jsonify(pedido.to_dict()), 201
-    except ValueError as e:
-        return jsonify({'error': str(e)}), 400
-    except Exception as e:
-        import traceback
-        print(f"Error en crear_pedido_interno: {str(e)}")
-        print(traceback.format_exc())
-        return jsonify({'error': str(e)}), 500
+    datos = request.get_json()
+    if not datos:
+        return error_response('Datos JSON requeridos', 400, 'VALIDATION_ERROR')
+    
+    pedido = PedidoInternoService.crear_pedido_interno(db.session, datos)
+    db.session.commit()
+    return success_response(pedido.to_dict(), 201, 'Pedido interno creado correctamente')
 
 @bp.route('/pedidos-internos/<int:pedido_id>', methods=['GET'])
 def obtener_pedido_interno(pedido_id):
     """Obtiene un pedido interno por ID."""
     try:
+        validate_positive_int(pedido_id, 'pedido_id')
         pedido = PedidoInternoService.obtener_pedido_interno(db.session, pedido_id)
         if not pedido:
-            return jsonify({'error': 'Pedido interno no encontrado'}), 404
-        return jsonify(pedido.to_dict()), 200
+            return error_response('Pedido interno no encontrado', 404, 'NOT_FOUND')
+        return success_response(pedido.to_dict())
+    except ValueError as e:
+        return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return error_response(str(e), 500, 'INTERNAL_ERROR')
 
 @bp.route('/pedidos-internos/<int:pedido_id>/confirmar', methods=['POST'])
+@handle_db_transaction
 def confirmar_entrega_pedido_interno(pedido_id):
     """Confirma la entrega de un pedido interno y actualiza el inventario."""
-    try:
-        datos = request.get_json()
-        recibido_por_id = datos.get('recibido_por_id')
-        recibido_por_nombre = datos.get('recibido_por_nombre')
-        
-        if not recibido_por_id or not recibido_por_nombre:
-            return jsonify({'error': 'recibido_por_id y recibido_por_nombre son requeridos'}), 400
-        
-        pedido = PedidoInternoService.confirmar_entrega(
-            db.session,
-            pedido_id,
-            recibido_por_id,
-            recibido_por_nombre
-        )
-        return jsonify(pedido.to_dict()), 200
-    except ValueError as e:
-        return jsonify({'error': str(e)}), 400
-    except Exception as e:
-        import traceback
-        print(f"Error en confirmar_entrega_pedido_interno: {str(e)}")
-        print(traceback.format_exc())
-        return jsonify({'error': str(e)}), 500
+    validate_positive_int(pedido_id, 'pedido_id')
+    datos = request.get_json()
+    if not datos:
+        return error_response('Datos JSON requeridos', 400, 'VALIDATION_ERROR')
+    
+    recibido_por_id = require_field(datos, 'recibido_por_id', int)
+    recibido_por_nombre = require_field(datos, 'recibido_por_nombre', str)
+    
+    pedido = PedidoInternoService.confirmar_entrega(
+        db.session,
+        pedido_id,
+        recibido_por_id,
+        recibido_por_nombre
+    )
+    db.session.commit()
+    return success_response(pedido.to_dict(), message='Entrega confirmada correctamente')
 
 @bp.route('/pedidos-internos/<int:pedido_id>/cancelar', methods=['POST'])
+@handle_db_transaction
 def cancelar_pedido_interno(pedido_id):
     """Cancela un pedido interno pendiente."""
-    try:
-        pedido = PedidoInternoService.cancelar_pedido(db.session, pedido_id)
-        return jsonify(pedido.to_dict()), 200
-    except ValueError as e:
-        return jsonify({'error': str(e)}), 400
-    except Exception as e:
-        import traceback
-        print(f"Error en cancelar_pedido_interno: {str(e)}")
-        print(traceback.format_exc())
-        return jsonify({'error': str(e)}), 500
+    validate_positive_int(pedido_id, 'pedido_id')
+    pedido = PedidoInternoService.cancelar_pedido(db.session, pedido_id)
+    db.session.commit()
+    return success_response(pedido.to_dict(), message='Pedido cancelado correctamente')

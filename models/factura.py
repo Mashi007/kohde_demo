@@ -28,8 +28,9 @@ class Factura(db.Model):
     numero_factura = Column(String(50), nullable=False)
     tipo = Column(Enum(TipoFactura), nullable=False)
     # FK flexible: puede ser cliente_id o proveedor_id según el tipo
-    cliente_id = Column(Integer, ForeignKey('clientes.id'), nullable=True)
-    proveedor_id = Column(Integer, ForeignKey('proveedores.id'), nullable=True)
+    # Nota: cliente_id mantenido para compatibilidad pero sin FK (tabla clientes removida)
+    cliente_id = Column(Integer, nullable=True)  # Sin FK, tabla clientes no existe
+    proveedor_id = Column(Integer, ForeignKey('proveedores.id', ondelete='SET NULL'), nullable=True)
     fecha_emision = Column(DateTime, nullable=False)
     fecha_recepcion = Column(DateTime, default=datetime.utcnow, nullable=False)
     subtotal = Column(Numeric(10, 2), nullable=False)

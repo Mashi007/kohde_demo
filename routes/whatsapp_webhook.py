@@ -8,6 +8,9 @@ import requests
 from models import db
 from config import Config
 from modules.logistica.facturas import FacturaService
+from modules.logistica.facturas_whatsapp import FacturasWhatsAppService
+from modules.crm.notificaciones.whatsapp import whatsapp_service
+from modules.configuracion.whatsapp import WhatsAppConfigService
 
 bp = Blueprint('whatsapp', __name__)
 
@@ -89,8 +92,6 @@ def handle_image_message(sender_id: str, image_data: dict, sender_name: str = No
             return
         
         # Procesar factura desde WhatsApp
-        from modules.logistica.facturas_whatsapp import FacturasWhatsAppService
-        
         resultado = FacturasWhatsAppService.procesar_factura_desde_whatsapp(
             db.session,
             image_id,
@@ -100,7 +101,6 @@ def handle_image_message(sender_id: str, image_data: dict, sender_name: str = No
         
         if resultado.get('exito'):
             # Enviar confirmación al remitente
-            from modules.crm.notificaciones.whatsapp import whatsapp_service
             mensaje = (
                 f"✅ Factura recibida y procesada\n\n"
                 f"Número: {resultado.get('numero_factura', 'N/A')}\n"
@@ -112,7 +112,6 @@ def handle_image_message(sender_id: str, image_data: dict, sender_name: str = No
             whatsapp_service.enviar_mensaje(sender_id, mensaje)
         else:
             # Enviar mensaje de error
-            from modules.crm.notificaciones.whatsapp import whatsapp_service
             whatsapp_service.enviar_mensaje(
                 sender_id,
                 f"❌ Error al procesar la factura: {resultado.get('mensaje', 'Error desconocido')}\n\n"
@@ -125,7 +124,6 @@ def handle_image_message(sender_id: str, image_data: dict, sender_name: str = No
         traceback.print_exc()
         # Enviar mensaje de error al usuario
         try:
-            from modules.crm.notificaciones.whatsapp import whatsapp_service
             whatsapp_service.enviar_mensaje(
                 sender_id,
                 "❌ Error al procesar la factura. Por favor, intente nuevamente."
@@ -157,7 +155,6 @@ def download_image_from_whatsapp(image_id: str) -> str:
     """
     try:
         # Usar el servicio de configuración para descargar
-        from modules.configuracion.whatsapp import WhatsAppConfigService
         filepath = WhatsAppConfigService.descargar_imagen_whatsapp(image_id)
         return filepath
     except Exception as e:

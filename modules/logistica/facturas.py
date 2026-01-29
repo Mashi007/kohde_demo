@@ -1,5 +1,5 @@
 """
-Lógica de negocio para ingreso de facturas con OCR.
+L?gica de negocio para ingreso de facturas con OCR.
 """
 import os
 from typing import Dict, List, Optional
@@ -10,7 +10,7 @@ from werkzeug.utils import secure_filename
 from PIL import Image
 
 from models import Factura, FacturaItem, Proveedor, Item, Inventario
-# Cliente removido (módulo eliminado)
+# Cliente removido (m?dulo eliminado)
 from models.factura import TipoFactura, EstadoFactura
 from utils.ocr import ocr_processor
 from utils.helpers import calcular_iva, calcular_total
@@ -18,7 +18,7 @@ from config import Config
 from modules.crm.notificaciones.whatsapp import whatsapp_service
 
 class FacturaService:
-    """Servicio para gestión de facturas."""
+    """Servicio para gesti?n de facturas."""
     
     @staticmethod
     def procesar_factura_desde_imagen(
@@ -30,7 +30,7 @@ class FacturaService:
         Procesa una factura desde una imagen usando OCR.
         
         Args:
-            db: Sesión de base de datos
+            db: Sesi?n de base de datos
             imagen_path: Ruta al archivo de imagen
             tipo: Tipo de factura ('cliente' o 'proveedor')
             
@@ -59,7 +59,7 @@ class FacturaService:
         ).first()
         
         if factura_existente:
-            raise ValueError("Ya existe una factura con este número")
+            raise ValueError("Ya existe una factura con este n?mero")
         
         # 5. Crear factura
         fecha_emision = FacturaService._parsear_fecha(datos_ocr.get('fecha'))
@@ -82,10 +82,10 @@ class FacturaService:
         
         # 6. Crear items de factura
         for item_data in datos_ocr.get('items', []):
-            # Intentar encontrar item en base de datos por descripción
+            # Intentar encontrar item en base de datos por descripci?n
             item = FacturaService._buscar_item_por_descripcion(db, item_data.get('descripcion', ''))
             
-            # Extraer unidad de la descripción o usar la del item si existe
+            # Extraer unidad de la descripci?n o usar la del item si existe
             unidad_factura = item_data.get('unidad') or (item.unidad if item else None)
             
             factura_item = FacturaItem(
@@ -114,7 +114,10 @@ class FacturaService:
                     }
                 )
         except Exception as e:
-            print(f"Error al enviar notificación WhatsApp: {e}")
+            # Error no cr?tico, continuar sin notificaci?n
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Error al enviar notificaci?n WhatsApp: {e}", exc_info=True)
         
         return factura
     
@@ -131,11 +134,11 @@ class FacturaService:
         Aprueba una factura y actualiza inventario.
         
         Args:
-            db: Sesión de base de datos
+            db: Sesi?n de base de datos
             factura_id: ID de la factura
             items_aprobados: Lista con cantidad_aprobada por cada item
             usuario_id: ID del usuario que aprueba
-            aprobar_parcial: Si True, permite aprobación parcial
+            aprobar_parcial: Si True, permite aprobaci?n parcial
             
         Returns:
             Factura aprobada
@@ -145,7 +148,7 @@ class FacturaService:
             raise ValueError("Factura no encontrada")
         
         if factura.estado == EstadoFactura.APROBADA:
-            raise ValueError("La factura ya está aprobada")
+            raise ValueError("La factura ya est? aprobada")
         
         # Actualizar cantidad aprobada en cada item
         todos_aprobados = True
@@ -164,7 +167,7 @@ class FacturaService:
                 cantidad_aprobada = float(item_aprobado['cantidad_aprobada'])
                 item_factura.cantidad_aprobada = cantidad_aprobada
                 
-                # Actualizar unidad si se proporciona en la aprobación
+                # Actualizar unidad si se proporciona en la aprobaci?n
                 if 'unidad' in item_aprobado and item_aprobado['unidad']:
                     item_factura.unidad = item_aprobado['unidad']
                 # Si no tiene unidad y tiene item asociado, usar la del item
@@ -188,7 +191,7 @@ class FacturaService:
                         item_factura.unidad = item.unidad
                 total_aprobado += float(item_factura.cantidad_facturada)
         
-        # Verificar si se aprobó el 100%
+        # Verificar si se aprob? el 100%
         porcentaje_aprobado = (total_aprobado / total_facturado * 100) if total_facturado > 0 else 0
         
         # Actualizar estado de factura
@@ -205,7 +208,7 @@ class FacturaService:
             factura.observaciones = observaciones
         
         # Actualizar inventario solo con items aprobados
-        # IMPORTANTE: Las cantidades se deben convertir a la unidad estándar del item antes de actualizar inventario
+        # IMPORTANTE: Las cantidades se deben convertir a la unidad est?ndar del item antes de actualizar inventario
         from modules.logistica.conversor_unidades import son_unidades_compatibles, convertir_unidad
         
         for item_factura in factura.items:
@@ -215,9 +218,9 @@ class FacturaService:
                     # Obtener unidad de la factura
                     unidad_factura = item_factura.unidad if item_factura.unidad else item.unidad
                     cantidad_aprobada = float(item_factura.cantidad_aprobada)
-                    unidad_estandar = item.unidad  # Unidad estándar del módulo Items
+                    unidad_estandar = item.unidad  # Unidad est?ndar del m?dulo Items
                     
-                    # Convertir a unidad estándar si es necesario
+                    # Convertir a unidad est?ndar si es necesario
                     if son_unidades_compatibles(unidad_factura, unidad_estandar) and unidad_factura != unidad_estandar:
                         cantidad_estandarizada = convertir_unidad(cantidad_aprobada, unidad_factura, unidad_estandar)
                         if cantidad_estandarizada:
@@ -246,7 +249,7 @@ class FacturaService:
         Rechaza una factura.
         
         Args:
-            db: Sesión de base de datos
+            db: Sesi?n de base de datos
             factura_id: ID de la factura
             usuario_id: ID del usuario que rechaza
             motivo: Motivo del rechazo
@@ -278,23 +281,23 @@ class FacturaService:
         observaciones: str
     ) -> Factura:
         """
-        Envía una factura a revisión (mantiene estado PENDIENTE pero con observaciones).
+        Env?a una factura a revisi?n (mantiene estado PENDIENTE pero con observaciones).
         
         Args:
-            db: Sesión de base de datos
+            db: Sesi?n de base de datos
             factura_id: ID de la factura
-            usuario_id: ID del usuario que envía a revisión
-            observaciones: Observaciones sobre qué necesita revisión
+            usuario_id: ID del usuario que env?a a revisi?n
+            observaciones: Observaciones sobre qu? necesita revisi?n
             
         Returns:
-            Factura en revisión
+            Factura en revisi?n
         """
         factura = db.query(Factura).filter(Factura.id == factura_id).first()
         if not factura:
             raise ValueError("Factura no encontrada")
         
         if factura.estado != EstadoFactura.PENDIENTE:
-            raise ValueError("Solo se pueden enviar a revisión facturas pendientes")
+            raise ValueError("Solo se pueden enviar a revisi?n facturas pendientes")
         
         factura.observaciones = observaciones
         # Mantener estado PENDIENTE para que pueda ser reprocesada
@@ -343,12 +346,12 @@ class FacturaService:
         db.refresh(proveedor)
         return proveedor
     
-    # Método _buscar_o_crear_cliente removido (módulo Cliente eliminado)
+    # M?todo _buscar_o_crear_cliente removido (m?dulo Cliente eliminado)
     
     @staticmethod
     def _buscar_item_por_descripcion(db: Session, descripcion: str) -> Optional[Item]:
-        """Busca un item por descripción (búsqueda aproximada)."""
-        # Búsqueda simple por nombre similar
+        """Busca un item por descripci?n (b?squeda aproximada)."""
+        # B?squeda simple por nombre similar
         items = db.query(Item).filter(Item.nombre.ilike(f'%{descripcion[:20]}%')).all()
         if items:
             return items[0]

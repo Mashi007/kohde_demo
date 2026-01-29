@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react'
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import api from '../config/api'
 import toast from 'react-hot-toast'
+import logger from '../utils/logger'
 import LabelForm from './LabelForm'
 import { Plus } from 'lucide-react'
 
@@ -55,11 +56,10 @@ export default function ItemForm({ item, onClose, onSuccess }) {
       try {
         const res = await api.get('/logistica/labels?activo=true')
         const data = res.data || []
-        console.log('Labels cargadas:', data.length, data)
+        logger.debug('Labels cargadas:', data.length)
         return data
       } catch (error) {
-        console.error('Error cargando labels:', error)
-        console.error('Error completo:', error.response?.data || error.message)
+        logger.error('Error cargando labels:', error.response?.data || error.message)
         throw error
       }
     },
@@ -537,7 +537,7 @@ export default function ItemForm({ item, onClose, onSuccess }) {
                     setMostrarFormLabel(false)
                   }, 200)
                 } catch (error) {
-                  console.error('Error al actualizar labels:', error)
+                  logger.error('Error al actualizar labels:', error.response?.data || error.message)
                   // Aún así, mantener la selección
                   setFormData(prev => ({
                     ...prev,

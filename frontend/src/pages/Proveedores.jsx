@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import api from '../config/api'
+import ConfirmDialog from '../components/ConfirmDialog'
 import { Truck, Plus, Edit, Trash2, Power, X, Search, Filter } from 'lucide-react'
 import Modal from '../components/Modal'
 import ProveedorForm from '../components/ProveedorForm'
@@ -72,9 +73,16 @@ export default function Proveedores() {
     },
   })
 
+  const [confirmarEliminar, setConfirmarEliminar] = useState(false)
+
   const handleEliminar = () => {
-    if (window.confirm('¿Estás seguro de eliminar este proveedor?')) {
+    setConfirmarEliminar(true)
+  }
+
+  const confirmarEliminacion = () => {
+    if (proveedorSeleccionado) {
       eliminarMutation.mutate(proveedorSeleccionado)
+      setConfirmarEliminar(false)
     }
   }
 
@@ -95,6 +103,18 @@ export default function Proveedores() {
   }
 
   return (
+    <>
+      <ConfirmDialog
+        isOpen={confirmarEliminar}
+        onClose={() => setConfirmarEliminar(false)}
+        onConfirm={confirmarEliminacion}
+        title="Eliminar proveedor"
+        message="¿Estás seguro de eliminar este proveedor? Esta acción no se puede deshacer."
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        variant="danger"
+        isLoading={eliminarMutation.isPending}
+      />
     <div className="flex gap-6 h-[calc(100vh-4rem)]">
       {/* Panel izquierdo: Filtros por Labels */}
       <div className="w-64 bg-slate-800 rounded-lg border border-slate-700 p-4 overflow-y-auto">
@@ -379,5 +399,6 @@ export default function Proveedores() {
         />
       </Modal>
     </div>
+    </>
   )
 }

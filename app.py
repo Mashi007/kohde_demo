@@ -31,11 +31,34 @@ def create_app():
     
     # Habilitar CORS
     # Permitir requests desde el frontend
-    CORS(app, origins=[
-        "https://kfronend-demo.onrender.com",
-        "http://localhost:3000",  # Para desarrollo local
-        "http://localhost:5173",  # Vite dev server alternativo
-    ])
+    import os
+    cors_origins = os.getenv('CORS_ORIGINS', 
+        'https://kfronend-demo.onrender.com,http://localhost:3000,http://localhost:5173'
+    ).split(',')
+    
+    CORS(app, 
+         origins=[origin.strip() for origin in cors_origins],
+         supports_credentials=True,
+         allow_headers=['Content-Type', 'Authorization', 'X-Requested-With'],
+         methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+         expose_headers=['X-Total-Count', 'X-Page-Size', 'X-Page-Offset']
+    )
+    
+    # Agregar headers CORS a todas las respuestas
+    @app.after_request
+    def after_request(response):
+        """Agrega headers CORS y de seguridad a todas las respuestas."""
+        origin = request.headers.get('Origin')
+        if origin and origin in [origin.strip() for origin in cors_origins]:
+            response.headers['Access-Control-Allow-Origin'] = origin
+            response.headers['Access-Control-Allow-Credentials'] = 'true'
+        
+        # Headers de seguridad
+        response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['X-Frame-Options'] = 'DENY'
+        response.headers['X-XSS-Protection'] = '1; mode=block'
+        
+        return response
     
     # Inicializar extensiones
     db.init_app(app)
@@ -54,12 +77,19 @@ def create_app():
     app.register_blueprint(whatsapp_webhook.bp, url_prefix='/whatsapp')
     
     # Crear tablas en la base de datos
+    # Nota: En producción, usar migraciones (Alembic) en lugar de create_all()
     with app.app_context():
         try:
+            # Solo crear tablas si no existen (útil para desarrollo)
+            # En producción, usar migraciones SQL o Alembic
             db.create_all()
-            print("✅ Tablas de base de datos creadas correctamente")
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.info("✅ Tablas de base de datos verificadas/creadas correctamente")
         except Exception as e:
-            print(f"⚠️ Error al crear tablas: {e}")
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"⚠️ Error al crear tablas: {e}", exc_info=True)
             import traceback
             traceback.print_exc()
     

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useAuth } from '../contexts/AuthContext'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '../config/api'
 import toast from 'react-hot-toast'
@@ -6,6 +7,7 @@ import { ShoppingCart, Package, AlertTriangle, CheckCircle, X, Loader } from 'lu
 
 export default function NecesidadesProgramacion({ programacionId, onClose }) {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
   const [mostrarPedidosInteligentes, setMostrarPedidosInteligentes] = useState(false)
   
   // Cargar necesidades
@@ -18,7 +20,7 @@ export default function NecesidadesProgramacion({ programacionId, onClose }) {
   // Generar pedidos inteligentes
   const generarPedidosMutation = useMutation({
     mutationFn: () => api.post(`/planificacion/programacion/${programacionId}/generar-pedidos-inteligentes`, {
-      usuario_id: 1 // TODO: Obtener del contexto de usuario
+      usuario_id: user?.id || 1 // Obtener del contexto de autenticación
     }),
     onSuccess: (data) => {
       toast.success('Pedidos generados correctamente')

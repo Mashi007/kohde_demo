@@ -12,7 +12,7 @@ class Inventario(db.Model):
     __tablename__ = 'inventario'
     
     id = Column(Integer, primary_key=True)
-    item_id = Column(Integer, ForeignKey('items.id'), unique=True, nullable=False)
+    item_id = Column(Integer, ForeignKey('items.id', ondelete='CASCADE'), unique=True, nullable=False)
     ubicacion = Column(String(100), nullable=False, default='bodega_principal')
     cantidad_actual = Column(Numeric(10, 2), nullable=False, default=0)
     cantidad_minima = Column(Numeric(10, 2), nullable=False, default=0)  # Amortiguador

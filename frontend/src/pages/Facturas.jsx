@@ -7,6 +7,10 @@ import { es } from 'date-fns/locale'
 import Modal from '../components/Modal'
 import FacturaUploadForm from '../components/FacturaUploadForm'
 import FacturaOCRModal from '../components/FacturaOCRModal'
+import { handleApiError } from '../utils/errorHandler'
+import LoadingSpinner from '../components/LoadingSpinner'
+import SkeletonLoader from '../components/SkeletonLoader'
+import EmptyState from '../components/EmptyState'
 import toast from 'react-hot-toast'
 
 export default function Facturas() {
@@ -152,7 +156,7 @@ export default function Facturas() {
                         // Cargar factura completa con items
                         api.get(`/logistica/facturas/${factura.id}`)
                           .then(res => setFacturaOCRAbierta(res.data))
-                          .catch(err => toast.error('Error al cargar factura'))
+                          .catch(err => handleApiError(err, 'Error al cargar factura'))
                       }}
                       className="w-full bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg flex items-center justify-center gap-2"
                     >
@@ -200,7 +204,17 @@ export default function Facturas() {
 
       {/* Lista de Facturas */}
       {isLoading ? (
-        <div className="text-center py-8">Cargando...</div>
+        <div className="py-8">
+          <SkeletonLoader type="card" lines={3} />
+        </div>
+      ) : !facturas || facturas.length === 0 ? (
+        <EmptyState
+          icon={FileText}
+          title="No hay facturas"
+          description={tipoFiltro ? 'No se encontraron facturas con el filtro seleccionado.' : 'Aún no hay facturas registradas en el sistema.'}
+          action={() => setShowUploadModal(true)}
+          actionLabel="Subir primera factura"
+        />
       ) : (
         <div className="space-y-4">
           {facturas?.map((factura) => (
@@ -239,7 +253,7 @@ export default function Facturas() {
                     onClick={() => {
                       api.get(`/logistica/facturas/${factura.id}`)
                         .then(res => setFacturaOCRAbierta(res.data))
-                        .catch(err => toast.error('Error al cargar factura'))
+                        .catch(err => handleApiError(err, 'Error al cargar factura'))
                     }}
                     className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg text-sm flex items-center gap-2"
                   >

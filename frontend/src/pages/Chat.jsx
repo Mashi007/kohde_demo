@@ -5,11 +5,13 @@ import { Send, Bot, User, Plus, Trash2, MessageSquare } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import ConfirmDialog from '../components/ConfirmDialog'
 
 export default function Chat() {
   const [conversacionActual, setConversacionActual] = useState(null)
   const [mensaje, setMensaje] = useState('')
   const [contextoModulo, setContextoModulo] = useState('')
+  const [confirmarEliminar, setConfirmarEliminar] = useState(null)
   const messagesEndRef = useRef(null)
   const queryClient = useQueryClient()
 
@@ -103,13 +105,30 @@ export default function Chat() {
 
   const eliminarConversacion = (id, e) => {
     e.stopPropagation()
-    if (confirm('¿Estás seguro de eliminar esta conversación?')) {
-      eliminarConversacionMutation.mutate(id)
+    setConfirmarEliminar(id)
+  }
+
+  const confirmarEliminacion = () => {
+    if (confirmarEliminar) {
+      eliminarConversacionMutation.mutate(confirmarEliminar)
+      setConfirmarEliminar(null)
     }
   }
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] bg-slate-900">
+    <>
+      <ConfirmDialog
+        isOpen={!!confirmarEliminar}
+        onClose={() => setConfirmarEliminar(null)}
+        onConfirm={confirmarEliminacion}
+        title="Eliminar conversación"
+        message="¿Estás seguro de eliminar esta conversación? Esta acción no se puede deshacer."
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        variant="danger"
+        isLoading={eliminarConversacionMutation.isPending}
+      />
+      <div className="flex h-[calc(100vh-4rem)] bg-slate-900">
       {/* Sidebar de conversaciones */}
       <div className="w-80 bg-slate-800 border-r border-slate-700 flex flex-col">
         <div className="p-4 border-b border-slate-700">
@@ -283,6 +302,6 @@ export default function Chat() {
           </div>
         )}
       </div>
-    </div>
+    </>
   )
 }

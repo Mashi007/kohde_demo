@@ -95,7 +95,9 @@ class TicketService:
                 pass
             except Exception as e:
                 # Otro tipo de error, loguear pero continuar
-                print(f"Error al filtrar tickets por estado '{estado}': {str(e)}")
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.debug(f"Error al filtrar tickets por estado '{estado}': {str(e)}")
                 pass
         
         if tipo:
@@ -104,10 +106,14 @@ class TicketService:
                 query = query.filter(Ticket.tipo == tipo_enum)
             except KeyError:
                 # Tipo inválido, ignorar filtro
-                print(f"Tipo de ticket inválido: {tipo}")
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.debug(f"Tipo de ticket inválido: {tipo}")
                 pass
             except Exception as e:
-                print(f"Error al filtrar tickets por tipo '{tipo}': {str(e)}")
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.debug(f"Error al filtrar tickets por tipo '{tipo}': {str(e)}")
                 pass
         
         if asignado_a:

@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import api from '../config/api'
 import toast from 'react-hot-toast'
+import logger from '../utils/logger'
 import { X, Plus } from 'lucide-react'
 
 export default function LabelForm({ onClose, onSuccess }) {
@@ -22,7 +23,7 @@ export default function LabelForm({ onClose, onSuccess }) {
         const res = await api.get('/logistica/labels?activo=true')
         return res.data || []
       } catch (error) {
-        console.error('Error cargando labels:', error)
+        logger.error('Error cargando labels:', error.response?.data || error.message)
         return []
       }
     },

@@ -85,8 +85,6 @@ def probar_ai():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-# ========== RUTA GENERAL ==========
-
 # ========== RUTAS DE NOTIFICACIONES POR EMAIL ==========
 
 @bp.route('/notificaciones', methods=['GET'])

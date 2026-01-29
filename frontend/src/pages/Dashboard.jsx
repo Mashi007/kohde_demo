@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
 import api from '../config/api'
 import { Package, FileText, MessageSquare, AlertTriangle, DollarSign } from 'lucide-react'
+import LoadingSpinner from '../components/LoadingSpinner'
+import SkeletonLoader from '../components/SkeletonLoader'
 
 export default function Dashboard() {
   const { data: stockBajo } = useQuery({

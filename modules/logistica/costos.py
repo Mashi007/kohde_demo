@@ -220,7 +220,9 @@ class CostoService:
                     sin_datos_items += 1
             except Exception as e:
                 errores_items += 1
-                print(f"Error calculando costo para item {item.id}: {e}")
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Error calculando costo para item {item.id}: {e}", exc_info=True)
         
         db.commit()
         
@@ -238,7 +240,9 @@ class CostoService:
                 calculadas_recetas += 1
             except Exception as e:
                 errores_recetas += 1
-                print(f"Error calculando costo para receta {receta.id}: {e}")
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Error calculando costo para receta {receta.id}: {e}", exc_info=True)
         
         db.commit()
         

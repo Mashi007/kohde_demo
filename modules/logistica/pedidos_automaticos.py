@@ -228,6 +228,8 @@ class PedidosAutomaticosService:
                 )
                 
         except Exception as e:
-            print(f"Error al enviar pedido {pedido_id} al proveedor: {e}")
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error al enviar pedido {pedido_id} al proveedor: {e}", exc_info=True)
             import traceback
             traceback.print_exc()

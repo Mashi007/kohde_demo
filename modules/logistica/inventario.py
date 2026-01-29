@@ -101,8 +101,8 @@ class InventarioService:
         else:
             raise ValueError("Operación inválida")
         
-        db.commit()
-        db.refresh(inventario)
+        db.session.commit()
+        db.session.refresh(inventario)
         return inventario
     
     @staticmethod

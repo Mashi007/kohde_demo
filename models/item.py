@@ -29,7 +29,7 @@ class Item(db.Model):
     categoria = Column(Enum(CategoriaItem), nullable=False, default=CategoriaItem.INSUMO)
     unidad = Column(String(20), nullable=False)  # Unidad estándar del item (kg, litro, unidad, etc.) - Define la estandarización para todos los módulos
     calorias_por_unidad = Column(Numeric(10, 2), nullable=True)  # Calorías por unidad base
-    proveedor_autorizado_id = Column(Integer, ForeignKey('proveedores.id'), nullable=True)
+    proveedor_autorizado_id = Column(Integer, ForeignKey('proveedores.id', ondelete='SET NULL'), nullable=True)
     tiempo_entrega_dias = Column(Integer, default=7, nullable=False)
     costo_unitario_actual = Column(Numeric(10, 2), nullable=True)
     activo = Column(Boolean, default=True, nullable=False)

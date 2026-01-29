@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '../config/api'
 import toast from 'react-hot-toast'
+import { validateFile, ALLOWED_FILE_TYPES } from '../utils/validation'
 import { Upload } from 'lucide-react'
 
 export default function FacturaUploadForm({ onClose, onSuccess }) {
@@ -28,14 +29,34 @@ export default function FacturaUploadForm({ onClose, onSuccess }) {
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0]
-    if (selectedFile) {
-      setFile(selectedFile)
-      // Crear preview
+    if (!selectedFile) {
+      return
+    }
+
+    // Validar archivo antes de procesarlo
+    const validation = validateFile(selectedFile, {
+      allowedTypes: [...ALLOWED_FILE_TYPES.image, ...ALLOWED_FILE_TYPES.pdf],
+      maxSizeMB: 16
+    })
+
+    if (!validation.valid) {
+      toast.error(validation.error)
+      e.target.value = '' // Limpiar input
+      setFile(null)
+      setPreview(null)
+      return
+    }
+
+    setFile(selectedFile)
+    // Crear preview solo para imágenes
+    if (selectedFile.type.startsWith('image/')) {
       const reader = new FileReader()
       reader.onloadend = () => {
         setPreview(reader.result)
       }
       reader.readAsDataURL(selectedFile)
+    } else {
+      setPreview(null)
     }
   }
 

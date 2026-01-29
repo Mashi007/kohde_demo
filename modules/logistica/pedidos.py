@@ -140,7 +140,9 @@ class PedidoCompraService:
                         }
                     )
             except Exception as e:
-                print(f"Error al enviar notificación: {e}")
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Error al enviar notificación: {e}", exc_info=True)
         
         return pedidos_creados
     
@@ -233,7 +235,9 @@ class PedidoCompraService:
                     f"<h2>Pedido #{pedido.id}</h2><p>Total: ${pedido.total:,.2f}</p>"
                 )
         except Exception as e:
-            print(f"Error al enviar pedido al proveedor: {e}")
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error al enviar pedido al proveedor: {e}", exc_info=True)
         
         db.commit()
         db.refresh(pedido)

@@ -3,11 +3,15 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '../config/api'
 import { X, CheckCircle, XCircle, RotateCcw } from 'lucide-react'
 import toast from 'react-hot-toast'
+import ConfirmDialog from './ConfirmDialog'
+import { useAuth } from '../contexts/AuthContext'
 
 export default function FacturaOCRModal({ factura, isOpen, onClose }) {
   const [itemsConfirmados, setItemsConfirmados] = useState({})
   const [observaciones, setObservaciones] = useState('')
+  const [confirmarRechazo, setConfirmarRechazo] = useState(false)
   const queryClient = useQueryClient()
+  const { user } = useAuth()
 
   if (!isOpen || !factura) return null
 
@@ -102,7 +106,7 @@ export default function FacturaOCRModal({ factura, isOpen, onClose }) {
     const porcentajeAprobado = totalFacturado > 0 ? (totalAprobado / totalFacturado * 100) : 0
 
     aprobarMutation.mutate({
-      usuario_id: 1, // TODO: Obtener del contexto de usuario
+      usuario_id: user?.id || 1, // Obtener del contexto de autenticación
       items_aprobados,
       aprobar_parcial: porcentajeAprobado < 100,
       observaciones
@@ -110,19 +114,20 @@ export default function FacturaOCRModal({ factura, isOpen, onClose }) {
   }
 
   const handleRechazar = () => {
-    if (!window.confirm('¿Estás seguro de rechazar esta factura? El proveedor deberá refacturar solo por lo recibido.')) {
-      return
-    }
-    
+    setConfirmarRechazo(true)
+  }
+
+  const confirmarRechazoAction = () => {
     rechazarMutation.mutate({
-      usuario_id: 1,
+      usuario_id: user?.id || 1, // Obtener del contexto de autenticación
       motivo: observaciones || 'Factura rechazada - requiere refacturación'
     })
+    setConfirmarRechazo(false)
   }
 
   const handleEnviarRevision = () => {
     revisionMutation.mutate({
-      usuario_id: 1,
+      usuario_id: user?.id || 1, // Obtener del contexto de autenticación
       observaciones: observaciones || 'Enviada a revisión'
     })
   }
@@ -132,7 +137,19 @@ export default function FacturaOCRModal({ factura, isOpen, onClose }) {
   const porcentajeAprobado = totalFacturado > 0 ? (totalAprobado / totalFacturado * 100) : 0
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+    <>
+      <ConfirmDialog
+        isOpen={confirmarRechazo}
+        onClose={() => setConfirmarRechazo(false)}
+        onConfirm={confirmarRechazoAction}
+        title="Rechazar factura"
+        message="¿Estás seguro de rechazar esta factura? El proveedor deberá refacturar solo por lo recibido."
+        confirmText="Rechazar"
+        cancelText="Cancelar"
+        variant="danger"
+        isLoading={rechazarMutation.isPending}
+      />
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-slate-800 rounded-lg border border-slate-700 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="sticky top-0 bg-slate-800 border-b border-slate-700 p-6 flex items-center justify-between">
@@ -361,6 +378,6 @@ export default function FacturaOCRModal({ factura, isOpen, onClose }) {
           </div>
         </div>
       </div>
-    </div>
+    </>
   )
 }

@@ -48,7 +48,9 @@ class WhatsAppService:
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:
-            print(f"Error al enviar mensaje WhatsApp: {e}")
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error al enviar mensaje WhatsApp: {e}", exc_info=True)
             raise
     
     def enviar_imagen(self, numero_destino: str, imagen_url: str, caption: Optional[str] = None) -> Dict:
@@ -89,7 +91,9 @@ class WhatsAppService:
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:
-            print(f"Error al enviar imagen WhatsApp: {e}")
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error al enviar imagen WhatsApp: {e}", exc_info=True)
             raise
     
     def notificar_factura_recibida(self, numero_destino: str, factura_info: Dict) -> Dict:

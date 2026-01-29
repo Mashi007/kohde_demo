@@ -34,7 +34,9 @@ class FacturasWhatsAppService:
             phone_number_id = Config.WHATSAPP_PHONE_NUMBER_ID
             
             if not phone_number_id:
-                print("Error: WHATSAPP_PHONE_NUMBER_ID no configurado")
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error("WHATSAPP_PHONE_NUMBER_ID no configurado")
                 return None
             
             # URL para obtener la imagen: /{phone-number-id}/media/{media-id}
@@ -69,7 +71,9 @@ class FacturasWhatsAppService:
             return str(filepath)
             
         except Exception as e:
-            print(f"Error al descargar imagen de WhatsApp: {e}")
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error al descargar imagen de WhatsApp: {e}", exc_info=True)
             import traceback
             traceback.print_exc()
             return None
@@ -201,9 +205,9 @@ class FacturasWhatsAppService:
             
         except Exception as e:
             db.rollback()
-            print(f"Error al procesar factura desde WhatsApp: {e}")
-            import traceback
-            traceback.print_exc()
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error al procesar factura desde WhatsApp: {e}", exc_info=True)
             return {
                 'exito': False,
                 'mensaje': f'Error al procesar factura: {str(e)}'
@@ -229,9 +233,9 @@ class FacturasWhatsAppService:
             for formato in formatos:
                 try:
                     return datetime.strptime(fecha_str, formato)
-                except:
+                except ValueError:
                     continue
-        except:
+        except Exception:
             pass
         
         return datetime.now()
