@@ -72,7 +72,7 @@ app.get('*', (req, res, next) => {
     return res.status(404).send('Archivo no encontrado');
   }
   
-  // Para todas las demás rutas (incluyendo /notificaciones, /items, /items?, etc.), servir index.html
+  // Para todas las demás rutas (incluyendo /items, /items?, /notificaciones, etc.), servir index.html
   const indexPath = path.join(distPath, 'index.html');
   
   if (!existsSync(indexPath)) {
@@ -96,7 +96,7 @@ app.get('*', (req, res, next) => {
   
   console.log(`[✓] Sirviendo index.html para ruta SPA: ${pathOnly}`);
   
-  res.sendFile(indexPath, (err) => {
+  res.sendFile(indexPath, { root: distPath }, (err) => {
     if (err) {
       console.error(`[ERROR] Error al servir index.html:`, err.message);
       console.error(`[ERROR] Stack:`, err.stack);

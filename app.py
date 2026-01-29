@@ -55,10 +55,16 @@ def create_app():
     @app.after_request
     def after_request(response):
         """Agrega headers CORS y de seguridad a todas las respuestas."""
-        origin = request.headers.get('Origin')
-        if origin and origin in [origin.strip() for origin in cors_origins]:
-            response.headers['Access-Control-Allow-Origin'] = origin
-            response.headers['Access-Control-Allow-Credentials'] = 'true'
+        try:
+            from flask import request
+            origin = request.headers.get('Origin')
+            if origin and origin in [origin.strip() for origin in cors_origins]:
+                response.headers['Access-Control-Allow-Origin'] = origin
+                response.headers['Access-Control-Allow-Credentials'] = 'true'
+        except Exception as e:
+            # Si hay algún error obteniendo el origin, continuar sin él
+            import logging
+            logging.warning(f"Error obteniendo Origin header: {str(e)}")
         
         # Headers de seguridad
         response.headers['X-Content-Type-Options'] = 'nosniff'
