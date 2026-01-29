@@ -47,6 +47,57 @@ class ProgramacionMenuService:
         return programacion
     
     @staticmethod
+    def actualizar_programacion(db: Session, programacion_id: int, datos: Dict) -> ProgramacionMenu:
+        """
+        Actualiza una programación de menú existente.
+        
+        Args:
+            db: Sesión de base de datos
+            programacion_id: ID de la programación a actualizar
+            datos: Diccionario con datos actualizados
+            
+        Returns:
+            Programación actualizada
+        """
+        programacion = db.query(ProgramacionMenu).filter(
+            ProgramacionMenu.id == programacion_id
+        ).first()
+        
+        if not programacion:
+            raise ValueError("Programación no encontrada")
+        
+        recetas_data = datos.pop('recetas', None)
+        
+        # Actualizar campos básicos
+        for key, value in datos.items():
+            if hasattr(programacion, key):
+                setattr(programacion, key, value)
+        
+        # Actualizar recetas si se proporcionan
+        if recetas_data is not None:
+            # Eliminar items existentes
+            db.query(ProgramacionMenuItem).filter(
+                ProgramacionMenuItem.programacion_id == programacion_id
+            ).delete()
+            
+            # Crear nuevos items
+            for receta_data in recetas_data:
+                receta = db.query(Receta).filter(Receta.id == receta_data['receta_id']).first()
+                if not receta:
+                    raise ValueError(f"Receta {receta_data['receta_id']} no encontrada")
+                
+                programacion_item = ProgramacionMenuItem(
+                    programacion_id=programacion.id,
+                    receta_id=receta.id,
+                    cantidad_porciones=int(receta_data['cantidad_porciones'])
+                )
+                db.add(programacion_item)
+        
+        db.commit()
+        db.refresh(programacion)
+        return programacion
+    
+    @staticmethod
     def calcular_necesidades(db: Session, programacion_id: int) -> Dict:
         """
         Calcula las necesidades de items para una programación.
@@ -153,6 +204,7 @@ class ProgramacionMenuService:
         fecha_desde: Optional[date] = None,
         fecha_hasta: Optional[date] = None,
         ubicacion: Optional[str] = None,
+        tiempo_comida: Optional[str] = None,
         skip: int = 0,
         limit: int = 100
     ) -> List[ProgramacionMenu]:
@@ -164,12 +216,15 @@ class ProgramacionMenuService:
             fecha_desde: Filtrar desde fecha
             fecha_hasta: Filtrar hasta fecha
             ubicacion: Filtrar por ubicación
+            tiempo_comida: Filtrar por tiempo de comida (desayuno, almuerzo, cena)
             skip: Número de registros a saltar
             limit: Límite de registros
             
         Returns:
             Lista de programaciones
         """
+        from models.programacion import TiempoComida
+        
         query = db.query(ProgramacionMenu)
         
         if fecha_desde:
@@ -181,4 +236,11 @@ class ProgramacionMenuService:
         if ubicacion:
             query = query.filter(ProgramacionMenu.ubicacion == ubicacion)
         
-        return query.order_by(ProgramacionMenu.fecha.desc()).offset(skip).limit(limit).all()
+        if tiempo_comida:
+            try:
+                tiempo_enum = TiempoComida[tiempo_comida.upper()]
+                query = query.filter(ProgramacionMenu.tiempo_comida == tiempo_enum)
+            except KeyError:
+                pass  # Ignorar si el valor no es válido
+        
+        return query.order_by(ProgramacionMenu.fecha.desc(), ProgramacionMenu.tiempo_comida).offset(skip).limit(limit).all()

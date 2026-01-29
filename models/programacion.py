@@ -31,6 +31,7 @@ class ProgramacionMenu(db.Model):
     
     def to_dict(self):
         """Convierte el modelo a diccionario."""
+        totales = self.calcular_totales_servicio()
         return {
             'id': self.id,
             'fecha': self.fecha.isoformat() if self.fecha else None,
@@ -40,6 +41,10 @@ class ProgramacionMenu(db.Model):
             'charolas_planificadas': self.charolas_planificadas,
             'fecha_creacion': self.fecha_creacion.isoformat() if self.fecha_creacion else None,
             'items': [item.to_dict() for item in self.items] if self.items else [],
+            'calorias_totales': totales['calorias_totales'],
+            'costo_total': totales['costo_total'],
+            'total_recetas': totales['total_recetas'],
+            'total_porciones': totales['total_porciones'],
         }
     
     def calcular_necesidades_items(self):
@@ -61,6 +66,42 @@ class ProgramacionMenu(db.Model):
                     else:
                         necesidades[item_id] = cantidad_necesaria
         return necesidades
+    
+    def calcular_totales_servicio(self):
+        """
+        Calcula calorías totales y costo total del servicio (menú).
+        Retorna un diccionario con los totales calculados.
+        """
+        from decimal import Decimal
+        
+        calorias_totales = Decimal('0')
+        costo_total = Decimal('0')
+        total_recetas = len(self.items)
+        total_porciones = 0
+        
+        for item_programacion in self.items:
+            if item_programacion.receta:
+                receta = item_programacion.receta
+                cantidad_porciones = Decimal(str(item_programacion.cantidad_porciones))
+                
+                # Calorías: calorias_por_porcion × cantidad_porciones
+                if receta.calorias_por_porcion:
+                    calorias_receta = Decimal(str(receta.calorias_por_porcion)) * cantidad_porciones
+                    calorias_totales += calorias_receta
+                
+                # Costo: costo_por_porcion × cantidad_porciones
+                if receta.costo_por_porcion:
+                    costo_receta = Decimal(str(receta.costo_por_porcion)) * cantidad_porciones
+                    costo_total += costo_receta
+                
+                total_porciones += int(cantidad_porciones)
+        
+        return {
+            'calorias_totales': float(calorias_totales),
+            'costo_total': float(costo_total),
+            'total_recetas': total_recetas,
+            'total_porciones': total_porciones,
+        }
     
     def __repr__(self):
         return f'<ProgramacionMenu {self.fecha} - {self.tiempo_comida.value}>'

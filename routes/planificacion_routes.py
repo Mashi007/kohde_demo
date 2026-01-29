@@ -94,6 +94,7 @@ def listar_programaciones():
         fecha_desde = request.args.get('fecha_desde')
         fecha_hasta = request.args.get('fecha_hasta')
         ubicacion = request.args.get('ubicacion')
+        tiempo_comida = request.args.get('tiempo_comida')  # desayuno, almuerzo, cena
         skip = int(request.args.get('skip', 0))
         limit = int(request.args.get('limit', 100))
         
@@ -110,6 +111,7 @@ def listar_programaciones():
             fecha_desde=fecha_desde_obj,
             fecha_hasta=fecha_hasta_obj,
             ubicacion=ubicacion,
+            tiempo_comida=tiempo_comida,
             skip=skip,
             limit=limit
         )
@@ -162,6 +164,27 @@ def crear_programacion():
                 'advertencia': 'Programación creada pero no se pudieron generar pedidos automáticos'
             }), 201
         
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/programacion/<int:programacion_id>', methods=['PUT'])
+def actualizar_programacion(programacion_id):
+    """Actualiza una programación de menú existente."""
+    try:
+        datos = request.get_json()
+        # Convertir fecha string a date si existe
+        if 'fecha' in datos and isinstance(datos['fecha'], str):
+            datos['fecha'] = datetime.strptime(datos['fecha'], '%Y-%m-%d').date()
+        
+        programacion = ProgramacionMenuService.actualizar_programacion(
+            db.session,
+            programacion_id,
+            datos
+        )
+        
+        return jsonify(programacion.to_dict()), 200
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
     except Exception as e:
