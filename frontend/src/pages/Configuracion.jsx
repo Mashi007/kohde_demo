@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '../config/api'
-import { Settings, MessageSquare, Bot, CheckCircle, XCircle, Send, RefreshCw } from 'lucide-react'
+import { Settings, MessageSquare, Bot, CheckCircle, XCircle, Send, RefreshCw, Mail } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 export default function Configuracion() {
   const [whatsappNumero, setWhatsappNumero] = useState('')
   const [whatsappMensaje, setWhatsappMensaje] = useState('Mensaje de prueba desde ERP')
   const [aiMensaje, setAiMensaje] = useState('Hola, ¿puedes responder con OK?')
+  const [emailNotificaciones, setEmailNotificaciones] = useState('')
 
   const queryClient = useQueryClient()
 
@@ -78,6 +79,56 @@ export default function Configuracion() {
     probarAIMutation.mutate({ mensaje: aiMensaje })
   }
 
+  // Notificaciones por Email
+  const { data: notificacionesConfig } = useQuery({
+    queryKey: ['notificaciones-config'],
+    queryFn: () => api.get('/configuracion/notificaciones').then(res => res.data),
+  })
+
+  const { data: notificacionesVerificacion, refetch: refetchNotificaciones } = useQuery({
+    queryKey: ['notificaciones-verificacion'],
+    queryFn: () => api.get('/configuracion/notificaciones/verificar').then(res => res.data),
+    enabled: false, // Solo se ejecuta manualmente
+  })
+
+  const actualizarEmailMutation = useMutation({
+    mutationFn: (data) => api.put('/configuracion/notificaciones', data),
+    onSuccess: (data) => {
+      toast.success('Email de notificaciones actualizado correctamente')
+      queryClient.invalidateQueries(['notificaciones-config'])
+      setEmailNotificaciones('')
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.error || 'Error al actualizar email')
+    },
+  })
+
+  const probarNotificacionesMutation = useMutation({
+    mutationFn: (data) => api.post('/configuracion/notificaciones/probar', data),
+    onSuccess: () => {
+      toast.success('Email de prueba enviado correctamente')
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.error || 'Error al enviar email de prueba')
+    },
+  })
+
+  const verificarNotificaciones = () => {
+    refetchNotificaciones()
+  }
+
+  const actualizarEmail = () => {
+    if (!emailNotificaciones.trim()) {
+      toast.error('Ingresa un email válido')
+      return
+    }
+    actualizarEmailMutation.mutate({ email: emailNotificaciones })
+  }
+
+  const probarNotificaciones = () => {
+    probarNotificacionesMutation.mutate({ email: emailNotificaciones || notificacionesConfig?.email_notificaciones_pedidos })
+  }
+
   return (
     <div>
       <div className="flex items-center gap-3 mb-6">
@@ -85,7 +136,7 @@ export default function Configuracion() {
         <h1 className="text-3xl font-bold">Configuración</h1>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         {/* WhatsApp */}
         <div className="bg-slate-800 p-6 rounded-lg border border-slate-700">
           <div className="flex items-center gap-3 mb-4">
@@ -307,11 +358,139 @@ export default function Configuracion() {
             <p className="text-xs text-slate-400">
               <strong>Nota:</strong> Las variables de entorno deben configurarse en Render:
               <br />
-              • OPENAI_API_KEY
+              • OPENAI_API_KEY (requerido)
               <br />
               • OPENAI_MODEL (opcional, por defecto: gpt-3.5-turbo)
               <br />
               • OPENAI_BASE_URL (opcional, por defecto: https://api.openai.com/v1)
+            </p>
+            <div className="mt-3 p-2 bg-blue-600/10 border border-blue-500/50 rounded">
+              <p className="text-xs text-blue-300 font-medium mb-1">✨ Acceso a Base de Datos</p>
+              <p className="text-xs text-slate-400">
+                El AI tiene acceso a PostgreSQL y puede consultar datos directamente. 
+                Usa el Chat AI y pregunta sobre inventario, facturas, pedidos, etc. 
+                El AI ejecutará consultas SQL de forma segura (solo SELECT).
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Notificaciones por Email */}
+        <div className="bg-slate-800 p-6 rounded-lg border border-slate-700">
+          <div className="flex items-center gap-3 mb-4">
+            <Mail size={24} className="text-blue-500" />
+            <h2 className="text-xl font-bold">Notificaciones por Email</h2>
+          </div>
+
+          {/* Estado */}
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-slate-400">Estado:</span>
+              {notificacionesConfig?.estado === 'configurado' ? (
+                <span className="flex items-center gap-1 text-green-400">
+                  <CheckCircle size={16} />
+                  Configurado
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 text-red-400">
+                  <XCircle size={16} />
+                  No configurado
+                </span>
+              )}
+            </div>
+
+            {/* Información de configuración */}
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-slate-400">Email de notificaciones:</span>
+                <span className="text-slate-300 break-all text-right">
+                  {notificacionesConfig?.email_notificaciones_pedidos || 'No configurado'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">Email remitente:</span>
+                <span className="text-slate-300 text-xs">
+                  {notificacionesConfig?.email_from || 'N/A'}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-400">SendGrid API Key:</span>
+                <span className="text-slate-300 font-mono text-xs">
+                  {notificacionesConfig?.sendgrid_api_key_preview || 'No configurado'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Verificación */}
+          {notificacionesVerificacion && (
+            <div className={`mb-4 p-3 rounded-lg ${
+              notificacionesVerificacion.valido 
+                ? 'bg-green-500/10 border border-green-500/50' 
+                : 'bg-red-500/10 border border-red-500/50'
+            }`}>
+              <p className={`text-sm font-medium ${
+                notificacionesVerificacion.valido ? 'text-green-400' : 'text-red-400'
+              }`}>
+                {notificacionesVerificacion.mensaje}
+              </p>
+              {notificacionesVerificacion.detalles && (
+                <p className="text-xs text-slate-400 mt-1">{notificacionesVerificacion.detalles}</p>
+              )}
+            </div>
+          )}
+
+          {/* Botones de acción */}
+          <div className="space-y-3">
+            <button
+              onClick={verificarNotificaciones}
+              className="w-full bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg flex items-center justify-center gap-2"
+            >
+              <RefreshCw size={18} />
+              Verificar Configuración
+            </button>
+
+            <div className="border-t border-slate-700 pt-3">
+              <h3 className="text-sm font-medium mb-2">Actualizar Email de Notificaciones</h3>
+              <input
+                type="email"
+                value={emailNotificaciones}
+                onChange={(e) => setEmailNotificaciones(e.target.value)}
+                placeholder={notificacionesConfig?.email_notificaciones_pedidos || "Email para notificaciones"}
+                className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg mb-2 text-sm focus:outline-none focus:border-purple-500"
+              />
+              <button
+                onClick={actualizarEmail}
+                disabled={actualizarEmailMutation.isPending || !emailNotificaciones.trim()}
+                className="w-full bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50 mb-3"
+              >
+                {actualizarEmailMutation.isPending ? 'Actualizando...' : 'Actualizar Email'}
+              </button>
+            </div>
+
+            <div className="border-t border-slate-700 pt-3">
+              <h3 className="text-sm font-medium mb-2">Enviar Email de Prueba</h3>
+              <button
+                onClick={probarNotificaciones}
+                disabled={probarNotificacionesMutation.isPending}
+                className="w-full bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                <Send size={18} />
+                {probarNotificacionesMutation.isPending ? 'Enviando...' : 'Enviar Prueba'}
+              </button>
+            </div>
+          </div>
+
+          {/* Nota */}
+          <div className="mt-4 p-3 bg-slate-700/50 rounded-lg">
+            <p className="text-xs text-slate-400">
+              <strong>Nota:</strong> Las variables de entorno deben configurarse en Render:
+              <br />
+              • SENDGRID_API_KEY
+              <br />
+              • EMAIL_FROM
+              <br />
+              • EMAIL_NOTIFICACIONES_PEDIDOS (se puede actualizar desde aquí)
             </p>
           </div>
         </div>

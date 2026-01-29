@@ -67,6 +67,7 @@ class Config:
     # SendGrid (Email)
     SENDGRID_API_KEY = os.getenv('SENDGRID_API_KEY', '')
     EMAIL_FROM = os.getenv('EMAIL_FROM', 'noreply@restaurantes.com')
+    EMAIL_NOTIFICACIONES_PEDIDOS = os.getenv('EMAIL_NOTIFICACIONES_PEDIDOS', 'a3b7x9q@gmail.com')
     
     # OpenAI / Chat AI
     OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')

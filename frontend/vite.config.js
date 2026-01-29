@@ -21,7 +21,14 @@ export default defineConfig({
             copyFileSync(src, dest)
             console.log('✓ _redirects copiado al build')
           } else {
-            console.warn('⚠ Archivo _redirects no encontrado en:', src)
+            // Intentar con path relativo desde el directorio del proyecto
+            const altSrc = join(process.cwd(), 'frontend', 'public', '_redirects')
+            if (existsSync(altSrc)) {
+              copyFileSync(altSrc, dest)
+              console.log('✓ _redirects copiado al build (path alternativo)')
+            } else {
+              console.warn('⚠ Archivo _redirects no encontrado en:', src, 'o', altSrc)
+            }
           }
         } catch (error) {
           console.warn('⚠ No se pudo copiar _redirects:', error.message)

@@ -222,3 +222,26 @@ def generar_pedidos_automaticos(programacion_id):
         return jsonify({'error': str(e)}), 400
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@bp.route('/programacion/<int:programacion_id>/generar-pedidos-inteligentes', methods=['POST'])
+def generar_pedidos_inteligentes(programacion_id):
+    """
+    Genera pedidos inteligentes para una programación:
+    1. Primero compra lo necesario para la programación
+    2. Luego asegura el inventario de emergencia/base (stock mínimo)
+    """
+    try:
+        datos = request.get_json()
+        usuario_id = datos.get('usuario_id', 1)  # Por defecto usuario 1
+        
+        resultado = ProgramacionMenuService.generar_pedidos_inteligentes(
+            db.session,
+            programacion_id,
+            usuario_id
+        )
+        
+        return jsonify(resultado), 201
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

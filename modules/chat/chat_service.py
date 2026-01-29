@@ -150,9 +150,9 @@ class ChatService:
         # Agregar el nuevo mensaje del usuario
         mensajes_openai.append({"role": "user", "content": contenido})
         
-        # Llamar a OpenAI
+        # Llamar a OpenAI con soporte para consultas a base de datos
         try:
-            respuesta_ai = self._llamar_openai(mensajes_openai)
+            respuesta_ai = self._llamar_openai_con_db(mensajes_openai, db)
             respuesta_contenido = respuesta_ai.get('content', '')
             tokens_usados = respuesta_ai.get('tokens', None)
         except Exception as e:
@@ -183,6 +183,159 @@ class ChatService:
             'mensaje_asistente': mensaje_asistente.to_dict()
         }
     
+    def _ejecutar_consulta_db(self, db: Session, query: str) -> Dict:
+        """
+        Ejecuta una consulta SQL de forma segura (solo SELECT).
+        
+        Args:
+            db: Sesión de base de datos
+            query: Consulta SQL
+            
+        Returns:
+            Diccionario con los resultados o error
+        """
+        import re
+        
+        # Limpiar y validar la consulta
+        query = query.strip()
+        
+        # Verificar que solo sea SELECT (seguridad)
+        if not re.match(r'^\s*SELECT\s+', query, re.IGNORECASE):
+            return {
+                'error': 'Solo se permiten consultas SELECT (lectura). No se pueden ejecutar INSERT, UPDATE, DELETE u otras operaciones.',
+                'resultados': None
+            }
+        
+        # Verificar que no tenga comandos peligrosos
+        comandos_peligrosos = ['DROP', 'DELETE', 'UPDATE', 'INSERT', 'ALTER', 'CREATE', 'TRUNCATE', 'EXEC', 'EXECUTE']
+        query_upper = query.upper()
+        for cmd in comandos_peligrosos:
+            if cmd in query_upper:
+                return {
+                    'error': f'Comando no permitido: {cmd}. Solo se permiten consultas SELECT.',
+                    'resultados': None
+                }
+        
+        try:
+            from sqlalchemy import text
+            
+            # Ejecutar consulta usando SQLAlchemy
+            resultado = db.execute(text(query))
+            filas = resultado.fetchall()
+            
+            # Convertir a lista de diccionarios
+            columnas = resultado.keys()
+            resultados = []
+            for fila in filas:
+                resultado_dict = {}
+                for i, columna in enumerate(columnas):
+                    valor = fila[i]
+                    # Convertir tipos especiales a string
+                    if hasattr(valor, 'isoformat'):  # datetime
+                        valor = valor.isoformat()
+                    elif hasattr(valor, '__dict__'):  # objetos SQLAlchemy
+                        valor = str(valor)
+                    elif valor is None:
+                        valor = None
+                    resultado_dict[columna] = valor
+                resultados.append(resultado_dict)
+            
+            return {
+                'error': None,
+                'resultados': resultados,
+                'total_filas': len(resultados)
+            }
+        except Exception as e:
+            return {
+                'error': f'Error al ejecutar consulta: {str(e)}',
+                'resultados': None
+            }
+    
+    def _llamar_openai_con_db(self, mensajes: List[Dict], db: Session, max_iteraciones: int = 3) -> Dict:
+        """
+        Llama a OpenAI con soporte para ejecutar consultas a la base de datos.
+        
+        Args:
+            mensajes: Lista de mensajes en formato OpenAI
+            db: Sesión de base de datos
+            max_iteraciones: Máximo número de iteraciones (para consultas anidadas)
+            
+        Returns:
+            Diccionario con la respuesta y tokens usados
+        """
+        iteracion = 0
+        tokens_totales = 0
+        
+        while iteracion < max_iteraciones:
+            iteracion += 1
+            
+            # Llamar a OpenAI
+            respuesta = self._llamar_openai(mensajes)
+            contenido = respuesta.get('content', '')
+            tokens_totales += respuesta.get('tokens', 0) or 0
+            
+            # Verificar si hay una consulta a la base de datos en la respuesta
+            if '[QUERY_DB]' in contenido:
+                # Extraer la consulta SQL
+                partes = contenido.split('[QUERY_DB]')
+                if len(partes) > 1:
+                    consulta_sql = partes[1].strip()
+                    # Limpiar la consulta (puede tener texto adicional después)
+                    lineas = consulta_sql.split('\n')
+                    consulta_sql = lineas[0].strip()
+                    
+                    # Ejecutar consulta
+                    resultado_db = self._ejecutar_consulta_db(db, consulta_sql)
+                    
+                    # Agregar resultado al contexto
+                    if resultado_db['error']:
+                        mensaje_db = f"Error al ejecutar consulta: {resultado_db['error']}"
+                    else:
+                        resultados = resultado_db['resultados']
+                        total = resultado_db['total_filas']
+                        
+                        # Formatear resultados
+                        if resultados:
+                            # Crear tabla formateada
+                            mensaje_db = f"Resultados de la consulta ({total} filas):\n\n"
+                            # Mostrar primeras columnas y filas (limitado)
+                            if resultados:
+                                columnas = list(resultados[0].keys())
+                                mensaje_db += "Columnas: " + ", ".join(columnas) + "\n\n"
+                                mensaje_db += "Primeras filas:\n"
+                                for i, fila in enumerate(resultados[:10]):  # Máximo 10 filas
+                                    valores = [str(fila[col])[:50] for col in columnas]  # Limitar longitud
+                                    mensaje_db += f"Fila {i+1}: " + " | ".join(valores) + "\n"
+                                if total > 10:
+                                    mensaje_db += f"\n... y {total - 10} filas más."
+                        else:
+                            mensaje_db = "La consulta no devolvió resultados."
+                    
+                    # Agregar resultado al contexto y continuar
+                    mensajes.append({
+                        "role": "assistant",
+                        "content": contenido.replace('[QUERY_DB]' + consulta_sql, '[Consulta ejecutada]')
+                    })
+                    mensajes.append({
+                        "role": "user",
+                        "content": f"Resultado de la consulta:\n{mensaje_db}\n\nPor favor, interpreta estos resultados y responde al usuario de manera clara."
+                    })
+                    
+                    # Continuar el loop para obtener respuesta final
+                    continue
+            
+            # Si no hay consulta, retornar respuesta final
+            return {
+                'content': contenido,
+                'tokens': tokens_totales
+            }
+        
+        # Si se alcanzó el máximo de iteraciones
+        return {
+            'content': contenido + "\n\n[Nota: Se alcanzó el límite de consultas a la base de datos]",
+            'tokens': tokens_totales
+        }
+    
     def _construir_prompt_sistema(self, contexto_modulo: Optional[str] = None) -> str:
         """
         Construye el prompt del sistema basado en el contexto del módulo.
@@ -195,14 +348,37 @@ class ChatService:
         """
         base_prompt = """Eres un asistente virtual experto en sistemas ERP para restaurantes. 
 Ayudas a los usuarios con consultas sobre gestión de restaurantes, inventario, facturas, pedidos, proveedores y más.
-Responde de manera clara, concisa y profesional en español."""
+Responde de manera clara, concisa y profesional en español.
+
+IMPORTANTE: Tienes acceso a la base de datos PostgreSQL del sistema ERP. Puedes consultar información directamente de las tablas.
+
+Cuando el usuario necesite información específica de la base de datos, puedes usar la función especial [QUERY_DB] seguida de una consulta SQL válida.
+
+Ejemplos de consultas que puedes hacer:
+- Consultar items del inventario: SELECT * FROM items WHERE activo = true LIMIT 10
+- Consultar facturas recientes: SELECT * FROM facturas ORDER BY fecha_emision DESC LIMIT 5
+- Consultar proveedores: SELECT id, nombre, email, telefono FROM proveedores WHERE activo = true
+- Consultar recetas: SELECT id, nombre, tipo, porcion_gramos, costo_por_porcion FROM recetas
+- Consultar programaciones: SELECT * FROM programacion_menu ORDER BY fecha DESC LIMIT 10
+
+IMPORTANTE sobre seguridad:
+- Solo ejecuta consultas SELECT (lectura). NO ejecutes INSERT, UPDATE, DELETE o DDL.
+- Limita los resultados con LIMIT para evitar respuestas muy largas.
+- Usa WHERE clauses apropiadas para filtrar datos.
+- Si necesitas información específica, primero pregunta al usuario o usa consultas exploratorias.
+
+Formato para consultas:
+[QUERY_DB]
+SELECT campo1, campo2 FROM tabla WHERE condicion LIMIT 10
+
+Después de ejecutar una consulta, interpreta los resultados y presenta la información de manera clara y útil para el usuario."""
         
         modulos_contexto = {
-            'crm': "Te especializas en gestión de relaciones con clientes, proveedores, tickets y notificaciones.",
-            'logistica': "Te especializas en gestión de inventario, items, facturas, pedidos y requerimientos.",
-            'contabilidad': "Te especializas en contabilidad, facturas, cuentas contables y reportes financieros.",
-            'planificacion': "Te especializas en planificación de menús, recetas y programación.",
-            'reportes': "Te especializas en reportes de charolas, mermas y análisis de datos.",
+            'crm': "Te especializas en gestión de relaciones con clientes, proveedores, tickets y notificaciones. Tablas relevantes: proveedores, tickets, notificaciones.",
+            'logistica': "Te especializas en gestión de inventario, items, facturas, pedidos y requerimientos. Tablas relevantes: items, inventario, facturas, pedidos_compra, requerimientos.",
+            'contabilidad': "Te especializas en contabilidad, facturas, cuentas contables y reportes financieros. Tablas relevantes: facturas, centro_cuentas.",
+            'planificacion': "Te especializas en planificación de menús, recetas y programación. Tablas relevantes: recetas, receta_ingredientes, programacion_menu, programacion_menu_items.",
+            'reportes': "Te especializas en reportes de charolas, mermas y análisis de datos. Tablas relevantes: charolas, mermas.",
         }
         
         if contexto_modulo and contexto_modulo.lower() in modulos_contexto:

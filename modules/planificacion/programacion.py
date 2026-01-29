@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from models import ProgramacionMenu, ProgramacionMenuItem, Receta, Inventario
 from modules.logistica.inventario import InventarioService
 from modules.logistica.pedidos import PedidoCompraService
+from config import Config
 
 class ProgramacionMenuService:
     """Servicio para gestión de programación de menús."""
@@ -244,3 +245,134 @@ class ProgramacionMenuService:
                 pass  # Ignorar si el valor no es válido
         
         return query.order_by(ProgramacionMenu.fecha.desc(), ProgramacionMenu.tiempo_comida).offset(skip).limit(limit).all()
+    
+    @staticmethod
+    def generar_pedidos_inteligentes(
+        db: Session,
+        programacion_id: int,
+        usuario_id: int
+    ) -> Dict:
+        """
+        Genera pedidos inteligentes para una programación:
+        1. Primero compra lo necesario para la programación
+        2. Luego asegura el inventario de emergencia/base (stock mínimo)
+        
+        Args:
+            db: Sesión de base de datos
+            programacion_id: ID de la programación
+            usuario_id: ID del usuario que genera los pedidos
+            
+        Returns:
+            Diccionario con información de los pedidos generados
+        """
+        from models import Item as ItemModel, Inventario
+        from modules.logistica.pedidos import PedidoCompraService
+        from config import Config
+        
+        programacion = db.query(ProgramacionMenu).filter(
+            ProgramacionMenu.id == programacion_id
+        ).first()
+        
+        if not programacion:
+            raise ValueError("Programación no encontrada")
+        
+        # Calcular necesidades de la programación
+        necesidades_programacion = programacion.calcular_necesidades_items()
+        
+        # FASE 1: Items faltantes para la programación
+        items_para_programacion = []
+        items_suficientes_programacion = []
+        
+        for item_id, cantidad_necesaria in necesidades_programacion.items():
+            inventario = db.query(Inventario).filter(Inventario.item_id == item_id).first()
+            item = db.query(ItemModel).filter(ItemModel.id == item_id).first()
+            
+            if not item:
+                continue
+            
+            cantidad_disponible = float(inventario.cantidad_actual) if inventario else 0.0
+            cantidad_faltante = max(0, cantidad_necesaria - cantidad_disponible)
+            
+            if cantidad_faltante > 0:
+                # Agregar amortiguador del 10% para la programación
+                cantidad_con_amortiguador = cantidad_faltante * 1.1
+                items_para_programacion.append({
+                    'item_id': item_id,
+                    'cantidad': cantidad_con_amortiguador,
+                    'motivo': 'programacion',
+                    'cantidad_necesaria': cantidad_necesaria,
+                    'cantidad_disponible': cantidad_disponible,
+                    'cantidad_faltante': cantidad_faltante,
+                })
+            else:
+                items_suficientes_programacion.append({
+                    'item_id': item_id,
+                    'nombre': item.nombre,
+                    'cantidad_necesaria': cantidad_necesaria,
+                    'cantidad_disponible': cantidad_disponible,
+                })
+        
+        # FASE 2: Items por debajo del stock mínimo (inventario de emergencia/base)
+        items_para_stock_minimo = []
+        
+        # Obtener todos los items que están por debajo del stock mínimo
+        items_bajo_stock = InventarioService.obtener_stock_bajo(db)
+        
+        for item_stock in items_bajo_stock:
+            item_id = item_stock['item_id']
+            cantidad_actual = item_stock['cantidad_actual']
+            cantidad_minima = item_stock['cantidad_minima']
+            
+            # Calcular cuánto falta para llegar al stock mínimo
+            cantidad_faltante_stock = cantidad_minima - cantidad_actual
+            
+            # Verificar si este item ya está en la lista de programación
+            ya_incluido = any(item['item_id'] == item_id for item in items_para_programacion)
+            
+            if cantidad_faltante_stock > 0 and not ya_incluido:
+                # Agregar amortiguador para stock mínimo
+                from config import Config
+                cantidad_con_amortiguador = cantidad_faltante_stock * (1 + Config.STOCK_MINIMUM_THRESHOLD_PERCENTAGE)
+                items_para_stock_minimo.append({
+                    'item_id': item_id,
+                    'cantidad': cantidad_con_amortiguador,
+                    'motivo': 'stock_minimo',
+                    'cantidad_actual': cantidad_actual,
+                    'cantidad_minima': cantidad_minima,
+                    'cantidad_faltante': cantidad_faltante_stock,
+                })
+        
+        # Generar pedidos para items de programación
+        pedidos_programacion = []
+        if items_para_programacion:
+            pedidos_programacion = PedidoCompraService.generar_pedido_automatico(
+                db,
+                items_para_programacion,
+                usuario_id
+            )
+        
+        # Generar pedidos para stock mínimo
+        pedidos_stock_minimo = []
+        if items_para_stock_minimo:
+            pedidos_stock_minimo = PedidoCompraService.generar_pedido_automatico(
+                db,
+                items_para_stock_minimo,
+                usuario_id
+            )
+        
+        return {
+            'programacion_id': programacion_id,
+            'fecha': programacion.fecha.isoformat(),
+            'items_suficientes_programacion': items_suficientes_programacion,
+            'items_para_programacion': items_para_programacion,
+            'items_para_stock_minimo': items_para_stock_minimo,
+            'pedidos_programacion': [p.to_dict() for p in pedidos_programacion],
+            'pedidos_stock_minimo': [p.to_dict() for p in pedidos_stock_minimo],
+            'total_pedidos_programacion': len(pedidos_programacion),
+            'total_pedidos_stock_minimo': len(pedidos_stock_minimo),
+            'resumen': {
+                'items_suficientes': len(items_suficientes_programacion),
+                'items_faltantes_programacion': len(items_para_programacion),
+                'items_bajo_stock_minimo': len(items_para_stock_minimo),
+            }
+        }

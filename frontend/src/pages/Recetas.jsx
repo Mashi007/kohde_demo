@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import api from '../config/api'
 import { ChefHat, Plus, Filter } from 'lucide-react'
 import RecetaForm from '../components/RecetaForm'
-import Modal from './Modal'
+import Modal from '../components/Modal'
 
 export default function Recetas() {
   const [tipoFiltro, setTipoFiltro] = useState('')

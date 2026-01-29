@@ -142,6 +142,15 @@ export default function Chat() {
               <option value="reportes">Reportes</option>
             </select>
           </div>
+          
+          <div className="mt-3 p-2 bg-blue-600/10 border border-blue-500/50 rounded">
+            <p className="text-xs text-blue-300 font-medium mb-1">💡 Acceso a Base de Datos</p>
+            <p className="text-xs text-slate-400">
+              Puedes preguntar sobre datos del sistema. El AI consultará PostgreSQL automáticamente.
+              <br />
+              Ejemplos: "¿Cuántos items hay en inventario?", "Muéstrame las facturas recientes", etc.
+            </p>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-2">

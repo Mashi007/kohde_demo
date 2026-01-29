@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import api from '../config/api'
-import { Calendar, Plus, Filter, UtensilsCrossed } from 'lucide-react'
+import { Calendar, Plus, Filter, UtensilsCrossed, Package } from 'lucide-react'
 import CalendarioProgramacion from '../components/CalendarioProgramacion'
 import ProgramacionForm from '../components/ProgramacionForm'
+import NecesidadesProgramacion from '../components/NecesidadesProgramacion'
 import { format, parseISO, isSameDay } from 'date-fns'
 import { es } from 'date-fns/locale'
 
@@ -11,6 +12,7 @@ export default function Programacion() {
   const [fechaSeleccionada, setFechaSeleccionada] = useState(new Date())
   const [mostrarFormulario, setMostrarFormulario] = useState(false)
   const [programacionEditando, setProgramacionEditando] = useState(null)
+  const [programacionNecesidades, setProgramacionNecesidades] = useState(null)
   const [filtroServicio, setFiltroServicio] = useState('')
   
   // Cargar programaciones
@@ -76,6 +78,10 @@ export default function Programacion() {
   const handleEditarProgramacion = (programacion) => {
     setProgramacionEditando(programacion)
     setMostrarFormulario(true)
+  }
+  
+  const handleVerNecesidades = (programacion) => {
+    setProgramacionNecesidades(programacion.id)
   }
   
   const handleFechaSeleccionada = (fecha) => {
@@ -154,6 +160,7 @@ export default function Programacion() {
                         key={prog.id}
                         programacion={prog}
                         onEdit={handleEditarProgramacion}
+                        onVerNecesidades={handleVerNecesidades}
                       />
                     ))}
                   </div>
@@ -170,6 +177,7 @@ export default function Programacion() {
                         key={prog.id}
                         programacion={prog}
                         onEdit={handleEditarProgramacion}
+                        onVerNecesidades={handleVerNecesidades}
                       />
                     ))}
                   </div>
@@ -186,6 +194,7 @@ export default function Programacion() {
                         key={prog.id}
                         programacion={prog}
                         onEdit={handleEditarProgramacion}
+                        onVerNecesidades={handleVerNecesidades}
                       />
                     ))}
                   </div>
@@ -212,11 +221,19 @@ export default function Programacion() {
           }}
         />
       )}
+      
+      {/* Modal de Necesidades */}
+      {programacionNecesidades && (
+        <NecesidadesProgramacion
+          programacionId={programacionNecesidades}
+          onClose={() => setProgramacionNecesidades(null)}
+        />
+      )}
     </div>
   )
 }
 
-function ProgramacionCard({ programacion, onEdit }) {
+function ProgramacionCard({ programacion, onEdit, onVerNecesidades }) {
   const getServicioBadge = (servicio) => {
     const badges = {
       desayuno: 'bg-yellow-600/20 text-yellow-300 border-yellow-500/50',
@@ -288,6 +305,17 @@ function ProgramacionCard({ programacion, onEdit }) {
             <span className="font-semibold">${(programacion.costo_total || 0).toFixed(2)}</span>
           </div>
         </div>
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            onVerNecesidades(programacion)
+          }}
+          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm flex items-center gap-2 transition-colors"
+          title="Ver necesidades de inventario"
+        >
+          <Package className="w-4 h-4" />
+          Necesidades
+        </button>
       </div>
     </div>
   )
