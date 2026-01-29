@@ -5,7 +5,7 @@ import toast from 'react-hot-toast'
 
 export default function TicketForm({ ticket, onClose, onSuccess }) {
   const [formData, setFormData] = useState({
-    cliente_id: ticket?.cliente_id || 1, // TODO: Obtener del contexto de usuario
+    cliente_id: ticket?.cliente_id || null,
     asunto: ticket?.asunto || '',
     descripcion: ticket?.descripcion || '',
     tipo: ticket?.tipo || 'consulta',
@@ -13,6 +13,11 @@ export default function TicketForm({ ticket, onClose, onSuccess }) {
   })
 
   const queryClient = useQueryClient()
+  
+  const { data: clientes } = useQuery({
+    queryKey: ['clientes'],
+    queryFn: () => api.get('/crm/clientes').then(res => res.data),
+  })
 
   const createMutation = useMutation({
     mutationFn: (data) => api.post('/crm/tickets', data),
