@@ -17,8 +17,8 @@ class Proveedor(db.Model):
     telefono = Column(String(20), nullable=True)
     email = Column(String(100), nullable=True)
     direccion = Column(Text, nullable=True)
-    contacto_principal = Column(String(200), nullable=True)
-    dias_credito = Column(SQLInteger, default=0, nullable=False)  # Días de crédito
+    nombre_contacto = Column(String(200), nullable=True)  # Nombre del contacto principal
+    productos_que_provee = Column(Text, nullable=True)  # Lista de productos que provee
     activo = Column(Boolean, default=True, nullable=False)
     fecha_registro = Column(DateTime, default=datetime.utcnow, nullable=False)
     
@@ -36,8 +36,8 @@ class Proveedor(db.Model):
             'telefono': self.telefono,
             'email': self.email,
             'direccion': self.direccion,
-            'contacto_principal': self.contacto_principal,
-            'dias_credito': self.dias_credito,
+            'nombre_contacto': self.nombre_contacto,
+            'productos_que_provee': self.productos_que_provee,
             'activo': self.activo,
             'fecha_registro': self.fecha_registro.isoformat() if self.fecha_registro else None,
         }

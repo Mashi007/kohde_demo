@@ -10,7 +10,8 @@ export default function ProveedorForm({ proveedor, onClose, onSuccess }) {
     telefono: proveedor?.telefono || '',
     email: proveedor?.email || '',
     direccion: proveedor?.direccion || '',
-    dias_credito: proveedor?.dias_credito || 30,
+    nombre_contacto: proveedor?.nombre_contacto || '',
+    productos_que_provee: proveedor?.productos_que_provee || '',
     activo: proveedor?.activo !== undefined ? proveedor.activo : true,
   })
 
@@ -90,12 +91,23 @@ export default function ProveedorForm({ proveedor, onClose, onSuccess }) {
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-2">Días de Crédito</label>
+        <label className="block text-sm font-medium mb-2">Nombre de Contacto</label>
         <input
-          type="number"
-          min="0"
-          value={formData.dias_credito}
-          onChange={(e) => setFormData({ ...formData, dias_credito: parseInt(e.target.value) || 0 })}
+          type="text"
+          value={formData.nombre_contacto}
+          onChange={(e) => setFormData({ ...formData, nombre_contacto: e.target.value })}
+          placeholder="Nombre del contacto principal"
+          className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:border-purple-500"
+        />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium mb-2">Productos que Provee</label>
+        <textarea
+          value={formData.productos_que_provee}
+          onChange={(e) => setFormData({ ...formData, productos_que_provee: e.target.value })}
+          rows={4}
+          placeholder="Lista los productos o servicios que provee este proveedor (uno por línea)"
           className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:border-purple-500"
         />
       </div>

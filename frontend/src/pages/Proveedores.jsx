@@ -44,7 +44,15 @@ export default function Proveedores() {
               <p>RUC: {proveedor.ruc || 'N/A'}</p>
               <p>Teléfono: {proveedor.telefono || 'N/A'}</p>
               <p>Email: {proveedor.email || 'N/A'}</p>
-              <p>Días de crédito: {proveedor.dias_credito}</p>
+              {proveedor.nombre_contacto && (
+                <p>Contacto: {proveedor.nombre_contacto}</p>
+              )}
+              {proveedor.productos_que_provee && (
+                <p className="mt-2 text-xs">
+                  <strong>Productos:</strong> {proveedor.productos_que_provee.substring(0, 100)}
+                  {proveedor.productos_que_provee.length > 100 && '...'}
+                </p>
+              )}
             </div>
           </div>
         ))}
