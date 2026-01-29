@@ -5,7 +5,7 @@ import toast from 'react-hot-toast'
 
 export default function TicketForm({ ticket, onClose, onSuccess }) {
   const [formData, setFormData] = useState({
-    cliente_id: ticket?.cliente_id || null,
+    cliente_id: ticket?.cliente_id || null,  // Opcional ahora
     asunto: ticket?.asunto || '',
     descripcion: ticket?.descripcion || '',
     tipo: ticket?.tipo || 'consulta',
@@ -13,11 +13,6 @@ export default function TicketForm({ ticket, onClose, onSuccess }) {
   })
 
   const queryClient = useQueryClient()
-  
-  const { data: clientes } = useQuery({
-    queryKey: ['clientes'],
-    queryFn: () => api.get('/crm/clientes').then(res => res.data),
-  })
 
   const createMutation = useMutation({
     mutationFn: (data) => api.post('/crm/tickets', data),
@@ -39,23 +34,6 @@ export default function TicketForm({ ticket, onClose, onSuccess }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div>
-        <label className="block text-sm font-medium mb-2">Cliente *</label>
-        <select
-          required
-          value={formData.cliente_id || ''}
-          onChange={(e) => setFormData({ ...formData, cliente_id: parseInt(e.target.value) })}
-          className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:border-purple-500"
-        >
-          <option value="">Seleccionar cliente</option>
-          {clientes?.map((cliente) => (
-            <option key={cliente.id} value={cliente.id}>
-              {cliente.nombre} {cliente.ruc_ci ? `(${cliente.ruc_ci})` : ''}
-            </option>
-          ))}
-        </select>
-      </div>
-
       <div>
         <label className="block text-sm font-medium mb-2">Asunto *</label>
         <input

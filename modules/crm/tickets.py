@@ -5,7 +5,7 @@ from typing import List, Optional, Dict
 from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
-from models import Ticket, Cliente
+from models import Ticket
 from models.ticket import EstadoTicket, TipoTicket, PrioridadTicket
 
 class TicketService:
@@ -23,10 +23,8 @@ class TicketService:
         Returns:
             Ticket creado
         """
-        # Verificar que el cliente existe
-        cliente = db.query(Cliente).filter(Cliente.id == datos['cliente_id']).first()
-        if not cliente:
-            raise ValueError("Cliente no encontrado")
+        # cliente_id es ahora opcional (módulo Cliente eliminado)
+        # Si se proporciona, se guarda pero no se valida
         
         # Convertir strings a enums si es necesario
         ticket_data = datos.copy()

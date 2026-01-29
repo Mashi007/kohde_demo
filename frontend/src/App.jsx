@@ -2,7 +2,6 @@ import { Routes, Route } from 'react-router-dom'
 import { Toaster } from 'react-hot-toast'
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
-import Clientes from './pages/Clientes'
 import Tickets from './pages/Tickets'
 import Facturas from './pages/Facturas'
 import Inventario from './pages/Inventario'
@@ -17,10 +16,9 @@ function App() {
     <>
       <Toaster position="top-right" />
       <Layout>
-        <Routes>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/clientes" element={<Clientes />} />
-          <Route path="/tickets" element={<Tickets />} />
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/tickets" element={<Tickets />} />
           <Route path="/facturas" element={<Facturas />} />
           <Route path="/inventario" element={<Inventario />} />
           <Route path="/items" element={<Items />} />

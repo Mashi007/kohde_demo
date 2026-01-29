@@ -43,7 +43,7 @@ class Factura(db.Model):
     observaciones = Column(Text, nullable=True)
     
     # Relaciones
-    cliente = relationship('Cliente', back_populates='facturas')
+    # cliente removido (módulo Cliente eliminado)
     proveedor = relationship('Proveedor', back_populates='facturas')
     items = relationship('FacturaItem', back_populates='factura', cascade='all, delete-orphan')
     

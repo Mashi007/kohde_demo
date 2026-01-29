@@ -34,7 +34,7 @@ class Ticket(db.Model):
     __tablename__ = 'tickets'
     
     id = Column(Integer, primary_key=True)
-    cliente_id = Column(Integer, ForeignKey('clientes.id'), nullable=False)
+    cliente_id = Column(Integer, nullable=True)  # Removida FK, ahora opcional
     tipo = Column(Enum(TipoTicket), nullable=False)
     asunto = Column(String(200), nullable=False)
     descripcion = Column(Text, nullable=False)
@@ -45,8 +45,7 @@ class Ticket(db.Model):
     fecha_resolucion = Column(DateTime, nullable=True)
     respuesta = Column(Text, nullable=True)
     
-    # Relaciones
-    cliente = relationship('Cliente', back_populates='tickets')
+    # Relaciones removidas (módulo Cliente eliminado)
     
     def to_dict(self):
         """Convierte el modelo a diccionario."""

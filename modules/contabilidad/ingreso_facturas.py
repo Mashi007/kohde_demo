@@ -9,7 +9,8 @@ from sqlalchemy import and_
 from werkzeug.utils import secure_filename
 from PIL import Image
 
-from models import Factura, FacturaItem, Proveedor, Cliente, Item, Inventario
+from models import Factura, FacturaItem, Proveedor, Item, Inventario
+# Cliente removido (módulo eliminado)
 from models.factura import TipoFactura, EstadoFactura
 from utils.ocr import ocr_processor
 from utils.helpers import calcular_iva, calcular_total
@@ -224,28 +225,7 @@ class FacturaService:
         db.refresh(proveedor)
         return proveedor
     
-    @staticmethod
-    def _buscar_o_crear_cliente(db: Session, datos: Dict) -> Cliente:
-        """Busca o crea un cliente basado en datos OCR."""
-        ruc_ci = datos.get('ruc')
-        nombre = datos.get('proveedor', 'Cliente Desconocido')  # En OCR puede venir como proveedor
-        
-        if ruc_ci:
-            cliente = db.query(Cliente).filter(Cliente.ruc_ci == ruc_ci).first()
-            if cliente:
-                return cliente
-        
-        # Crear nuevo cliente
-        from models.cliente import TipoCliente
-        cliente = Cliente(
-            nombre=nombre,
-            ruc_ci=ruc_ci,
-            tipo=TipoCliente.EMPRESA if ruc_ci else TipoCliente.PERSONA
-        )
-        db.add(cliente)
-        db.commit()
-        db.refresh(cliente)
-        return cliente
+    # Método _buscar_o_crear_cliente removido (módulo Cliente eliminado)
     
     @staticmethod
     def _buscar_item_por_descripcion(db: Session, descripcion: str) -> Optional[Item]:

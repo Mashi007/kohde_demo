@@ -14,7 +14,6 @@ import {
 
 const menuItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/clientes', label: 'Clientes', icon: Users },
   { path: '/tickets', label: 'Tickets', icon: MessageSquare },
   { path: '/facturas', label: 'Facturas', icon: FileText },
   { path: '/inventario', label: 'Inventario', icon: Package },
