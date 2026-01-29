@@ -330,7 +330,7 @@ export default function Costos() {
                 <option value="">Todos los tipos</option>
                 <option value="desayuno">Desayuno</option>
                 <option value="almuerzo">Almuerzo</option>
-                <option value="merienda">Merienda</option>
+                <option value="cena">Cena</option>
               </select>
             </div>
           </div>
@@ -373,7 +373,7 @@ export default function Costos() {
                     const tipoLabels = {
                       'desayuno': { label: 'Desayuno', color: 'bg-yellow-600/20 text-yellow-300 border-yellow-500/50' },
                       'almuerzo': { label: 'Almuerzo', color: 'bg-orange-600/20 text-orange-300 border-orange-500/50' },
-                      'merienda': { label: 'Merienda', color: 'bg-blue-600/20 text-blue-300 border-blue-500/50' }
+                      'cena': { label: 'Cena', color: 'bg-blue-600/20 text-blue-300 border-blue-500/50' }
                     }
                     const tipoInfo = tipoLabels[receta.tipo?.toLowerCase()] || { label: receta.tipo || 'N/A', color: 'bg-slate-600/20 text-slate-300 border-slate-500/50' }
                     

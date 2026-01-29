@@ -25,10 +25,25 @@ class RecetaService:
         # Convertir tipo string a enum si es necesario
         if isinstance(datos.get('tipo'), str):
             from models.receta import TipoReceta
-            try:
-                datos['tipo'] = TipoReceta[datos['tipo'].upper()]
-            except KeyError:
-                datos['tipo'] = TipoReceta.ALMUERZO  # Valor por defecto
+            tipo_str = datos['tipo'].lower().strip()  # Convertir a minúsculas y limpiar
+            
+            # Mapeo directo de valores a enums
+            tipo_map = {
+                'desayuno': TipoReceta.DESAYUNO,
+                'almuerzo': TipoReceta.ALMUERZO,
+                'cena': TipoReceta.CENA,
+            }
+            
+            # Buscar el enum por su valor
+            tipo_enum = tipo_map.get(tipo_str)
+            if tipo_enum is None:
+                # Si no se encuentra, intentar por nombre del enum (fallback)
+                try:
+                    tipo_enum = TipoReceta[tipo_str.upper()]
+                except KeyError:
+                    tipo_enum = TipoReceta.ALMUERZO  # Valor por defecto
+            
+            datos['tipo'] = tipo_enum
         
         receta = Receta(**datos)
         db.add(receta)
@@ -75,7 +90,7 @@ class RecetaService:
         Args:
             db: Sesión de base de datos
             activa: Filtrar por estado activa
-            tipo: Filtrar por tipo (desayuno, almuerzo, merienda)
+            tipo: Filtrar por tipo (desayuno, almuerzo, cena)
             busqueda: Búsqueda por nombre
             skip: Número de registros a saltar
             limit: Límite de registros
@@ -138,6 +153,29 @@ class RecetaService:
                 db.add(ingrediente)
             
             datos.pop('ingredientes')
+        
+        # Convertir tipo string a enum si es necesario
+        if isinstance(datos.get('tipo'), str):
+            from models.receta import TipoReceta
+            tipo_str = datos['tipo'].lower().strip()  # Convertir a minúsculas y limpiar
+            
+            # Mapeo directo de valores a enums
+            tipo_map = {
+                'desayuno': TipoReceta.DESAYUNO,
+                'almuerzo': TipoReceta.ALMUERZO,
+                'cena': TipoReceta.CENA,
+            }
+            
+            # Buscar el enum por su valor
+            tipo_enum = tipo_map.get(tipo_str)
+            if tipo_enum is None:
+                # Si no se encuentra, intentar por nombre del enum (fallback)
+                try:
+                    tipo_enum = TipoReceta[tipo_str.upper()]
+                except KeyError:
+                    tipo_enum = TipoReceta.ALMUERZO  # Valor por defecto
+            
+            datos['tipo'] = tipo_enum
         
         # Actualizar otros campos
         for key, value in datos.items():

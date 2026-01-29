@@ -7,9 +7,9 @@ import { X, Plus, Calculator } from 'lucide-react'
 export default function RecetaForm({ receta, onClose, onSuccess }) {
   const [formData, setFormData] = useState({
     nombre: receta?.nombre || '',
-    descripcion: receta?.descripcion || '',
+    descripcion: receta?.descripcion || '', // Mantener descripcion para el backend, pero mostrar como "Instrucciones"
     tipo: receta?.tipo || 'almuerzo',
-    porciones: receta?.porciones || 1,
+    porciones: receta?.porciones || 1, // Por defecto 1 porción
     tiempo_preparacion: receta?.tiempo_preparacion || null,
     ingredientes: receta?.ingredientes?.map(ing => ({
       item_id: ing.item_id,
@@ -21,70 +21,76 @@ export default function RecetaForm({ receta, onClose, onSuccess }) {
 
   const queryClient = useQueryClient()
 
-  // Cargar items disponibles
-  const { data: itemsResponse, isLoading: loadingItems } = useQuery({
-    queryKey: ['items'],
-    queryFn: () => api.get('/logistica/items?activo=true&limit=1000').then(res => {
-      const items = extractData(res)
-      return Array.isArray(items) ? items : []
-    }),
+  // Cargar items disponibles (solo activos)
+  const { data: itemsResponse, isLoading: loadingItems, error: itemsError } = useQuery({
+    queryKey: ['items', 'activos'],
+    queryFn: async () => {
+      try {
+        const res = await api.get('/logistica/items', { 
+          params: { 
+            activo: true, 
+            limit: 1000 
+          } 
+        })
+        const items = extractData(res)
+        return Array.isArray(items) ? items : []
+      } catch (error) {
+        console.error('Error cargando items:', error)
+        toast.error('Error al cargar items disponibles')
+        return []
+      }
+    },
+    staleTime: 30000, // Cache por 30 segundos
+    refetchOnWindowFocus: false,
   })
   
   const items = Array.isArray(itemsResponse) ? itemsResponse : []
+  
+  // Mostrar estado de carga si es necesario
+  useEffect(() => {
+    if (itemsError) {
+      console.error('Error cargando items para receta:', itemsError)
+    }
+  }, [itemsError])
 
-  // Cálculos automáticos
-  const [calculos, setCalculos] = useState({
-    porcionGramos: 0,
-    caloriasTotales: 0,
-    costoTotal: 0,
-    caloriasPorPorcion: 0,
-    costoPorPorcion: 0,
-  })
-
-  // Función para convertir a gramos (simplificada para el frontend)
+  // Función para convertir a gramos
   const convertirAGramos = (cantidad, unidad) => {
     const unidadLower = unidad?.toLowerCase() || ''
     const cantidadNum = parseFloat(cantidad) || 0
 
-    // Conversiones básicas a gramos
     const conversiones = {
-      // Peso
       'kg': cantidadNum * 1000,
       'g': cantidadNum,
       'gramo': cantidadNum,
       'gramos': cantidadNum,
-      'qq': cantidadNum * 45359.2, // quintal a gramos (1 qq = 100 lb = 45.3592 kg)
+      'qq': cantidadNum * 45359.2,
       'quintal': cantidadNum * 45359.2,
       'quintales': cantidadNum * 45359.2,
-      'lb': cantidadNum * 453.592, // libra a gramos
+      'lb': cantidadNum * 453.592,
       'libras': cantidadNum * 453.592,
-      'oz': cantidadNum * 28.3495, // onza a gramos
+      'oz': cantidadNum * 28.3495,
       'onzas': cantidadNum * 28.3495,
-      // Volumen (asumiendo densidad ~1 g/ml para agua/líquidos)
-      'l': cantidadNum * 1000, // litro a gramos (aproximado)
+      'l': cantidadNum * 1000,
       'litro': cantidadNum * 1000,
       'litros': cantidadNum * 1000,
-      'ml': cantidadNum, // mililitro a gramos (aproximado)
+      'ml': cantidadNum,
       'mililitro': cantidadNum,
       'mililitros': cantidadNum,
-      // Unidades discretas (estimaciones)
-      'unidad': cantidadNum * 100, // Asumiendo promedio de 100g por unidad
+      'unidad': cantidadNum * 100,
       'unidades': cantidadNum * 100,
-      'caja': cantidadNum * 500, // Asumiendo promedio de 500g por caja
+      'caja': cantidadNum * 500,
       'cajas': cantidadNum * 500,
-      'paquete': cantidadNum * 300, // Asumiendo promedio de 300g por paquete
+      'paquete': cantidadNum * 300,
       'paquetes': cantidadNum * 300,
     }
 
     return conversiones[unidadLower] || cantidadNum
   }
 
-  // Función para convertir cantidad de una unidad a otra (mismo grupo)
+  // Función para convertir cantidad de una unidad a otra
   const convertirUnidad = (cantidad, unidadOrigen, unidadDestino) => {
-    // Primero convertir a gramos, luego a unidad destino
     const enGramos = convertirAGramos(cantidad, unidadOrigen)
     
-    // Convertir de gramos a unidad destino
     const unidadDestinoLower = unidadDestino?.toLowerCase() || ''
     const conversionesDesdeGramos = {
       'kg': enGramos / 1000,
@@ -115,46 +121,82 @@ export default function RecetaForm({ receta, onClose, onSuccess }) {
     return conversionesDesdeGramos[unidadDestinoLower] || cantidad
   }
 
+  // Calcular cálculos por ingrediente y totales
+  const calcularIngrediente = (ing) => {
+    if (!ing.item || !ing.cantidad) {
+      return {
+        pesoGramos: 0,
+        calorias: 0,
+        costo: 0,
+      }
+    }
+
+    const cantidad = parseFloat(ing.cantidad) || 0
+    const unidad = ing.unidad || ing.item.unidad || 'kg'
+    const unidadItem = ing.item.unidad || 'kg'
+
+    // Calcular peso en gramos
+    const pesoGramos = convertirAGramos(cantidad, unidad)
+
+    // Calcular calorías (convertir cantidad a unidad base del item)
+    let calorias = 0
+    if (ing.item.calorias_por_unidad) {
+      const cantidadEnUnidadItem = convertirUnidad(cantidad, unidad, unidadItem)
+      calorias = cantidadEnUnidadItem * (ing.item.calorias_por_unidad || 0)
+    }
+
+    // Calcular costo (convertir cantidad a unidad base del item)
+    let costo = 0
+    if (ing.item.costo_unitario_actual || ing.item.costo_unitario_promedio) {
+      const cantidadEnUnidadItem = convertirUnidad(cantidad, unidad, unidadItem)
+      const costoUnitario = ing.item.costo_unitario_actual || ing.item.costo_unitario_promedio || 0
+      costo = cantidadEnUnidadItem * costoUnitario
+    }
+
+    return {
+      pesoGramos,
+      calorias,
+      costo,
+    }
+  }
+
   // Calcular totales cuando cambian los ingredientes
+  const [calculos, setCalculos] = useState({
+    porcionGramos: 0,
+    caloriasTotales: 0,
+    costoTotal: 0,
+    caloriasPorPorcion: 0,
+    costoPorPorcion: 0,
+    ingredientesCalculados: [],
+  })
+
   useEffect(() => {
     let porcionGramos = 0
     let caloriasTotales = 0
     let costoTotal = 0
+    const ingredientesCalculados = []
 
     formData.ingredientes.forEach(ing => {
-      if (!ing.item) return
+      const calculo = calcularIngrediente(ing)
+      porcionGramos += calculo.pesoGramos
+      caloriasTotales += calculo.calorias
+      costoTotal += calculo.costo
 
-      const cantidad = parseFloat(ing.cantidad) || 0
-      const unidad = ing.unidad || ing.item.unidad || 'kg'
-
-      // Calcular peso en gramos
-      porcionGramos += convertirAGramos(cantidad, unidad)
-
-      // Calcular calorías (convertir cantidad a unidad base del item)
-      if (ing.item.calorias_por_unidad) {
-        const unidadItem = ing.item.unidad || 'kg'
-        // Convertir cantidad de la unidad ingresada a la unidad del item
-        const cantidadEnUnidadItem = convertirUnidad(cantidad, unidad, unidadItem)
-        caloriasTotales += cantidadEnUnidadItem * (ing.item.calorias_por_unidad || 0)
-      }
-
-      // Calcular costo (convertir cantidad a unidad base del item)
-      if (ing.item.costo_unitario_actual) {
-        const unidadItem = ing.item.unidad || 'kg'
-        // Convertir cantidad de la unidad ingresada a la unidad del item
-        const cantidadEnUnidadItem = convertirUnidad(cantidad, unidad, unidadItem)
-        costoTotal += cantidadEnUnidadItem * (ing.item.costo_unitario_actual || 0)
-      }
+      ingredientesCalculados.push({
+        ...ing,
+        ...calculo,
+      })
     })
 
     const porciones = formData.porciones || 1
 
     setCalculos({
-      porcionGramos: porcionGramos,
-      caloriasTotales: caloriasTotales,
-      costoTotal: costoTotal,
+      porcionGramos,
+      caloriasTotales,
+      costoTotal,
       caloriasPorPorcion: porciones > 0 ? caloriasTotales / porciones : 0,
       costoPorPorcion: porciones > 0 ? costoTotal / porciones : 0,
+      ingredientesCalculados,
     })
   }, [formData.ingredientes, formData.porciones])
 
@@ -192,6 +234,11 @@ export default function RecetaForm({ receta, onClose, onSuccess }) {
   }
 
   const agregarIngrediente = () => {
+    if (items.length === 0 && !loadingItems) {
+      toast.error('No hay items disponibles. Crea items primero en el módulo de Logística.')
+      return
+    }
+    
     setFormData(prev => ({
       ...prev,
       ingredientes: [...prev.ingredientes, {
@@ -262,19 +309,19 @@ export default function RecetaForm({ receta, onClose, onSuccess }) {
           >
             <option value="desayuno">Desayuno</option>
             <option value="almuerzo">Almuerzo</option>
-            <option value="merienda">Merienda</option>
+            <option value="cena">Cena</option>
           </select>
         </div>
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-2">Descripción</label>
+        <label className="block text-sm font-medium mb-2">Instrucciones para Cocina</label>
         <textarea
           value={formData.descripcion}
           onChange={(e) => setFormData({ ...formData, descripcion: e.target.value })}
           className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:border-purple-500"
-          rows="3"
-          placeholder="Descripción de la receta..."
+          rows="4"
+          placeholder="Instrucciones paso a paso para preparar la receta..."
         />
       </div>
 
@@ -308,15 +355,37 @@ export default function RecetaForm({ receta, onClose, onSuccess }) {
       <div>
         <div className="flex items-center justify-between mb-4">
           <label className="block text-sm font-medium">Ingredientes *</label>
-          <button
-            type="button"
-            onClick={agregarIngrediente}
-            className="flex items-center gap-2 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 rounded-lg text-sm"
-          >
-            <Plus size={16} />
-            Agregar Ingrediente
-          </button>
+          <div className="flex items-center gap-2">
+            {loadingItems && (
+              <span className="text-xs text-slate-400">Cargando items...</span>
+            )}
+            {!loadingItems && items.length > 0 && (
+              <span className="text-xs text-slate-400">
+                {items.length} item{items.length !== 1 ? 's' : ''} disponible{items.length !== 1 ? 's' : ''}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={agregarIngrediente}
+              disabled={loadingItems || items.length === 0}
+              className="flex items-center gap-2 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 rounded-lg text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Plus size={16} />
+              Agregar Ingrediente
+            </button>
+          </div>
         </div>
+        
+        {!loadingItems && items.length === 0 && (
+          <div className="mb-4 p-4 bg-yellow-600/20 border border-yellow-500/50 rounded-lg">
+            <p className="text-sm text-yellow-400">
+              ⚠️ No hay items activos disponibles. 
+            </p>
+            <p className="text-xs text-yellow-300 mt-1">
+              Ve al módulo de <strong>Logística → Items</strong> para crear items antes de agregar ingredientes a la receta.
+            </p>
+          </div>
+        )}
 
         {formData.ingredientes.length === 0 ? (
           <div className="p-8 text-center border border-slate-600 rounded-lg bg-slate-800">
@@ -327,24 +396,35 @@ export default function RecetaForm({ receta, onClose, onSuccess }) {
           <div className="space-y-3">
             {formData.ingredientes.map((ingrediente, index) => {
               const item = ingrediente.item || items?.find(i => i.id === ingrediente.item_id)
+              const calculoIngrediente = calcularIngrediente(ingrediente)
+              
               return (
                 <div key={index} className="bg-slate-800 p-4 rounded-lg border border-slate-700">
                   <div className="grid grid-cols-12 gap-3 items-end">
                     <div className="col-span-5">
                       <label className="block text-xs text-slate-400 mb-1">Item</label>
-                      <select
-                        required
-                        value={ingrediente.item_id || ''}
-                        onChange={(e) => actualizarIngrediente(index, 'item_id', e.target.value)}
-                        className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:border-purple-500 text-sm"
-                      >
-                        <option value="">Seleccionar item...</option>
-                        {items?.map(item => (
-                          <option key={item.id} value={item.id}>
-                            {item.nombre} ({item.codigo})
+                      {loadingItems ? (
+                        <div className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm text-slate-400">
+                          Cargando items...
+                        </div>
+                      ) : (
+                        <select
+                          required
+                          value={ingrediente.item_id || ''}
+                          onChange={(e) => actualizarIngrediente(index, 'item_id', e.target.value)}
+                          className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:border-purple-500 text-sm"
+                          disabled={loadingItems || items.length === 0}
+                        >
+                          <option value="">
+                            {items.length === 0 ? 'No hay items disponibles' : 'Seleccionar item...'}
                           </option>
-                        ))}
-                      </select>
+                          {items.map(item => (
+                            <option key={item.id} value={item.id}>
+                              {item.nombre} ({item.codigo})
+                            </option>
+                          ))}
+                        </select>
+                      )}
                     </div>
 
                     <div className="col-span-3">
@@ -391,18 +471,44 @@ export default function RecetaForm({ receta, onClose, onSuccess }) {
                     </div>
                   </div>
 
+                  {/* Información del item y cálculos */}
                   {item && (
-                    <div className="mt-2 text-xs text-slate-400">
-                      {item.calorias_por_unidad && (
-                        <span className="mr-3">
-                          Calorías: {item.calorias_por_unidad} kcal/{item.unidad}
-                        </span>
-                      )}
-                      {item.costo_unitario_actual && (
-                        <span>
-                          Costo: ${item.costo_unitario_actual.toFixed(2)}/{item.unidad}
-                        </span>
-                      )}
+                    <div className="mt-3 pt-3 border-t border-slate-700">
+                      <div className="grid grid-cols-2 gap-4 text-xs">
+                        <div>
+                          <span className="text-slate-400">Información del Item:</span>
+                          <div className="mt-1 space-y-1">
+                            {item.calorias_por_unidad && (
+                              <p className="text-slate-300">
+                                Calorías: <span className="text-purple-300 font-medium">{item.calorias_por_unidad.toFixed(1)}</span> kcal/{item.unidad}
+                              </p>
+                            )}
+                            {(item.costo_unitario_actual || item.costo_unitario_promedio) && (
+                              <p className="text-slate-300">
+                                Costo: <span className="text-green-300 font-medium">${((item.costo_unitario_actual || item.costo_unitario_promedio) || 0).toFixed(2)}</span>/{item.unidad}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div>
+                          <span className="text-slate-400">Cálculos para esta cantidad:</span>
+                          <div className="mt-1 space-y-1">
+                            <p className="text-slate-300">
+                              Peso: <span className="text-blue-300 font-medium">{calculoIngrediente.pesoGramos.toFixed(0)}</span> g
+                            </p>
+                            {calculoIngrediente.calorias > 0 && (
+                              <p className="text-slate-300">
+                                Calorías: <span className="text-purple-300 font-medium">{calculoIngrediente.calorias.toFixed(1)}</span> kcal
+                              </p>
+                            )}
+                            {calculoIngrediente.costo > 0 && (
+                              <p className="text-slate-300">
+                                Costo: <span className="text-green-300 font-medium">${calculoIngrediente.costo.toFixed(2)}</span>
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -415,11 +521,13 @@ export default function RecetaForm({ receta, onClose, onSuccess }) {
       {/* Resumen de cálculos */}
       {formData.ingredientes.length > 0 && (
         <div className="bg-purple-600/20 border border-purple-500/50 rounded-lg p-4">
-          <div className="flex items-center gap-2 mb-3">
+          <div className="flex items-center gap-2 mb-4">
             <Calculator className="text-purple-400" size={20} />
             <h3 className="text-sm font-semibold text-purple-300">Resumen de la Receta</h3>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+          
+          {/* Totales generales */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm mb-4 pb-4 border-b border-purple-500/30">
             <div>
               <p className="text-slate-400 text-xs">Peso Total</p>
               <p className="text-white font-bold text-lg">{calculos.porcionGramos.toFixed(0)} g</p>
@@ -439,6 +547,34 @@ export default function RecetaForm({ receta, onClose, onSuccess }) {
             <div>
               <p className="text-slate-400 text-xs">Costo/Porción</p>
               <p className="text-purple-300 font-bold text-lg">${calculos.costoPorPorcion.toFixed(2)}</p>
+            </div>
+          </div>
+
+          {/* Desglose por ingrediente */}
+          <div>
+            <h4 className="text-xs font-semibold text-purple-300 mb-2">Desglose por Ingrediente:</h4>
+            <div className="space-y-2">
+              {calculos.ingredientesCalculados.map((ing, index) => {
+                const item = ing.item || items?.find(i => i.id === ing.item_id)
+                if (!item) return null
+                
+                return (
+                  <div key={index} className="bg-slate-800/50 p-2 rounded text-xs">
+                    <div className="flex justify-between items-center">
+                      <span className="text-slate-300 font-medium">{item.nombre}</span>
+                      <div className="flex gap-4 text-slate-400">
+                        <span>{ing.cantidad || 0} {ing.unidad || 'kg'}</span>
+                        {ing.calorias > 0 && (
+                          <span className="text-purple-300">{ing.calorias.toFixed(1)} kcal</span>
+                        )}
+                        {ing.costo > 0 && (
+                          <span className="text-green-300">${ing.costo.toFixed(2)}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </div>
         </div>

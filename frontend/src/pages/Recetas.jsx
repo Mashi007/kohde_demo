@@ -25,14 +25,14 @@ export default function Recetas() {
     { value: '', label: 'Todas' },
     { value: 'desayuno', label: 'Desayuno' },
     { value: 'almuerzo', label: 'Almuerzo' },
-    { value: 'merienda', label: 'Merienda' },
+    { value: 'cena', label: 'Cena' },
   ]
 
   const getTipoBadge = (tipo) => {
     const badges = {
       desayuno: 'bg-yellow-600/20 text-yellow-300 border-yellow-500/50',
       almuerzo: 'bg-orange-600/20 text-orange-300 border-orange-500/50',
-      merienda: 'bg-blue-600/20 text-blue-300 border-blue-500/50',
+      cena: 'bg-blue-600/20 text-blue-300 border-blue-500/50',
     }
     return badges[tipo] || 'bg-slate-600/20 text-slate-300 border-slate-500/50'
   }
@@ -41,7 +41,7 @@ export default function Recetas() {
     const labels = {
       desayuno: 'Desayuno',
       almuerzo: 'Almuerzo',
-      merienda: 'Merienda',
+      cena: 'Cena',
     }
     return labels[tipo] || tipo
   }

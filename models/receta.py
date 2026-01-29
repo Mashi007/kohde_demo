@@ -12,7 +12,7 @@ class TipoReceta(enum.Enum):
     """Tipos de receta según momento del día."""
     DESAYUNO = 'desayuno'
     ALMUERZO = 'almuerzo'
-    MERIENDA = 'merienda'
+    CENA = 'cena'
 
 class Receta(db.Model):
     """Modelo de receta."""
