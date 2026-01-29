@@ -30,9 +30,24 @@ def listar_clientes():
             limit=limit
         )
         
-        return jsonify([c.to_dict() for c in clientes]), 200
+        # Convertir a lista de diccionarios de forma segura
+        clientes_list = []
+        for c in clientes:
+            try:
+                clientes_list.append(c.to_dict())
+            except Exception as e:
+                print(f"Error al serializar cliente {c.id}: {e}")
+                # Continuar con el siguiente cliente
+                continue
+        
+        return jsonify(clientes_list), 200
     except Exception as e:
-        return jsonify({'error': str(e)}), 400
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"Error en listar_clientes: {str(e)}")
+        print(f"Traceback: {error_trace}")
+        # En producción, no devolver el traceback completo por seguridad
+        return jsonify({'error': str(e)}), 500
 
 @bp.route('/clientes', methods=['POST'])
 def crear_cliente():

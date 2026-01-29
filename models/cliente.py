@@ -34,18 +34,33 @@ class Cliente(db.Model):
     
     def to_dict(self):
         """Convierte el modelo a diccionario."""
-        return {
-            'id': self.id,
-            'nombre': self.nombre,
-            'tipo': self.tipo.value if self.tipo else None,
-            'ruc_ci': self.ruc_ci,
-            'telefono': self.telefono,
-            'email': self.email,
-            'direccion': self.direccion,
-            'fecha_registro': self.fecha_registro.isoformat() if self.fecha_registro else None,
-            'activo': self.activo,
-            'notas': self.notas,
-        }
+        try:
+            return {
+                'id': self.id,
+                'nombre': self.nombre,
+                'tipo': self.tipo.value if self.tipo else None,
+                'ruc_ci': self.ruc_ci,
+                'telefono': self.telefono,
+                'email': self.email,
+                'direccion': self.direccion,
+                'fecha_registro': self.fecha_registro.isoformat() if self.fecha_registro else None,
+                'activo': self.activo,
+                'notas': self.notas,
+            }
+        except Exception as e:
+            # Fallback en caso de error
+            return {
+                'id': getattr(self, 'id', None),
+                'nombre': getattr(self, 'nombre', ''),
+                'tipo': getattr(self, 'tipo', None),
+                'ruc_ci': getattr(self, 'ruc_ci', None),
+                'telefono': getattr(self, 'telefono', None),
+                'email': getattr(self, 'email', None),
+                'direccion': getattr(self, 'direccion', None),
+                'fecha_registro': None,
+                'activo': getattr(self, 'activo', True),
+                'notas': getattr(self, 'notas', None),
+            }
     
     def __repr__(self):
         return f'<Cliente {self.nombre}>'

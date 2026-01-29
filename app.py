@@ -17,7 +17,8 @@ from routes import (
     logistica_routes,
     compras_routes,
     planificacion_routes,
-    configuracion_routes
+    configuracion_routes,
+    health
 )
 from routes import whatsapp_webhook
 
@@ -39,6 +40,7 @@ def create_app():
     jwt = JWTManager(app)
     
     # Registrar blueprints
+    app.register_blueprint(health.bp)  # Health check sin prefijo
     app.register_blueprint(crm_routes.bp, url_prefix='/api/crm')
     app.register_blueprint(contabilidad_routes.bp, url_prefix='/api/contabilidad')
     app.register_blueprint(logistica_routes.bp, url_prefix='/api/logistica')
@@ -49,7 +51,13 @@ def create_app():
     
     # Crear tablas en la base de datos
     with app.app_context():
-        db.create_all()
+        try:
+            db.create_all()
+            print("✅ Tablas de base de datos creadas correctamente")
+        except Exception as e:
+            print(f"⚠️ Error al crear tablas: {e}")
+            import traceback
+            traceback.print_exc()
     
     return app
 
