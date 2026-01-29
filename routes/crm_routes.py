@@ -94,14 +94,10 @@ def resolver_ticket(ticket_id):
         
         ticket = TicketService.resolver_ticket(db.session, ticket_id, respuesta)
         
-        # Notificar al cliente por WhatsApp si tiene teléfono
+        # Notificar por WhatsApp si se implementa en el futuro
         try:
             from modules.notificaciones.whatsapp import whatsapp_service
-            if ticket.cliente and ticket.cliente.telefono:
-                whatsapp_service.notificar_ticket_resuelto(
-                    ticket.cliente.telefono,
-                    ticket.to_dict()
-                )
+            # Notificación opcional si se implementa
         except Exception as e:
             print(f"Error al enviar notificación: {e}")
         
