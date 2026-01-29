@@ -14,5 +14,8 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
+    // Copiar archivo _redirects al build para Render
+    copyPublicDir: true,
   },
+  publicDir: 'public',
 })

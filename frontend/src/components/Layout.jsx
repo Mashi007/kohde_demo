@@ -17,7 +17,8 @@ import {
   ChevronDown,
   ChevronRight,
   Users,
-  Bell
+  Bell,
+  DollarSign
 } from 'lucide-react'
 
 // Estructura de menú con secciones agrupadas
@@ -48,6 +49,7 @@ const menuStructure = [
       { path: '/inventario', label: 'Inventario', icon: Package },
       { path: '/pedidos', label: 'Pedidos', icon: ClipboardList },
       { path: '/facturas', label: 'Facturas', icon: FileText },
+      { path: '/costos', label: 'Costos', icon: DollarSign },
     ]
   },
   // Planificación - Items, recetas y programación de producción

@@ -24,7 +24,7 @@ class Item(db.Model):
     nombre = Column(String(200), nullable=False)
     descripcion = Column(Text, nullable=True)
     categoria = Column(Enum(CategoriaItem), nullable=False, default=CategoriaItem.INSUMO)
-    unidad = Column(String(20), nullable=False)  # kg, litro, unidad, etc.
+    unidad = Column(String(20), nullable=False)  # Unidad estándar del item (kg, litro, unidad, etc.) - Define la estandarización para todos los módulos
     calorias_por_unidad = Column(Numeric(10, 2), nullable=True)  # Calorías por unidad base
     proveedor_autorizado_id = Column(Integer, ForeignKey('proveedores.id'), nullable=True)
     tiempo_entrega_dias = Column(Integer, default=7, nullable=False)
@@ -40,6 +40,7 @@ class Item(db.Model):
     pedido_items = relationship('PedidoCompraItem', back_populates='item', lazy='dynamic')
     factura_items = relationship('FacturaItem', back_populates='item', lazy='dynamic')
     labels = relationship('ItemLabel', secondary=item_labels, back_populates='items', lazy='dynamic')
+    costo_estandarizado = relationship('CostoItem', back_populates='item', uselist=False)
     
     def to_dict(self):
         """Convierte el modelo a diccionario."""

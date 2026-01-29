@@ -63,6 +63,18 @@ def create_app():
             import traceback
             traceback.print_exc()
     
+    # Configurar tareas programadas (solo en producción o cuando se especifique)
+    import os
+    if os.getenv('ENABLE_SCHEDULER', 'true').lower() == 'true':
+        try:
+            from modules.logistica.tareas_programadas import configurar_tareas_programadas
+            configurar_tareas_programadas(app)
+            print("✅ Tareas programadas configuradas: Recálculo de costos cada sábado a las 2:00 AM")
+        except Exception as e:
+            print(f"⚠️ Advertencia: No se pudo inicializar el scheduler: {e}")
+            import traceback
+            traceback.print_exc()
+    
     return app
 
 # Crear instancia de la aplicación para Gunicorn

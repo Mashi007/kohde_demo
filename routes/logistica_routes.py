@@ -12,6 +12,7 @@ from modules.logistica.requerimientos import RequerimientoService
 from modules.logistica.facturas import FacturaService
 from modules.logistica.pedidos import PedidoCompraService
 from modules.logistica.compras_stats import ComprasStatsService
+from modules.logistica.costos import CostoService
 from models import ItemLabel
 from config import Config
 from datetime import datetime
@@ -41,7 +42,15 @@ def listar_items():
             limit=limit
         )
         
-        return jsonify([i.to_dict() for i in items]), 200
+        # Agregar costo promedio calculado a cada item
+        items_con_costo = []
+        for item in items:
+            item_dict = item.to_dict()
+            costo_promedio = ItemService.calcular_costo_unitario_promedio(db.session, item.id)
+            item_dict['costo_unitario_promedio'] = costo_promedio
+            items_con_costo.append(item_dict)
+        
+        return jsonify(items_con_costo), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
@@ -59,11 +68,19 @@ def crear_item():
 
 @bp.route('/items/<int:item_id>', methods=['GET'])
 def obtener_item(item_id):
-    """Obtiene un item por ID."""
-    item = ItemService.obtener_item(db.session, item_id)
-    if not item:
-        return jsonify({'error': 'Item no encontrado'}), 404
-    return jsonify(item.to_dict()), 200
+    """Obtiene un item por ID con costo promedio calculado."""
+    try:
+        item = ItemService.obtener_item(db.session, item_id)
+        if not item:
+            return jsonify({'error': 'Item no encontrado'}), 404
+        
+        item_dict = item.to_dict()
+        costo_promedio = ItemService.calcular_costo_unitario_promedio(db.session, item_id)
+        item_dict['costo_unitario_promedio'] = costo_promedio
+        
+        return jsonify(item_dict), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
 
 @bp.route('/items/<int:item_id>', methods=['PUT'])
 def actualizar_item(item_id):
@@ -625,5 +642,62 @@ def compras_por_proceso():
         )
         
         return jsonify(resumen), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+# ========== RUTAS DE COSTOS ESTANDARIZADOS ==========
+
+@bp.route('/costos', methods=['GET'])
+def listar_costos():
+    """Lista costos estandarizados con filtros opcionales."""
+    try:
+        label_id = request.args.get('label_id', type=int)
+        categoria = request.args.get('categoria')
+        skip = int(request.args.get('skip', 0))
+        limit = int(request.args.get('limit', 100))
+        
+        costos = CostoService.listar_costos_estandarizados(
+            db.session,
+            label_id=label_id,
+            categoria=categoria,
+            skip=skip,
+            limit=limit
+        )
+        
+        return jsonify([c.to_dict() for c in costos]), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@bp.route('/costos/<int:item_id>', methods=['GET'])
+def obtener_costo_item(item_id):
+    """Obtiene el costo estandarizado de un item específico."""
+    try:
+        costo = CostoService.obtener_costo_estandarizado(db.session, item_id)
+        if not costo:
+            return jsonify({'error': 'Costo no encontrado para este item'}), 404
+        return jsonify(costo.to_dict()), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@bp.route('/costos/<int:item_id>/calcular', methods=['POST'])
+def calcular_costo_item(item_id):
+    """Calcula y almacena el costo estandarizado de un item."""
+    try:
+        costo = CostoService.calcular_y_almacenar_costo_estandarizado(db.session, item_id)
+        if not costo:
+            return jsonify({'error': 'No hay suficientes facturas aprobadas para calcular el costo'}), 404
+        return jsonify(costo.to_dict()), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@bp.route('/costos/recalcular-todos', methods=['POST'])
+def recalcular_todos_costos():
+    """Recalcula todos los costos estandarizados."""
+    try:
+        estadisticas = CostoService.recalcular_todos_los_costos(db.session)
+        return jsonify({
+            'mensaje': 'Recálculo completado',
+            'estadisticas': estadisticas
+        }), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 400

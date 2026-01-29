@@ -93,6 +93,7 @@ class FacturaItem(db.Model):
     cantidad_aprobada = Column(Numeric(10, 2), nullable=True)  # Se llena al aprobar
     precio_unitario = Column(Numeric(10, 2), nullable=False)
     subtotal = Column(Numeric(10, 2), nullable=False)
+    unidad = Column(String(20), nullable=True)  # Unidad de la factura (qq, kg, l, etc.) - se usa para estandarización
     descripcion = Column(String(500), nullable=True)  # Descripción del item en la factura
     
     # Relaciones
@@ -109,6 +110,7 @@ class FacturaItem(db.Model):
             'cantidad_aprobada': float(self.cantidad_aprobada) if self.cantidad_aprobada else None,
             'precio_unitario': float(self.precio_unitario) if self.precio_unitario else None,
             'subtotal': float(self.subtotal) if self.subtotal else None,
+            'unidad': self.unidad,
             'descripcion': self.descripcion,
         }
     

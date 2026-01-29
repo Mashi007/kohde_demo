@@ -172,6 +172,9 @@ class FacturasWhatsAppService:
                     db, item_ocr.get('descripcion', '')
                 )
                 
+                # Extraer unidad de la descripción o usar la del item si existe
+                unidad_factura = item_ocr.get('unidad') or (item.unidad if item else None)
+                
                 factura_item = FacturaItem(
                     factura_id=factura.id,
                     item_id=item.id if item else None,
@@ -179,6 +182,7 @@ class FacturasWhatsAppService:
                     cantidad_aprobada=None,  # Se llenará al confirmar
                     precio_unitario=float(item_ocr.get('precio', 0)),
                     subtotal=float(item_ocr.get('total', 0)),
+                    unidad=unidad_factura,
                     descripcion=item_ocr.get('descripcion', '')
                 )
                 db.add(factura_item)

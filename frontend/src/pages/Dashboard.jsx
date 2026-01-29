@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import api from '../config/api'
-import { Package, FileText, MessageSquare, AlertTriangle } from 'lucide-react'
+import { Package, FileText, MessageSquare, AlertTriangle, DollarSign } from 'lucide-react'
 
 export default function Dashboard() {
   const { data: stockBajo } = useQuery({
@@ -21,6 +21,16 @@ export default function Dashboard() {
   const { data: ultimaFactura } = useQuery({
     queryKey: ['factura-ultima'],
     queryFn: () => api.get('/logistica/facturas/ultima').then(res => res.data).catch(() => null),
+  })
+
+  // Obtener items con costo unitario promedio (top 10 más costosos)
+  const { data: itemsConCosto } = useQuery({
+    queryKey: ['items-con-costo'],
+    queryFn: () => api.get('/logistica/items?limit=100').then(res => {
+      // Filtrar items con costo promedio y ordenar
+      const items = res.data.filter(item => item.costo_unitario_promedio)
+      return items.sort((a, b) => (b.costo_unitario_promedio || 0) - (a.costo_unitario_promedio || 0)).slice(0, 10)
+    }).catch(() => []),
   })
 
   return (
@@ -110,6 +120,35 @@ export default function Dashboard() {
                 Ver Detalles
               </a>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Costos Unitarios Promedio */}
+      {itemsConCosto && itemsConCosto.length > 0 && (
+        <div className="bg-slate-800 p-6 rounded-lg border border-slate-700 mb-6">
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+            <DollarSign size={24} />
+            Costos Unitarios Promedio (Top 10)
+          </h2>
+          <p className="text-xs text-slate-400 mb-4">
+            Promedio calculado de las últimas 3 facturas aprobadas por item
+          </p>
+          <div className="space-y-2">
+            {itemsConCosto.map((item) => (
+              <div key={item.id} className="flex justify-between items-center p-3 bg-slate-700 rounded">
+                <div className="flex-1">
+                  <span className="font-medium">{item.nombre}</span>
+                  <span className="text-xs text-slate-400 ml-2">({item.codigo})</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-purple-400 font-bold">
+                    ${item.costo_unitario_promedio.toFixed(2)}
+                  </span>
+                  <span className="text-xs text-slate-400 ml-1">/{item.unidad}</span>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}

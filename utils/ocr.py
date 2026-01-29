@@ -167,16 +167,36 @@ class OCRProcessor:
                 break
         
         # Buscar items (líneas con cantidades y precios)
+        unidades_comunes = ['kg', 'g', 'qq', 'quintal', 'quintales', 'l', 'ml', 'litro', 'litros', 
+                           'unidad', 'unidades', 'caja', 'cajas', 'paquete', 'paquetes', 
+                           'lb', 'libras', 'arroba', 'arrobas']
+        
         for linea in lineas:
             # Patrón: cantidad descripción precio total
-            item_match = re.match(r'(\d+)\s+(.+?)\s+(\d+\.?\d*)\s+(\d+\.?\d*)', linea)
+            item_match = re.match(r'(\d+\.?\d*)\s+(.+?)\s+(\d+\.?\d*)\s+(\d+\.?\d*)', linea)
             if item_match:
                 cantidad, descripcion, precio, total_item = item_match.groups()
+                
+                # Intentar extraer unidad de la descripción
+                unidad_extraida = None
+                descripcion_limpia = descripcion.strip()
+                
+                # Buscar unidad al final de la descripción o después de la cantidad
+                for unidad in unidades_comunes:
+                    # Buscar unidad después de la cantidad o al final de la descripción
+                    patron_unidad = rf'\b{unidad}\b'
+                    if re.search(patron_unidad, descripcion_limpia, re.IGNORECASE):
+                        unidad_extraida = unidad.lower()
+                        # Limpiar la unidad de la descripción
+                        descripcion_limpia = re.sub(patron_unidad, '', descripcion_limpia, flags=re.IGNORECASE).strip()
+                        break
+                
                 datos['items'].append({
-                    'descripcion': descripcion.strip(),
+                    'descripcion': descripcion_limpia,
                     'cantidad': float(cantidad),
                     'precio': float(precio),
                     'total': float(total_item),
+                    'unidad': unidad_extraida,
                 })
         
         return datos

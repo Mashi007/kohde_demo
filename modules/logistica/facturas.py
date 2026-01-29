@@ -85,12 +85,16 @@ class FacturaService:
             # Intentar encontrar item en base de datos por descripción
             item = FacturaService._buscar_item_por_descripcion(db, item_data.get('descripcion', ''))
             
+            # Extraer unidad de la descripción o usar la del item si existe
+            unidad_factura = item_data.get('unidad') or (item.unidad if item else None)
+            
             factura_item = FacturaItem(
                 factura_id=factura.id,
                 item_id=item.id if item else None,
                 cantidad_facturada=float(item_data.get('cantidad', 0)),
                 precio_unitario=float(item_data.get('precio', 0)),
                 subtotal=float(item_data.get('total', 0)),
+                unidad=unidad_factura,
                 descripcion=item_data.get('descripcion', '')
             )
             db.add(factura_item)
@@ -159,6 +163,16 @@ class FacturaService:
             if item_aprobado:
                 cantidad_aprobada = float(item_aprobado['cantidad_aprobada'])
                 item_factura.cantidad_aprobada = cantidad_aprobada
+                
+                # Actualizar unidad si se proporciona en la aprobación
+                if 'unidad' in item_aprobado and item_aprobado['unidad']:
+                    item_factura.unidad = item_aprobado['unidad']
+                # Si no tiene unidad y tiene item asociado, usar la del item
+                elif not item_factura.unidad and item_factura.item_id:
+                    item = db.query(Item).filter(Item.id == item_factura.item_id).first()
+                    if item:
+                        item_factura.unidad = item.unidad
+                
                 total_aprobado += cantidad_aprobada
                 
                 # Si la cantidad aprobada es menor a la facturada, es parcial
@@ -167,6 +181,11 @@ class FacturaService:
             else:
                 # Si no se proporciona cantidad aprobada, usar la facturada
                 item_factura.cantidad_aprobada = float(item_factura.cantidad_facturada)
+                # Asegurar que tenga unidad (usar la del item si existe)
+                if not item_factura.unidad and item_factura.item_id:
+                    item = db.query(Item).filter(Item.id == item_factura.item_id).first()
+                    if item:
+                        item_factura.unidad = item.unidad
                 total_aprobado += float(item_factura.cantidad_facturada)
         
         # Verificar si se aprobó el 100%
@@ -186,14 +205,31 @@ class FacturaService:
             factura.observaciones = observaciones
         
         # Actualizar inventario solo con items aprobados
+        # IMPORTANTE: Las cantidades se deben convertir a la unidad estándar del item antes de actualizar inventario
+        from modules.logistica.conversor_unidades import son_unidades_compatibles, convertir_unidad
+        
         for item_factura in factura.items:
             if item_factura.cantidad_aprobada and item_factura.cantidad_aprobada > 0 and item_factura.item_id:
-                FacturaService._actualizar_inventario(
-                    db,
-                    item_factura.item_id,
-                    float(item_factura.cantidad_aprobada),
-                    float(item_factura.precio_unitario)
-                )
+                item = db.query(Item).filter(Item.id == item_factura.item_id).first()
+                if item:
+                    # Obtener unidad de la factura
+                    unidad_factura = item_factura.unidad if item_factura.unidad else item.unidad
+                    cantidad_aprobada = float(item_factura.cantidad_aprobada)
+                    unidad_estandar = item.unidad  # Unidad estándar del módulo Items
+                    
+                    # Convertir a unidad estándar si es necesario
+                    if son_unidades_compatibles(unidad_factura, unidad_estandar) and unidad_factura != unidad_estandar:
+                        cantidad_estandarizada = convertir_unidad(cantidad_aprobada, unidad_factura, unidad_estandar)
+                        if cantidad_estandarizada:
+                            cantidad_aprobada = cantidad_estandarizada
+                    
+                    # Actualizar inventario con cantidad estandarizada
+                    FacturaService._actualizar_inventario(
+                        db,
+                        item_factura.item_id,
+                        cantidad_aprobada,
+                        float(item_factura.precio_unitario)
+                    )
         
         db.commit()
         db.refresh(factura)

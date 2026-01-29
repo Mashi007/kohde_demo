@@ -17,6 +17,7 @@ export default function FacturaOCRModal({ factura, isOpen, onClose }) {
     factura.items?.forEach(item => {
       items[item.id] = {
         cantidad_aprobada: item.cantidad_facturada || 0,
+        unidad: item.unidad || item.item?.unidad || 'unidad',
         confirmado: false
       }
     })
@@ -92,7 +93,8 @@ export default function FacturaOCRModal({ factura, isOpen, onClose }) {
   const handleAprobar = () => {
     const items_aprobados = Object.entries(itemsConfirmados).map(([itemId, data]) => ({
       factura_item_id: parseInt(itemId),
-      cantidad_aprobada: data.cantidad_aprobada
+      cantidad_aprobada: data.cantidad_aprobada,
+      unidad: data.unidad || factura.items?.find(i => i.id === parseInt(itemId))?.unidad || factura.items?.find(i => i.id === parseInt(itemId))?.item?.unidad
     }))
 
     const totalAprobado = items_aprobados.reduce((sum, item) => sum + item.cantidad_aprobada, 0)
@@ -214,7 +216,7 @@ export default function FacturaOCRModal({ factura, isOpen, onClose }) {
                         {item.item?.nombre || item.descripcion || 'Item sin identificar'}
                       </h4>
                       <p className="text-sm text-slate-400">
-                        {item.item?.codigo || 'Sin código'} • {item.item?.unidad || 'unidad'}
+                        {item.item?.codigo || 'Sin código'} • {item.unidad || item.item?.unidad || 'unidad'}
                       </p>
                     </div>
                     {itemData.confirmado && (
@@ -225,22 +227,48 @@ export default function FacturaOCRModal({ factura, isOpen, onClose }) {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
                       <label className="text-xs text-slate-400 block mb-1">Cantidad Facturada</label>
-                      <p className="font-semibold">{item.cantidad_facturada || 0}</p>
+                      <p className="font-semibold">
+                        {item.cantidad_facturada || 0} {item.unidad || item.item?.unidad || 'unidad'}
+                      </p>
                     </div>
                     <div>
                       <label className="text-xs text-slate-400 block mb-1">Cantidad Recibida</label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={itemData.cantidad_aprobada}
-                        onChange={(e) => handleCambiarCantidad(item.id, e.target.value)}
-                        className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg focus:outline-none focus:border-purple-500"
-                        disabled={itemData.confirmado}
-                      />
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={itemData.cantidad_aprobada}
+                          onChange={(e) => handleCambiarCantidad(item.id, e.target.value)}
+                          className="flex-1 px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg focus:outline-none focus:border-purple-500"
+                          disabled={itemData.confirmado}
+                        />
+                        <select
+                          value={itemData.unidad || item.unidad || item.item?.unidad || 'unidad'}
+                          onChange={(e) => setItemsConfirmados(prev => ({
+                            ...prev,
+                            [item.id]: { ...prev[item.id], unidad: e.target.value }
+                          }))}
+                          className="px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg focus:outline-none focus:border-purple-500 text-sm"
+                          disabled={itemData.confirmado}
+                        >
+                          <option value="kg">kg</option>
+                          <option value="g">g</option>
+                          <option value="qq">qq</option>
+                          <option value="quintal">quintal</option>
+                          <option value="l">l</option>
+                          <option value="ml">ml</option>
+                          <option value="unidad">unidad</option>
+                          <option value="caja">caja</option>
+                          <option value="paquete">paquete</option>
+                        </select>
+                      </div>
                     </div>
                     <div>
                       <label className="text-xs text-slate-400 block mb-1">Precio Unitario</label>
-                      <p className="font-semibold">${parseFloat(item.precio_unitario || 0).toLocaleString('es-ES', { minimumFractionDigits: 2 })}</p>
+                      <p className="font-semibold">
+                        ${parseFloat(item.precio_unitario || 0).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                        <span className="text-xs text-slate-500 ml-1">/{item.unidad || item.item?.unidad || 'unidad'}</span>
+                      </p>
                     </div>
                     <div>
                       <label className="text-xs text-slate-400 block mb-1">Subtotal</label>

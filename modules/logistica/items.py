@@ -3,12 +3,77 @@ Lógica de negocio para gestión de items (catálogo de productos).
 """
 from typing import List, Optional, Dict
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
-from models import Item, Inventario, ItemLabel
+from sqlalchemy import or_, func, desc
+from datetime import datetime
+from models import Item, Inventario, ItemLabel, FacturaItem, Factura
+from models.factura import EstadoFactura
 from utils.validators import validate_positive_number
 
 class ItemService:
     """Servicio para gestión de items."""
+    
+    @staticmethod
+    def generar_codigo_automatico(db: Session, categoria: str, nombre: str = None) -> str:
+        """
+        Genera un código automático para un item.
+        
+        Formato: CAT-YYYYMMDD-NNNN
+        Donde:
+        - CAT: Prefijo según categoría (MP, IN, PT, BE, LI, OT)
+        - YYYYMMDD: Fecha actual
+        - NNNN: Número secuencial del día
+        
+        Args:
+            db: Sesión de base de datos
+            categoria: Categoría del item
+            nombre: Nombre del item (opcional, para generar código alternativo)
+            
+        Returns:
+            Código generado
+        """
+        # Prefijos por categoría
+        prefijos = {
+            'materia_prima': 'MP',
+            'insumo': 'IN',
+            'producto_terminado': 'PT',
+            'bebida': 'BE',
+            'limpieza': 'LI',
+            'otros': 'OT'
+        }
+        
+        prefijo = prefijos.get(categoria.lower(), 'IT')
+        fecha = datetime.now().strftime('%Y%m%d')
+        
+        # Buscar el último código del día con este prefijo
+        patron_codigo = f"{prefijo}-{fecha}-%"
+        ultimo_item = db.query(Item).filter(
+            Item.codigo.like(patron_codigo)
+        ).order_by(Item.codigo.desc()).first()
+        
+        # Obtener el siguiente número secuencial
+        if ultimo_item:
+            try:
+                # Extraer el número del último código
+                partes = ultimo_item.codigo.split('-')
+                if len(partes) == 3:
+                    ultimo_numero = int(partes[2])
+                    siguiente_numero = ultimo_numero + 1
+                else:
+                    siguiente_numero = 1
+            except (ValueError, IndexError):
+                siguiente_numero = 1
+        else:
+            siguiente_numero = 1
+        
+        # Generar código con formato: CAT-YYYYMMDD-NNNN
+        codigo = f"{prefijo}-{fecha}-{siguiente_numero:04d}"
+        
+        # Verificar que no exista (por si acaso)
+        while db.query(Item).filter(Item.codigo == codigo).first():
+            siguiente_numero += 1
+            codigo = f"{prefijo}-{fecha}-{siguiente_numero:04d}"
+        
+        return codigo
     
     @staticmethod
     def crear_item(db: Session, datos: Dict) -> Item:
@@ -22,6 +87,24 @@ class ItemService:
         Returns:
             Item creado
         """
+        # Generar código automático si no se proporciona o está vacío
+        codigo_proporcionado = datos.get('codigo', '').strip() if datos.get('codigo') else ''
+        if not codigo_proporcionado:
+            categoria = datos.get('categoria', 'otros')
+            # Convertir string a enum si es necesario
+            if isinstance(categoria, str):
+                from models.item import CategoriaItem
+                try:
+                    categoria_enum = CategoriaItem[categoria.upper()]
+                    categoria_str = categoria_enum.value
+                except KeyError:
+                    categoria_str = categoria.lower()
+            else:
+                categoria_str = categoria.value if hasattr(categoria, 'value') else str(categoria)
+            
+            nombre = datos.get('nombre', '')
+            datos['codigo'] = ItemService.generar_codigo_automatico(db, categoria_str, nombre)
+        
         # Validar código único
         if datos.get('codigo'):
             existente = db.query(Item).filter(Item.codigo == datos['codigo']).first()
@@ -146,6 +229,61 @@ class ItemService:
         db.commit()
         db.refresh(item)
         return item
+    
+    @staticmethod
+    def calcular_costo_unitario_promedio(db: Session, item_id: int) -> Optional[float]:
+        """
+        Calcula el costo unitario promedio basado en las últimas 3 facturas aprobadas.
+        
+        Args:
+            db: Sesión de base de datos
+            item_id: ID del item
+            
+        Returns:
+            Costo unitario promedio o None si no hay facturas aprobadas
+        """
+        # Obtener las últimas 3 facturas aprobadas que contengan este item
+        facturas_items = db.query(FacturaItem).join(Factura).filter(
+            FacturaItem.item_id == item_id,
+            Factura.estado == EstadoFactura.APROBADA,
+            FacturaItem.cantidad_aprobada.isnot(None),
+            FacturaItem.cantidad_aprobada > 0,
+            FacturaItem.precio_unitario.isnot(None),
+            FacturaItem.precio_unitario > 0
+        ).order_by(desc(Factura.fecha_aprobacion)).limit(3).all()
+        
+        if not facturas_items:
+            return None
+        
+        # Calcular el promedio de los precios unitarios
+        precios = [float(fi.precio_unitario) for fi in facturas_items if fi.precio_unitario]
+        if not precios:
+            return None
+        
+        promedio = sum(precios) / len(precios)
+        return round(promedio, 2)
+    
+    @staticmethod
+    def obtener_item_con_costo(db: Session, item_id: int) -> Optional[Dict]:
+        """
+        Obtiene un item con su costo unitario calculado.
+        
+        Args:
+            db: Sesión de base de datos
+            item_id: ID del item
+            
+        Returns:
+            Diccionario con el item y su costo unitario calculado
+        """
+        item = ItemService.obtener_item(db, item_id)
+        if not item:
+            return None
+        
+        item_dict = item.to_dict()
+        costo_promedio = ItemService.calcular_costo_unitario_promedio(db, item_id)
+        item_dict['costo_unitario_promedio'] = costo_promedio
+        
+        return item_dict
     
     @staticmethod
     def actualizar_costo_unitario(db: Session, item_id: int, costo: float) -> Item:

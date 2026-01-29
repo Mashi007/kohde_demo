@@ -16,6 +16,7 @@ import Mermas from './pages/Mermas'
 import Chat from './pages/Chat'
 import Configuracion from './pages/Configuracion'
 import ComprasDashboard from './pages/ComprasDashboard'
+import Costos from './pages/Costos'
 
 function App() {
   return (
@@ -36,6 +37,7 @@ function App() {
         <Route path="/charolas" element={<Charolas />} />
         <Route path="/mermas" element={<Mermas />} />
         <Route path="/compras" element={<ComprasDashboard />} />
+        <Route path="/costos" element={<Costos />} />
         <Route path="/chat" element={<Chat />} />
         <Route path="/configuracion" element={<Configuracion />} />
         </Routes>
