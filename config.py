@@ -26,8 +26,12 @@ class Config:
         # Si existe DATABASE_URL (Render), usarla directamente
         # Render puede usar postgres:// pero SQLAlchemy necesita postgresql://
         # Usar psycopg3 (psycopg) en lugar de psycopg2 para Python 3.13
-        db_url = DATABASE_URL.replace('postgres://', 'postgresql+psycopg://')
-        SQLALCHEMY_DATABASE_URI = db_url.replace('postgresql://', 'postgresql+psycopg://')
+        if DATABASE_URL.startswith('postgres://'):
+            SQLALCHEMY_DATABASE_URI = DATABASE_URL.replace('postgres://', 'postgresql+psycopg://', 1)
+        elif DATABASE_URL.startswith('postgresql://'):
+            SQLALCHEMY_DATABASE_URI = DATABASE_URL.replace('postgresql://', 'postgresql+psycopg://', 1)
+        else:
+            SQLALCHEMY_DATABASE_URI = DATABASE_URL
     else:
         # Configuración manual para desarrollo local
         DB_HOST = os.getenv('DB_HOST', 'localhost')
