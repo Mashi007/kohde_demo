@@ -31,6 +31,17 @@ services:
       - key: IVA_PERCENTAGE
         value: 0.15
 
+  # Frontend - Static Site
+  - type: web
+    name: kfronend-demo
+    env: node
+    buildCommand: cd frontend && npm install && npm run build
+    startCommand: cd frontend && npx serve -s dist -l $PORT
+    staticPublishPath: frontend/dist
+    envVars:
+      - key: NODE_VERSION
+        value: 18.x
+
   # PostgreSQL Database
   - type: pgsql
     name: erp-restaurantes-db

@@ -86,7 +86,13 @@ class TicketService:
             query = query.filter(Ticket.cliente_id == cliente_id)
         
         if estado:
-            query = query.filter(Ticket.estado == EstadoTicket[estado.upper()])
+            try:
+                estado_enum = EstadoTicket[estado.upper()]
+                query = query.filter(Ticket.estado == estado_enum)
+            except KeyError:
+                # Estado inválido, ignorar filtro o retornar error
+                # Por ahora ignoramos el filtro si el estado no es válido
+                pass
         
         if tipo:
             query = query.filter(Ticket.tipo == TipoTicket[tipo.upper()])

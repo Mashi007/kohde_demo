@@ -8,4 +8,8 @@ export default {
     extend: {},
   },
   plugins: [],
+  corePlugins: {
+    // Deshabilitar text-size-adjust si causa problemas
+    // textSizeAdjust: false,
+  },
 }

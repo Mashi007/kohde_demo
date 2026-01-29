@@ -5,6 +5,7 @@ Incluye: Items, Inventario, Facturas, Compras y Pedidos
 from flask import Blueprint, request, jsonify
 from werkzeug.utils import secure_filename
 import os
+from sqlalchemy import and_, exists
 from models import db
 from modules.logistica.items import ItemService
 from modules.logistica.inventario import InventarioService
@@ -314,12 +315,16 @@ def listar_facturas():
         
         if estado:
             from models.factura import EstadoFactura
-            query = query.filter(Factura.estado == EstadoFactura[estado.upper()])
+            try:
+                estado_enum = EstadoFactura[estado.upper()]
+                query = query.filter(Factura.estado == estado_enum)
+            except KeyError:
+                # Estado inválido, retornar error descriptivo
+                return jsonify({'error': f'Estado inválido: {estado}. Estados válidos: pendiente, parcial, aprobada, rechazada'}), 400
         
         # Filtrar facturas pendientes de confirmación (con items sin cantidad_aprobada)
         if pendiente_confirmacion:
             from models import FacturaItem
-            from sqlalchemy import exists
             query = query.filter(
                 Factura.estado == EstadoFactura.PENDIENTE,
                 exists().where(
@@ -343,7 +348,7 @@ def obtener_ultima_factura():
         from models import Factura
         factura = db.session.query(Factura).order_by(Factura.fecha_recepcion.desc()).first()
         if not factura:
-            return jsonify({'error': 'No hay facturas'}), 404
+            return jsonify(None), 200  # Retornar null en lugar de error 404
         return jsonify(factura.to_dict()), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 400
