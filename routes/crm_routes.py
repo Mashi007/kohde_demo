@@ -4,7 +4,7 @@ Incluye: Proveedores, Notificaciones y Tickets
 """
 from flask import Blueprint, request, jsonify
 from sqlalchemy.orm import Session
-from models import db
+from models import db, Item
 from modules.crm.tickets import TicketService
 from modules.crm.proveedores import ProveedorService
 from modules.crm.notificaciones.whatsapp import whatsapp_service
@@ -20,6 +20,7 @@ def listar_proveedores():
     try:
         activo = request.args.get('activo')
         busqueda = request.args.get('busqueda')
+        label_id = request.args.get('label_id', type=int)  # Filtrar por label
         skip = int(request.args.get('skip', 0))
         limit = int(request.args.get('limit', 100))
         
@@ -29,11 +30,18 @@ def listar_proveedores():
             db.session,
             activo=activo_bool,
             busqueda=busqueda,
+            label_id=label_id,
             skip=skip,
             limit=limit
         )
         
-        return jsonify([p.to_dict() for p in proveedores]), 200
+        # Incluir información de items y labels para cada proveedor
+        resultado = []
+        for p in proveedores:
+            prov_dict = p.to_dict(include_items=True)
+            resultado.append(prov_dict)
+        
+        return jsonify(resultado), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
@@ -51,11 +59,45 @@ def crear_proveedor():
 
 @bp.route('/proveedores/<int:proveedor_id>', methods=['GET'])
 def obtener_proveedor(proveedor_id):
-    """Obtiene un proveedor por ID."""
-    proveedor = ProveedorService.obtener_proveedor(db.session, proveedor_id)
-    if not proveedor:
+    """Obtiene un proveedor por ID con items y labels."""
+    resultado = ProveedorService.obtener_proveedor_con_items_labels(db.session, proveedor_id)
+    if not resultado:
         return jsonify({'error': 'Proveedor no encontrado'}), 404
-    return jsonify(proveedor.to_dict()), 200
+    return jsonify(resultado), 200
+
+@bp.route('/proveedores/<int:proveedor_id>', methods=['PUT'])
+def actualizar_proveedor(proveedor_id):
+    """Actualiza un proveedor existente."""
+    try:
+        datos = request.get_json()
+        proveedor = ProveedorService.actualizar_proveedor(db.session, proveedor_id, datos)
+        return jsonify(proveedor.to_dict()), 200
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/proveedores/<int:proveedor_id>', methods=['DELETE'])
+def eliminar_proveedor(proveedor_id):
+    """Elimina (soft delete) un proveedor."""
+    try:
+        ProveedorService.eliminar_proveedor(db.session, proveedor_id)
+        return jsonify({'mensaje': 'Proveedor eliminado correctamente'}), 200
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/proveedores/<int:proveedor_id>/toggle-activo', methods=['POST'])
+def toggle_activo_proveedor(proveedor_id):
+    """Alterna el estado activo/inactivo de un proveedor."""
+    try:
+        proveedor = ProveedorService.toggle_activo(db.session, proveedor_id)
+        return jsonify(proveedor.to_dict()), 200
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @bp.route('/proveedores/<int:proveedor_id>/facturas', methods=['GET'])
 def obtener_facturas_proveedor(proveedor_id):

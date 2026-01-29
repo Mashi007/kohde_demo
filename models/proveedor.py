@@ -27,9 +27,14 @@ class Proveedor(db.Model):
     pedidos = relationship('PedidoCompra', back_populates='proveedor', lazy='dynamic')
     items_autorizados = relationship('Item', back_populates='proveedor_autorizado', lazy='dynamic')
     
-    def to_dict(self):
-        """Convierte el modelo a diccionario."""
-        return {
+    def to_dict(self, include_items=False):
+        """
+        Convierte el modelo a diccionario.
+        
+        Args:
+            include_items: Si True, incluye información de items y labels
+        """
+        result = {
             'id': self.id,
             'nombre': self.nombre,
             'ruc': self.ruc,
@@ -41,6 +46,24 @@ class Proveedor(db.Model):
             'activo': self.activo,
             'fecha_registro': self.fecha_registro.isoformat() if self.fecha_registro else None,
         }
+        
+        if include_items:
+            from models import Item
+            items = Item.query.filter(
+                Item.proveedor_autorizado_id == self.id,
+                Item.activo == True
+            ).all()
+            
+            labels_set = set()
+            for item in items:
+                for label in item.labels:
+                    if label.activo:
+                        labels_set.add(label.id)
+            
+            result['total_items'] = len(items)
+            result['total_labels'] = len(labels_set)
+        
+        return result
     
     def __repr__(self):
         return f'<Proveedor {self.nombre}>'

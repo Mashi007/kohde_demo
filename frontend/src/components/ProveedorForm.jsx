@@ -30,9 +30,27 @@ export default function ProveedorForm({ proveedor, onClose, onSuccess }) {
     },
   })
 
+  const updateMutation = useMutation({
+    mutationFn: (data) => api.put(`/crm/proveedores/${proveedor?.id}`, data),
+    onSuccess: () => {
+      toast.success('Proveedor actualizado correctamente')
+      queryClient.invalidateQueries(['proveedores'])
+      queryClient.invalidateQueries(['proveedor-detalle'])
+      onSuccess?.()
+      onClose()
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.error || 'Error al actualizar proveedor')
+    },
+  })
+
   const handleSubmit = (e) => {
     e.preventDefault()
-    createMutation.mutate(formData)
+    if (proveedor) {
+      updateMutation.mutate(formData)
+    } else {
+      createMutation.mutate(formData)
+    }
   }
 
   return (
@@ -115,10 +133,14 @@ export default function ProveedorForm({ proveedor, onClose, onSuccess }) {
       <div className="flex gap-4 pt-4">
         <button
           type="submit"
-          disabled={createMutation.isPending}
+          disabled={createMutation.isPending || updateMutation.isPending}
           className="flex-1 bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg disabled:opacity-50"
         >
-          {createMutation.isPending ? 'Guardando...' : 'Crear Proveedor'}
+          {createMutation.isPending || updateMutation.isPending
+            ? 'Guardando...'
+            : proveedor
+            ? 'Actualizar Proveedor'
+            : 'Crear Proveedor'}
         </button>
         <button
           type="button"
