@@ -14,6 +14,9 @@ class CategoriaItem(enum.Enum):
     MATERIA_PRIMA = 'materia_prima'
     INSUMO = 'insumo'
     PRODUCTO_TERMINADO = 'producto_terminado'
+    BEBIDA = 'bebida'
+    LIMPIEZA = 'limpieza'
+    OTROS = 'otros'
 
 class Item(db.Model):
     """Modelo de item (producto/insumo)."""

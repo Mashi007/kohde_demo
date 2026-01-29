@@ -28,6 +28,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "serve": "npx serve -s dist -l"
+    "serve": "npx serve -s dist -l",
+    "start": "serve -s dist -l $PORT"
   }
 }
