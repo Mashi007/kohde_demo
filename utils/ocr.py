@@ -27,27 +27,45 @@ class OCRProcessor:
                 credentials = service_account.Credentials.from_service_account_info(credentials_info)
                 self.client = vision.ImageAnnotatorClient(credentials=credentials)
             # Prioridad 2: Workload Identity de Render (archivo automático)
-            elif Config.GOOGLE_APPLICATION_CREDENTIALS and os.path.exists(Config.GOOGLE_APPLICATION_CREDENTIALS):
-                # Render crea automáticamente el archivo en /tmp/gcloud-credentials.json
-                self.client = vision.ImageAnnotatorClient()
+            # Intentar usar Application Default Credentials si la variable está configurada
+            elif Config.GOOGLE_APPLICATION_CREDENTIALS:
+                # Render puede crear el archivo después del inicio, intentar usar ADC
+                try:
+                    self.client = vision.ImageAnnotatorClient()
+                except Exception as e:
+                    print(f"Advertencia: No se pudo inicializar con ADC: {e}")
+                    # Si el archivo existe, intentar usarlo
+                    if os.path.exists(Config.GOOGLE_APPLICATION_CREDENTIALS):
+                        self.client = vision.ImageAnnotatorClient()
+                    else:
+                        print(f"Advertencia: Archivo {Config.GOOGLE_APPLICATION_CREDENTIALS} no existe aún")
+                        self.client = None
             # Prioridad 3: Archivo desde ruta personalizada
             elif Config.GOOGLE_CREDENTIALS_PATH and os.path.exists(Config.GOOGLE_CREDENTIALS_PATH):
                 credentials = service_account.Credentials.from_service_account_file(
                     Config.GOOGLE_CREDENTIALS_PATH
                 )
                 self.client = vision.ImageAnnotatorClient(credentials=credentials)
-            # Prioridad 4: Variable de entorno estándar (sin archivo)
-            elif Config.GOOGLE_APPLICATION_CREDENTIALS:
-                # Intentar usar Application Default Credentials
-                self.client = vision.ImageAnnotatorClient()
             else:
                 print("Advertencia: No se encontraron credenciales de Google Cloud Vision")
+                print("El OCR se inicializará cuando las credenciales estén disponibles")
                 self.client = None
         except Exception as e:
             print(f"Error al inicializar cliente de Vision: {e}")
             import traceback
             traceback.print_exc()
             self.client = None
+    
+    def _ensure_client(self):
+        """Asegura que el cliente esté inicializado, reintentando si es necesario."""
+        if self.client:
+            return
+        
+        # Reintentar inicialización si no estaba disponible al inicio
+        self._initialize_client()
+        
+        if not self.client:
+            raise Exception("Cliente de Google Cloud Vision no inicializado. Verifica las credenciales.")
     
     def extract_text_from_image(self, image_path: str) -> str:
         """
@@ -59,8 +77,7 @@ class OCRProcessor:
         Returns:
             Texto extraído de la imagen
         """
-        if not self.client:
-            raise Exception("Cliente de Google Cloud Vision no inicializado")
+        self._ensure_client()
         
         with open(image_path, 'rb') as image_file:
             content = image_file.read()
