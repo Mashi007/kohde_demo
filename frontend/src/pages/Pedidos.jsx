@@ -7,7 +7,7 @@ import { es } from 'date-fns/locale'
 export default function Pedidos() {
   const { data: pedidos } = useQuery({
     queryKey: ['pedidos'],
-    queryFn: () => api.get('/compras/pedidos').then(res => res.data),
+    queryFn: () => api.get('/logistica/pedidos').then(res => res.data),
   })
 
   const getEstadoBadge = (estado) => {

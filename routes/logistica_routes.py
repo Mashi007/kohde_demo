@@ -1,11 +1,17 @@
 """
 Rutas API para módulo de Logística.
+Incluye: Items, Inventario, Facturas, Compras y Pedidos
 """
 from flask import Blueprint, request, jsonify
+from werkzeug.utils import secure_filename
+import os
 from models import db
 from modules.logistica.items import ItemService
 from modules.logistica.inventario import InventarioService
 from modules.logistica.requerimientos import RequerimientoService
+from modules.logistica.facturas import FacturaService
+from modules.logistica.pedidos import PedidoCompraService
+from config import Config
 
 bp = Blueprint('logistica', __name__)
 

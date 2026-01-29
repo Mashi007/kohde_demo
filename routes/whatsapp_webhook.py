@@ -7,7 +7,7 @@ import os
 import requests
 from models import db
 from config import Config
-from modules.contabilidad.ingreso_facturas import FacturaService
+from modules.logistica.facturas import FacturaService
 
 bp = Blueprint('whatsapp', __name__)
 

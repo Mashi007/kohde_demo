@@ -1,3 +1,4 @@
 """
-Módulo de Logística (Inventario, Requerimientos, Items).
+Módulo de Logística.
+Incluye: Items, Inventario, Facturas, Compras y Pedidos.
 """

@@ -12,7 +12,7 @@ export default function FacturaUploadForm({ onClose, onSuccess }) {
   const queryClient = useQueryClient()
 
   const uploadMutation = useMutation({
-    mutationFn: (formData) => api.post('/contabilidad/facturas/ingresar-imagen', formData, {
+    mutationFn: (formData) => api.post('/logistica/facturas/ingresar-imagen', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     }),
     onSuccess: () => {

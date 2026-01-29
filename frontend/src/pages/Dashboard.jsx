@@ -10,7 +10,7 @@ export default function Dashboard() {
 
   const { data: facturasPendientes } = useQuery({
     queryKey: ['facturas-pendientes'],
-    queryFn: () => api.get('/contabilidad/facturas?estado=pendiente').then(res => res.data),
+    queryFn: () => api.get('/logistica/facturas?estado=pendiente').then(res => res.data),
   })
 
   const { data: ticketsAbiertos } = useQuery({

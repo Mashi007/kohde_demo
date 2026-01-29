@@ -14,7 +14,7 @@ export default function Facturas() {
   const { data: facturas, isLoading } = useQuery({
     queryKey: ['facturas', tipoFiltro],
     queryFn: () => 
-      api.get('/contabilidad/facturas', { params: tipoFiltro ? { estado: tipoFiltro } : {} })
+      api.get('/logistica/facturas', { params: tipoFiltro ? { estado: tipoFiltro } : {} })
         .then(res => res.data),
   })
 
@@ -101,7 +101,7 @@ export default function Facturas() {
                   <button 
                     onClick={async () => {
                       try {
-                        await api.post(`/contabilidad/facturas/${factura.id}/aprobar`, {
+                        await api.post(`/logistica/facturas/${factura.id}/aprobar`, {
                           usuario_id: 1, // TODO: Obtener del contexto de usuario
                           items_aprobados: factura.items?.map(item => ({
                             factura_item_id: item.id,
