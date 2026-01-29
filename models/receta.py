@@ -35,6 +35,7 @@ class Receta(db.Model):
     # Relaciones
     ingredientes = relationship('RecetaIngrediente', back_populates='receta', cascade='all, delete-orphan')
     programacion_items = relationship('ProgramacionMenuItem', back_populates='receta', lazy='dynamic')
+    mermas_programacion = relationship('MermaRecetaProgramacion', back_populates='receta', lazy='dynamic')
     
     def calcular_totales(self):
         """Calcula calorías, costos y peso total basado en ingredientes."""

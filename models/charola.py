@@ -22,9 +22,11 @@ class Charola(db.Model):
     ganancia = Column(Numeric(10, 2), nullable=False, default=0)
     observaciones = Column(Text, nullable=True)
     fecha_registro = Column(DateTime, default=datetime.utcnow, nullable=False)
+    programacion_id = Column(Integer, ForeignKey('programacion_menu.id'), nullable=True)  # Vinculación con programación
     
     # Relaciones
     items_charola = relationship('CharolaItem', back_populates='charola', cascade='all, delete-orphan')
+    programacion = relationship('ProgramacionMenu', back_populates='charolas')
     
     def to_dict(self):
         """Convierte el modelo a diccionario."""
@@ -40,6 +42,8 @@ class Charola(db.Model):
             'ganancia': float(self.ganancia) if self.ganancia else 0,
             'observaciones': self.observaciones,
             'fecha_registro': self.fecha_registro.isoformat() if self.fecha_registro else None,
+            'programacion_id': self.programacion_id,
+            'programacion': self.programacion.to_dict() if self.programacion else None,
             'items': [item.to_dict() for item in self.items_charola] if self.items_charola else []
         }
     

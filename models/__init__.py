@@ -20,6 +20,7 @@ from models.requerimiento import Requerimiento, RequerimientoItem
 from models.contabilidad import CuentaContable
 from models.charola import Charola, CharolaItem
 from models.merma import Merma
+from models.merma_receta_programacion import MermaRecetaProgramacion
 from models.chat import Conversacion, Mensaje
 from models.costo_item import CostoItem
 
@@ -45,6 +46,7 @@ __all__ = [
     'Charola',
     'CharolaItem',
     'Merma',
+    'MermaRecetaProgramacion',
     'Conversacion',
     'Mensaje',
     'CostoItem',
