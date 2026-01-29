@@ -129,7 +129,7 @@ export default function Chat() {
         isLoading={eliminarConversacionMutation.isPending}
       />
       <div className="flex h-[calc(100vh-4rem)] bg-slate-900">
-      {/* Sidebar de conversaciones */}
+        {/* Sidebar de conversaciones */}
       <div className="w-80 bg-slate-800 border-r border-slate-700 flex flex-col">
         <div className="p-4 border-b border-slate-700">
           <div className="flex items-center justify-between mb-4">
@@ -302,6 +302,7 @@ export default function Chat() {
           </div>
         )}
       </div>
+    </div>
     </>
   )
 }
