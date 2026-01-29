@@ -29,8 +29,16 @@ class FacturasWhatsAppService:
             Ruta del archivo descargado o None
         """
         try:
-            # Obtener URL de la imagen
-            url = f"{Config.WHATSAPP_API_URL}/{image_id}"
+            # Obtener URL de la imagen desde WhatsApp API
+            whatsapp_api_url = Config.WHATSAPP_API_URL or 'https://graph.facebook.com/v18.0'
+            phone_number_id = Config.WHATSAPP_PHONE_NUMBER_ID
+            
+            if not phone_number_id:
+                print("Error: WHATSAPP_PHONE_NUMBER_ID no configurado")
+                return None
+            
+            # URL para obtener la imagen: /{phone-number-id}/media/{media-id}
+            url = f"{whatsapp_api_url}/{phone_number_id}/media/{image_id}"
             headers = {
                 'Authorization': f'Bearer {access_token}'
             }
