@@ -444,3 +444,109 @@ def enviar_pedido(pedido_id):
         return jsonify({'error': str(e)}), 400
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+# ========== RUTAS DE ESTADÍSTICAS DE COMPRAS ==========
+
+@bp.route('/compras/resumen', methods=['GET'])
+def resumen_compras():
+    """Obtiene resumen general de compras."""
+    try:
+        fecha_desde = request.args.get('fecha_desde')
+        fecha_hasta = request.args.get('fecha_hasta')
+        
+        fecha_desde_obj = None
+        fecha_hasta_obj = None
+        
+        if fecha_desde:
+            fecha_desde_obj = datetime.strptime(fecha_desde, '%Y-%m-%d').date()
+        if fecha_hasta:
+            fecha_hasta_obj = datetime.strptime(fecha_hasta, '%Y-%m-%d').date()
+        
+        resumen = ComprasStatsService.obtener_resumen_general(
+            db.session,
+            fecha_desde=fecha_desde_obj,
+            fecha_hasta=fecha_hasta_obj
+        )
+        
+        return jsonify(resumen), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@bp.route('/compras/por-item', methods=['GET'])
+def compras_por_item():
+    """Obtiene resumen de compras agrupado por item."""
+    try:
+        fecha_desde = request.args.get('fecha_desde')
+        fecha_hasta = request.args.get('fecha_hasta')
+        limite = int(request.args.get('limite', 20))
+        
+        fecha_desde_obj = None
+        fecha_hasta_obj = None
+        
+        if fecha_desde:
+            fecha_desde_obj = datetime.strptime(fecha_desde, '%Y-%m-%d').date()
+        if fecha_hasta:
+            fecha_hasta_obj = datetime.strptime(fecha_hasta, '%Y-%m-%d').date()
+        
+        resumen = ComprasStatsService.obtener_resumen_por_item(
+            db.session,
+            fecha_desde=fecha_desde_obj,
+            fecha_hasta=fecha_hasta_obj,
+            limite=limite
+        )
+        
+        return jsonify(resumen), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@bp.route('/compras/por-proveedor', methods=['GET'])
+def compras_por_proveedor():
+    """Obtiene resumen de compras agrupado por proveedor."""
+    try:
+        fecha_desde = request.args.get('fecha_desde')
+        fecha_hasta = request.args.get('fecha_hasta')
+        limite = int(request.args.get('limite', 20))
+        
+        fecha_desde_obj = None
+        fecha_hasta_obj = None
+        
+        if fecha_desde:
+            fecha_desde_obj = datetime.strptime(fecha_desde, '%Y-%m-%d').date()
+        if fecha_hasta:
+            fecha_hasta_obj = datetime.strptime(fecha_hasta, '%Y-%m-%d').date()
+        
+        resumen = ComprasStatsService.obtener_resumen_por_proveedor(
+            db.session,
+            fecha_desde=fecha_desde_obj,
+            fecha_hasta=fecha_hasta_obj,
+            limite=limite
+        )
+        
+        return jsonify(resumen), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@bp.route('/compras/por-proceso', methods=['GET'])
+def compras_por_proceso():
+    """Obtiene estadísticas de compras relacionadas con procesos de inventario y programación."""
+    try:
+        fecha_desde = request.args.get('fecha_desde')
+        fecha_hasta = request.args.get('fecha_hasta')
+        
+        fecha_desde_obj = None
+        fecha_hasta_obj = None
+        
+        if fecha_desde:
+            fecha_desde_obj = datetime.strptime(fecha_desde, '%Y-%m-%d').date()
+        if fecha_hasta:
+            fecha_hasta_obj = datetime.strptime(fecha_hasta, '%Y-%m-%d').date()
+        
+        resumen = ComprasStatsService.obtener_compras_por_proceso(
+            db.session,
+            fecha_desde=fecha_desde_obj,
+            fecha_hasta=fecha_hasta_obj
+        )
+        
+        return jsonify(resumen), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
