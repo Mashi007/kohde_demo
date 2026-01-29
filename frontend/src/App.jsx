@@ -9,6 +9,7 @@ import Items from './pages/Items'
 import Recetas from './pages/Recetas'
 import Programacion from './pages/Programacion'
 import Proveedores from './pages/Proveedores'
+import Notificaciones from './pages/Notificaciones'
 import Pedidos from './pages/Pedidos'
 import Charolas from './pages/Charolas'
 import Mermas from './pages/Mermas'
@@ -29,6 +30,7 @@ function App() {
           <Route path="/recetas" element={<Recetas />} />
           <Route path="/programacion" element={<Programacion />} />
         <Route path="/proveedores" element={<Proveedores />} />
+        <Route path="/notificaciones" element={<Notificaciones />} />
         <Route path="/pedidos" element={<Pedidos />} />
         <Route path="/charolas" element={<Charolas />} />
         <Route path="/mermas" element={<Mermas />} />

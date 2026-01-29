@@ -16,7 +16,8 @@ import {
   Settings,
   ChevronDown,
   ChevronRight,
-  Users
+  Users,
+  Bell
 } from 'lucide-react'
 
 // Estructura de menú con secciones agrupadas
@@ -33,8 +34,9 @@ const menuStructure = [
     section: 'CRM',
     icon: Users,
     items: [
-      { path: '/tickets', label: 'Tickets', icon: MessageSquare },
       { path: '/proveedores', label: 'Proveedores', icon: Truck },
+      { path: '/notificaciones', label: 'Notificaciones', icon: Bell },
+      { path: '/tickets', label: 'Tickets', icon: MessageSquare },
     ]
   },
   // Logística - Gestión de inventario, compras y facturas
