@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import api from '../config/api'
+import api, { extractData } from '../config/api'
 import toast from 'react-hot-toast'
 import { X, Plus, Trash2, Calculator } from 'lucide-react'
 
@@ -20,7 +20,7 @@ export default function ProgramacionForm({ programacion, fecha, tiempoComida, on
   })
   
   // Cargar recetas disponibles según el tipo de servicio
-  const { data: recetasDisponibles, isLoading: cargandoRecetas } = useQuery({
+  const { data: recetasDisponiblesResponse, isLoading: cargandoRecetas } = useQuery({
     queryKey: ['recetas', formData.tiempo_comida],
     queryFn: () => {
       // Mapear tiempo_comida a tipo de receta
@@ -30,9 +30,12 @@ export default function ProgramacionForm({ programacion, fecha, tiempoComida, on
         'cena': 'almuerzo', // Las cenas usan recetas de tipo almuerzo
       }
       const tipo = tipoMap[formData.tiempo_comida] || 'almuerzo'
-      return api.get(`/planificacion/recetas?tipo=${tipo}&activa=true`).then(res => res.data)
+      return api.get(`/planificacion/recetas?tipo=${tipo}&activa=true`).then(extractData)
     },
   })
+
+  // Asegurar que recetasDisponibles sea un array
+  const recetasDisponibles = Array.isArray(recetasDisponiblesResponse) ? recetasDisponiblesResponse : []
   
   // Calcular totales del servicio
   const calcularTotales = () => {

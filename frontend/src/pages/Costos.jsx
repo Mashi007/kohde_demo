@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import api from '../config/api'
+import api, { extractData } from '../config/api'
 import { DollarSign, RefreshCw, Search, Filter, Package, ChefHat } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -30,14 +30,17 @@ export default function Costos() {
   })
 
   // Cargar costos de recetas
-  const { data: costosRecetas, isLoading: isLoadingRecetas } = useQuery({
+  const { data: costosRecetasResponse, isLoading: isLoadingRecetas } = useQuery({
     queryKey: ['costos-recetas', filtroTipoReceta],
     queryFn: () => {
       const params = {}
       if (filtroTipoReceta) params.tipo = filtroTipoReceta
-      return api.get('/logistica/costos/recetas', { params }).then(res => res.data)
+      return api.get('/logistica/costos/recetas', { params }).then(extractData)
     },
   })
+
+  // Asegurar que costosRecetas sea un array
+  const costosRecetas = Array.isArray(costosRecetasResponse) ? costosRecetasResponse : []
 
   // Cargar labels para filtro
   const { data: labels } = useQuery({

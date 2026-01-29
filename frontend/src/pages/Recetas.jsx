@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import api from '../config/api'
+import api, { extractData } from '../config/api'
 import { ChefHat, Plus, Filter } from 'lucide-react'
 import RecetaForm from '../components/RecetaForm'
 import Modal from '../components/Modal'
@@ -10,13 +10,16 @@ export default function Recetas() {
   const [mostrarFormulario, setMostrarFormulario] = useState(false)
   const [recetaEditando, setRecetaEditando] = useState(null)
 
-  const { data: recetas, isLoading } = useQuery({
+  const { data: recetasResponse, isLoading } = useQuery({
     queryKey: ['recetas', tipoFiltro],
     queryFn: () => {
       const params = tipoFiltro ? `?tipo=${tipoFiltro}` : ''
-      return api.get(`/planificacion/recetas${params}`).then(res => res.data)
+      return api.get(`/planificacion/recetas${params}`).then(extractData)
     },
   })
+
+  // Asegurar que recetas sea un array
+  const recetas = Array.isArray(recetasResponse) ? recetasResponse : []
 
   const tiposReceta = [
     { value: '', label: 'Todas' },

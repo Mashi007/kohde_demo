@@ -27,10 +27,12 @@ export default function CharolaForm({ charola, onClose, onSuccess }) {
   
   const items = Array.isArray(itemsResponse) ? itemsResponse : []
 
-  const { data: recetas } = useQuery({
+  const { data: recetasResponse } = useQuery({
     queryKey: ['recetas'],
-    queryFn: () => api.get('/planificacion/recetas').then(res => res.data),
+    queryFn: () => api.get('/planificacion/recetas').then(extractData),
   })
+  
+  const recetas = Array.isArray(recetasResponse) ? recetasResponse : []
 
   const createMutation = useMutation({
     mutationFn: (data) => api.post('/reportes/charolas', data),
