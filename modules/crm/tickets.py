@@ -28,7 +28,16 @@ class TicketService:
         if not cliente:
             raise ValueError("Cliente no encontrado")
         
-        ticket = Ticket(**datos)
+        # Convertir strings a enums si es necesario
+        ticket_data = datos.copy()
+        if isinstance(ticket_data.get('tipo'), str):
+            ticket_data['tipo'] = TipoTicket[ticket_data['tipo'].upper()]
+        if isinstance(ticket_data.get('prioridad'), str):
+            ticket_data['prioridad'] = PrioridadTicket[ticket_data['prioridad'].upper()]
+        if isinstance(ticket_data.get('estado'), str):
+            ticket_data['estado'] = EstadoTicket[ticket_data['estado'].upper()]
+        
+        ticket = Ticket(**ticket_data)
         db.add(ticket)
         db.commit()
         db.refresh(ticket)

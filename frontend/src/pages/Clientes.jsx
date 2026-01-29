@@ -3,9 +3,13 @@ import { useState } from 'react'
 import api from '../config/api'
 import { Plus, Search, Edit, Trash2 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import Modal from '../components/Modal'
+import ClienteForm from '../components/ClienteForm'
 
 export default function Clientes() {
   const [busqueda, setBusqueda] = useState('')
+  const [showModal, setShowModal] = useState(false)
+  const [clienteEditando, setClienteEditando] = useState(null)
   const queryClient = useQueryClient()
 
   const { data: clientes, isLoading } = useQuery({
@@ -27,11 +31,34 @@ export default function Clientes() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Clientes</h1>
-        <button className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg flex items-center gap-2">
+        <button 
+          onClick={() => {
+            setClienteEditando(null)
+            setShowModal(true)
+          }}
+          className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg flex items-center gap-2"
+        >
           <Plus size={20} />
           Nuevo Cliente
         </button>
       </div>
+
+      <Modal
+        isOpen={showModal}
+        onClose={() => {
+          setShowModal(false)
+          setClienteEditando(null)
+        }}
+        title={clienteEditando ? 'Editar Cliente' : 'Nuevo Cliente'}
+      >
+        <ClienteForm
+          cliente={clienteEditando}
+          onClose={() => {
+            setShowModal(false)
+            setClienteEditando(null)
+          }}
+        />
+      </Modal>
 
       {/* Búsqueda */}
       <div className="mb-6">
@@ -73,7 +100,13 @@ export default function Clientes() {
                   <td className="px-6 py-4">{cliente.email || '-'}</td>
                   <td className="px-6 py-4">
                     <div className="flex gap-2">
-                      <button className="text-blue-400 hover:text-blue-300">
+                      <button 
+                        onClick={() => {
+                          setClienteEditando(cliente)
+                          setShowModal(true)
+                        }}
+                        className="text-blue-400 hover:text-blue-300"
+                      >
                         <Edit size={18} />
                       </button>
                       <button 

@@ -1,8 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
 import api from '../config/api'
-import { ShoppingCart } from 'lucide-react'
+import { ShoppingCart, Plus } from 'lucide-react'
+import Modal from '../components/Modal'
+import ItemForm from '../components/ItemForm'
 
 export default function Items() {
+  const [showModal, setShowModal] = useState(false)
+  
   const { data: items } = useQuery({
     queryKey: ['items'],
     queryFn: () => api.get('/logistica/items').then(res => res.data),
@@ -10,7 +15,26 @@ export default function Items() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold mb-6">Items</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">Items</h1>
+        <button 
+          onClick={() => setShowModal(true)}
+          className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg flex items-center gap-2"
+        >
+          <Plus size={20} />
+          Nuevo Item
+        </button>
+      </div>
+
+      <Modal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        title="Nuevo Item"
+      >
+        <ItemForm
+          onClose={() => setShowModal(false)}
+        />
+      </Modal>
       <div className="bg-slate-800 rounded-lg border border-slate-700 overflow-hidden">
         <table className="w-full">
           <thead className="bg-slate-700">

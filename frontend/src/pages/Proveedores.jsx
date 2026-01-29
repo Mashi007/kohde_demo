@@ -1,8 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
 import api from '../config/api'
-import { Truck } from 'lucide-react'
+import { Truck, Plus } from 'lucide-react'
+import Modal from '../components/Modal'
+import ProveedorForm from '../components/ProveedorForm'
 
 export default function Proveedores() {
+  const [showModal, setShowModal] = useState(false)
+  
   const { data: proveedores } = useQuery({
     queryKey: ['proveedores'],
     queryFn: () => api.get('/compras/proveedores').then(res => res.data),
@@ -10,7 +15,26 @@ export default function Proveedores() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold mb-6">Proveedores</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-3xl font-bold">Proveedores</h1>
+        <button 
+          onClick={() => setShowModal(true)}
+          className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg flex items-center gap-2"
+        >
+          <Plus size={20} />
+          Nuevo Proveedor
+        </button>
+      </div>
+
+      <Modal
+        isOpen={showModal}
+        onClose={() => setShowModal(false)}
+        title="Nuevo Proveedor"
+      >
+        <ProveedorForm
+          onClose={() => setShowModal(false)}
+        />
+      </Modal>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {proveedores?.map((proveedor) => (
           <div key={proveedor.id} className="bg-slate-800 p-6 rounded-lg border border-slate-700">

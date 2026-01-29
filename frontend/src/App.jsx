@@ -1,4 +1,5 @@
 import { Routes, Route } from 'react-router-dom'
+import { Toaster } from 'react-hot-toast'
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
 import Clientes from './pages/Clientes'
@@ -13,20 +14,23 @@ import Pedidos from './pages/Pedidos'
 
 function App() {
   return (
-    <Layout>
-      <Routes>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/clientes" element={<Clientes />} />
-        <Route path="/tickets" element={<Tickets />} />
-        <Route path="/facturas" element={<Facturas />} />
-        <Route path="/inventario" element={<Inventario />} />
-        <Route path="/items" element={<Items />} />
-        <Route path="/recetas" element={<Recetas />} />
-        <Route path="/programacion" element={<Programacion />} />
-        <Route path="/proveedores" element={<Proveedores />} />
-        <Route path="/pedidos" element={<Pedidos />} />
-      </Routes>
-    </Layout>
+    <>
+      <Toaster position="top-right" />
+      <Layout>
+        <Routes>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/clientes" element={<Clientes />} />
+          <Route path="/tickets" element={<Tickets />} />
+          <Route path="/facturas" element={<Facturas />} />
+          <Route path="/inventario" element={<Inventario />} />
+          <Route path="/items" element={<Items />} />
+          <Route path="/recetas" element={<Recetas />} />
+          <Route path="/programacion" element={<Programacion />} />
+          <Route path="/proveedores" element={<Proveedores />} />
+          <Route path="/pedidos" element={<Pedidos />} />
+        </Routes>
+      </Layout>
+    </>
   )
 }
 

@@ -4,9 +4,12 @@ import api from '../config/api'
 import { Upload, FileText, CheckCircle, XCircle } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
+import Modal from '../components/Modal'
+import FacturaUploadForm from '../components/FacturaUploadForm'
 
 export default function Facturas() {
   const [tipoFiltro, setTipoFiltro] = useState('')
+  const [showUploadModal, setShowUploadModal] = useState(false)
 
   const { data: facturas, isLoading } = useQuery({
     queryKey: ['facturas', tipoFiltro],
@@ -29,11 +32,24 @@ export default function Facturas() {
     <div>
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Facturas</h1>
-        <button className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg flex items-center gap-2">
+        <button 
+          onClick={() => setShowUploadModal(true)}
+          className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg flex items-center gap-2"
+        >
           <Upload size={20} />
           Subir Factura
         </button>
       </div>
+
+      <Modal
+        isOpen={showUploadModal}
+        onClose={() => setShowUploadModal(false)}
+        title="Subir Factura con OCR"
+      >
+        <FacturaUploadForm
+          onClose={() => setShowUploadModal(false)}
+        />
+      </Modal>
 
       {/* Filtros */}
       <div className="mb-6 flex gap-4">
@@ -82,7 +98,24 @@ export default function Facturas() {
               </div>
               {factura.estado === 'pendiente' && (
                 <div className="mt-4 pt-4 border-t border-slate-700">
-                  <button className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg text-sm">
+                  <button 
+                    onClick={async () => {
+                      try {
+                        await api.post(`/contabilidad/facturas/${factura.id}/aprobar`, {
+                          usuario_id: 1, // TODO: Obtener del contexto de usuario
+                          items_aprobados: factura.items?.map(item => ({
+                            factura_item_id: item.id,
+                            cantidad_aprobada: item.cantidad_facturada
+                          })) || [],
+                          aprobar_parcial: false
+                        })
+                        window.location.reload()
+                      } catch (error) {
+                        alert(error.response?.data?.error || 'Error al aprobar factura')
+                      }
+                    }}
+                    className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg text-sm"
+                  >
                     Revisar y Aprobar
                   </button>
                 </div>
