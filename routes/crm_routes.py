@@ -112,10 +112,17 @@ def enviar_notificacion():
         
         if tipo == 'whatsapp':
             resultado = whatsapp_service.enviar_mensaje(destinatario, mensaje)
+            # WhatsApp API retorna: {"messages": [{"id": "wamid.xxx"}]}
+            mensaje_id = None
+            if isinstance(resultado, dict):
+                messages = resultado.get('messages', [])
+                if messages and len(messages) > 0:
+                    mensaje_id = messages[0].get('id')
+            
             return jsonify({
                 'exito': True,
                 'tipo': 'whatsapp',
-                'mensaje_id': resultado.get('mensaje_id'),
+                'mensaje_id': mensaje_id,
                 'mensaje': 'Notificación WhatsApp enviada correctamente'
             }), 200
         
