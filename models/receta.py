@@ -2,7 +2,7 @@
 Modelos de Receta y RecetaIngrediente.
 """
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Numeric, ForeignKey, Enum
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Numeric, ForeignKey, Enum, TypeDecorator
 from sqlalchemy.orm import relationship
 import enum
 
@@ -14,6 +14,36 @@ class TipoReceta(enum.Enum):
     ALMUERZO = 'almuerzo'
     CENA = 'cena'
 
+class TipoRecetaEnum(TypeDecorator):
+    """TypeDecorator para asegurar que SQLAlchemy use el valor del enum, no el nombre."""
+    impl = Enum
+    cache_ok = True
+    
+    def __init__(self):
+        super().__init__(TipoReceta, native_enum=True, name='tiporeceta', create_constraint=True)
+    
+    def process_bind_param(self, value, dialect):
+        """Convierte el enum a su valor string antes de insertar."""
+        if value is None:
+            return None
+        # Si es un objeto Enum, retornar su valor
+        if isinstance(value, TipoReceta):
+            return value.value
+        # Si es un string, retornarlo directamente (ya debería ser el valor correcto)
+        if isinstance(value, str):
+            return value.lower()
+        return value
+    
+    def process_result_value(self, value, dialect):
+        """Convierte el valor string del enum a objeto Enum."""
+        if value is None:
+            return None
+        if isinstance(value, str):
+            for tipo in TipoReceta:
+                if tipo.value == value.lower():
+                    return tipo
+        return value
+
 class Receta(db.Model):
     """Modelo de receta."""
     __tablename__ = 'recetas'
@@ -21,7 +51,7 @@ class Receta(db.Model):
     id = Column(Integer, primary_key=True)
     nombre = Column(String(200), nullable=False)
     descripcion = Column(Text, nullable=True)
-    tipo = Column(Enum(TipoReceta), nullable=False, default=TipoReceta.ALMUERZO)
+    tipo = Column(TipoRecetaEnum(), nullable=False, default=TipoReceta.ALMUERZO)
     porciones = Column(Integer, nullable=False, default=1)
     porcion_gramos = Column(Numeric(10, 2), nullable=True)  # Peso total de la receta en gramos
     calorias_totales = Column(Numeric(10, 2), nullable=True)

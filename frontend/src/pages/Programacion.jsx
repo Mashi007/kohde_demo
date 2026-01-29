@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import api from '../config/api'
+import api, { extractData } from '../config/api'
 import { Calendar, Plus, Filter, UtensilsCrossed, Package } from 'lucide-react'
 import CalendarioProgramacion from '../components/CalendarioProgramacion'
 import ProgramacionForm from '../components/ProgramacionForm'
@@ -27,7 +27,7 @@ export default function Programacion() {
       if (filtroServicio) {
         params.append('tiempo_comida', filtroServicio)
       }
-      return api.get(`/planificacion/programacion?${params}`).then(res => res.data)
+      return api.get(`/planificacion/programacion?${params}`).then(res => extractData(res))
     },
   })
   
@@ -56,10 +56,11 @@ export default function Programacion() {
     return labels[servicio] || servicio
   }
   
-  const programacionesDelDia = programaciones?.filter(p => {
+  const programacionesArray = Array.isArray(programaciones) ? programaciones : []
+  const programacionesDelDia = programacionesArray.filter(p => {
     const fechaProg = parseISO(p.fecha)
     return isSameDay(fechaProg, fechaSeleccionada)
-  }) || []
+  })
   
   const programacionesPorServicio = programacionesDelDia.reduce((acc, prog) => {
     const servicio = prog.tiempo_comida
