@@ -777,7 +777,7 @@ def calcular_costo_item(item_id):
 
 @bp.route('/costos/recalcular-todos', methods=['POST'])
 def recalcular_todos_costos():
-    """Recalcula todos los costos estandarizados."""
+    """Recalcula todos los costos estandarizados de items y recetas."""
     try:
         estadisticas = CostoService.recalcular_todos_los_costos(db.session)
         return jsonify({
@@ -785,4 +785,77 @@ def recalcular_todos_costos():
             'estadisticas': estadisticas
         }), 200
     except Exception as e:
-        return jsonify({'error': str(e)}), 400
+        import traceback
+        print(f"Error en recalcular_todos_costos: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/costos/recetas', methods=['GET'])
+def listar_costos_recetas():
+    """Lista costos de recetas con filtros opcionales."""
+    try:
+        from models import Receta
+        from models.receta import TipoReceta
+        
+        tipo = request.args.get('tipo')
+        activa = request.args.get('activa')
+        busqueda = request.args.get('busqueda')
+        skip = int(request.args.get('skip', 0))
+        limit = int(request.args.get('limit', 100))
+        
+        query = db.session.query(Receta)
+        
+        if activa is not None:
+            activa_bool = activa.lower() == 'true'
+            query = query.filter(Receta.activa == activa_bool)
+        else:
+            query = query.filter(Receta.activa == True)
+        
+        if tipo:
+            try:
+                tipo_enum = TipoReceta[tipo.upper()]
+                query = query.filter(Receta.tipo == tipo_enum)
+            except KeyError:
+                pass
+        
+        if busqueda:
+            query = query.filter(Receta.nombre.ilike(f'%{busqueda}%'))
+        
+        recetas = query.order_by(Receta.nombre).offset(skip).limit(limit).all()
+        
+        # Recalcular costos antes de retornar (por si acaso)
+        for receta in recetas:
+            receta.calcular_totales()
+        
+        db.commit()
+        
+        resultado = []
+        for receta in recetas:
+            receta_dict = receta.to_dict()
+            
+            # Contar ingredientes con costo
+            ingredientes_con_costo = 0
+            total_ingredientes = 0
+            if receta.ingredientes:
+                for ing in receta.ingredientes:
+                    total_ingredientes += 1
+                    if ing.item and ing.item.costo_unitario_actual:
+                        ingredientes_con_costo += 1
+            
+            # Agregar información adicional de costos
+            receta_dict['costo_info'] = {
+                'costo_total': float(receta.costo_total) if receta.costo_total else None,
+                'costo_por_porcion': float(receta.costo_por_porcion) if receta.costo_por_porcion else None,
+                'porciones': receta.porciones,
+                'porcion_gramos': float(receta.porcion_gramos) if receta.porcion_gramos else None,
+                'ingredientes_con_costo': ingredientes_con_costo,
+                'total_ingredientes': total_ingredientes
+            }
+            resultado.append(receta_dict)
+        
+        return jsonify(resultado), 200
+    except Exception as e:
+        import traceback
+        print(f"Error en listar_costos_recetas: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500

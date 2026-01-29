@@ -197,31 +197,61 @@ class CostoService:
     @staticmethod
     def recalcular_todos_los_costos(db: Session) -> Dict[str, int]:
         """
-        Recalcula todos los costos estandarizados.
+        Recalcula todos los costos estandarizados de items y recetas.
         
         Returns:
             Diccionario con estadísticas del recálculo
         """
         items = db.query(Item).filter(Item.activo == True).all()
         
-        calculados = 0
-        sin_datos = 0
-        errores = 0
+        calculados_items = 0
+        sin_datos_items = 0
+        errores_items = 0
         
+        # Recalcular costos de items
         for item in items:
             try:
                 costo = CostoService.calcular_y_almacenar_costo_estandarizado(db, item.id)
                 if costo:
-                    calculados += 1
+                    calculados_items += 1
+                    # Actualizar costo_unitario_actual del item con el promedio calculado
+                    item.costo_unitario_actual = costo.costo_unitario_promedio
                 else:
-                    sin_datos += 1
+                    sin_datos_items += 1
             except Exception as e:
-                errores += 1
+                errores_items += 1
                 print(f"Error calculando costo para item {item.id}: {e}")
         
+        db.commit()
+        
+        # Recalcular costos de recetas (se actualizan automáticamente cuando cambian los costos de items)
+        from models import Receta
+        recetas = db.query(Receta).filter(Receta.activa == True).all()
+        
+        calculadas_recetas = 0
+        errores_recetas = 0
+        
+        for receta in recetas:
+            try:
+                # Recalcular totales de la receta (esto actualiza costo_total y costo_por_porcion)
+                receta.calcular_totales()
+                calculadas_recetas += 1
+            except Exception as e:
+                errores_recetas += 1
+                print(f"Error calculando costo para receta {receta.id}: {e}")
+        
+        db.commit()
+        
         return {
-            'calculados': calculados,
-            'sin_datos': sin_datos,
-            'errores': errores,
-            'total': len(items)
+            'items': {
+                'calculados': calculados_items,
+                'sin_datos': sin_datos_items,
+                'errores': errores_items,
+                'total': len(items)
+            },
+            'recetas': {
+                'calculadas': calculadas_recetas,
+                'errores': errores_recetas,
+                'total': len(recetas)
+            }
         }
