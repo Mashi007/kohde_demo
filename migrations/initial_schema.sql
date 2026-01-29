@@ -30,8 +30,8 @@ CREATE TABLE IF NOT EXISTS proveedores (
     telefono VARCHAR(20),
     email VARCHAR(100),
     direccion TEXT,
-    contacto_principal VARCHAR(200),
-    dias_credito INTEGER DEFAULT 0 NOT NULL,
+    nombre_contacto VARCHAR(200),
+    productos_que_provee TEXT,
     activo BOOLEAN DEFAULT TRUE NOT NULL,
     fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
