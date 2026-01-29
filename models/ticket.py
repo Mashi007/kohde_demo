@@ -45,6 +45,18 @@ class Ticket(db.Model):
     fecha_resolucion = Column(DateTime, nullable=True)
     respuesta = Column(Text, nullable=True)
     
+    # Relaciones con otros módulos
+    proveedor_id = Column(Integer, ForeignKey('proveedores.id'), nullable=True)
+    pedido_id = Column(Integer, ForeignKey('pedidos_compra.id'), nullable=True)
+    programacion_id = Column(Integer, ForeignKey('programacion_menu.id'), nullable=True)
+    charola_id = Column(Integer, ForeignKey('charolas.id'), nullable=True)
+    merma_id = Column(Integer, ForeignKey('mermas.id'), nullable=True)
+    inventario_id = Column(Integer, ForeignKey('inventario.id'), nullable=True)
+    
+    # Campos adicionales para contexto
+    origen_modulo = Column(String(50), nullable=True)  # 'proveedor', 'programacion', 'charola', 'merma', 'inventario'
+    auto_generado = Column(String(10), default='false', nullable=False)  # 'true' o 'false'
+    
     # Relaciones removidas (módulo Cliente eliminado)
     
     def to_dict(self):
@@ -61,6 +73,14 @@ class Ticket(db.Model):
             'fecha_creacion': self.fecha_creacion.isoformat() if self.fecha_creacion else None,
             'fecha_resolucion': self.fecha_resolucion.isoformat() if self.fecha_resolucion else None,
             'respuesta': self.respuesta,
+            'proveedor_id': self.proveedor_id,
+            'pedido_id': self.pedido_id,
+            'programacion_id': self.programacion_id,
+            'charola_id': self.charola_id,
+            'merma_id': self.merma_id,
+            'inventario_id': self.inventario_id,
+            'origen_modulo': self.origen_modulo,
+            'auto_generado': self.auto_generado == 'true',
         }
     
     def __repr__(self):

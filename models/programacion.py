@@ -23,6 +23,7 @@ class ProgramacionMenu(db.Model):
     tiempo_comida = Column(Enum(TiempoComida), nullable=False)
     ubicacion = Column(String(100), nullable=False)  # restaurante_A, restaurante_B, etc.
     personas_estimadas = Column(Integer, nullable=False, default=0)
+    charolas_planificadas = Column(Integer, nullable=False, default=0)  # Charolas planificadas para este servicio
     fecha_creacion = Column(DateTime, default=datetime.utcnow, nullable=False)
     
     # Relaciones
@@ -36,6 +37,7 @@ class ProgramacionMenu(db.Model):
             'tiempo_comida': self.tiempo_comida.value if self.tiempo_comida else None,
             'ubicacion': self.ubicacion,
             'personas_estimadas': self.personas_estimadas,
+            'charolas_planificadas': self.charolas_planificadas,
             'fecha_creacion': self.fecha_creacion.isoformat() if self.fecha_creacion else None,
             'items': [item.to_dict() for item in self.items] if self.items else [],
         }
