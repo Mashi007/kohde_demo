@@ -13,6 +13,7 @@ import Pedidos from './pages/Pedidos'
 import Charolas from './pages/Charolas'
 import Mermas from './pages/Mermas'
 import Chat from './pages/Chat'
+import Configuracion from './pages/Configuracion'
 
 function App() {
   return (
@@ -32,6 +33,7 @@ function App() {
         <Route path="/charolas" element={<Charolas />} />
         <Route path="/mermas" element={<Mermas />} />
         <Route path="/chat" element={<Chat />} />
+        <Route path="/configuracion" element={<Configuracion />} />
         </Routes>
       </Layout>
     </>

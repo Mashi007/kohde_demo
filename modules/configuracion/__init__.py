@@ -1,6 +1,8 @@
 """
-Módulo de configuración del sistema.
+Módulo de Configuración.
+Incluye: WhatsApp y AI (OpenAI).
 """
-from modules.configuracion.whatsapp import WhatsAppConfigService
+from . import whatsapp
+from . import ai
 
-__all__ = ['WhatsAppConfigService']
+__all__ = ['whatsapp', 'ai']

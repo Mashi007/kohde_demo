@@ -1,73 +1,107 @@
 """
-Rutas API para configuración del sistema.
+Rutas API para módulo de Configuración.
+Incluye: WhatsApp y AI (OpenAI)
 """
 from flask import Blueprint, request, jsonify
-from modules.configuracion.whatsapp import WhatsAppConfigService
+from modules.configuracion.whatsapp import whatsapp_config_service
+from modules.configuracion.ai import ai_config_service
 
 bp = Blueprint('configuracion', __name__)
 
-# ========== RUTAS DE CONFIGURACIÓN WHATSAPP ==========
+# ========== RUTAS DE WHATSAPP ==========
+
+@bp.route('/whatsapp', methods=['GET'])
+def obtener_configuracion_whatsapp():
+    """Obtiene la configuración actual de WhatsApp."""
+    try:
+        config = whatsapp_config_service.obtener_configuracion()
+        return jsonify(config), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @bp.route('/whatsapp/verificar', methods=['GET'])
 def verificar_whatsapp():
     """Verifica la configuración de WhatsApp."""
     try:
-        config = WhatsAppConfigService.verificar_configuracion()
-        return jsonify(config), 200
+        resultado = whatsapp_config_service.verificar_configuracion()
+        return jsonify(resultado), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 @bp.route('/whatsapp/probar', methods=['POST'])
 def probar_whatsapp():
-    """Prueba la conexión con WhatsApp API."""
+    """Envía un mensaje de prueba de WhatsApp."""
     try:
-        resultado = WhatsAppConfigService.probar_conexion()
-        return jsonify(resultado), 200
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@bp.route('/whatsapp/webhook-info', methods=['GET'])
-def webhook_info():
-    """Obtiene información del webhook de WhatsApp."""
-    try:
-        info = WhatsAppConfigService.obtener_webhook_info()
-        return jsonify(info), 200
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@bp.route('/whatsapp/enviar-prueba', methods=['POST'])
-def enviar_prueba():
-    """Envía un mensaje de prueba."""
-    try:
-        data = request.get_json()
-        numero = data.get('numero_destino')
+        datos = request.get_json()
+        numero = datos.get('numero', '').strip()
+        mensaje = datos.get('mensaje', 'Mensaje de prueba desde ERP')
         
         if not numero:
-            return jsonify({'error': 'numero_destino requerido'}), 400
+            return jsonify({'error': 'Número de teléfono requerido'}), 400
         
-        resultado = WhatsAppConfigService.enviar_mensaje_prueba(numero)
+        resultado = whatsapp_config_service.enviar_mensaje_prueba(numero, mensaje)
+        
+        if resultado.get('exito'):
+            return jsonify(resultado), 200
+        else:
+            return jsonify(resultado), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ========== RUTAS DE AI (OPENAI) ==========
+
+@bp.route('/ai', methods=['GET'])
+def obtener_configuracion_ai():
+    """Obtiene la configuración actual de AI."""
+    try:
+        config = ai_config_service.obtener_configuracion()
+        return jsonify(config), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/ai/verificar', methods=['GET'])
+def verificar_ai():
+    """Verifica la configuración de AI."""
+    try:
+        resultado = ai_config_service.verificar_configuracion()
         return jsonify(resultado), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@bp.route('/whatsapp/procesar-imagen', methods=['POST'])
-def procesar_imagen():
-    """Procesa una imagen recibida por WhatsApp."""
+@bp.route('/ai/probar', methods=['POST'])
+def probar_ai():
+    """Envía un mensaje de prueba al AI."""
     try:
-        data = request.get_json()
-        media_id = data.get('media_id')
-        sender_id = data.get('sender_id')
-        tipo = data.get('tipo', 'factura')
+        datos = request.get_json()
+        mensaje = datos.get('mensaje', 'Hola, ¿puedes responder con OK?')
         
-        if not media_id or not sender_id:
-            return jsonify({'error': 'media_id y sender_id requeridos'}), 400
+        resultado = ai_config_service.enviar_mensaje_prueba(mensaje)
         
-        resultado = WhatsAppConfigService.procesar_imagen_recibida(
-            media_id,
-            sender_id,
-            tipo
-        )
+        if resultado.get('exito'):
+            return jsonify(resultado), 200
+        else:
+            return jsonify(resultado), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ========== RUTA GENERAL ==========
+
+@bp.route('/estado', methods=['GET'])
+def obtener_estado_general():
+    """Obtiene el estado de todas las configuraciones."""
+    try:
+        whatsapp_config = whatsapp_config_service.obtener_configuracion()
+        ai_config = ai_config_service.obtener_configuracion()
         
-        return jsonify(resultado), 200
+        return jsonify({
+            'whatsapp': {
+                'configurado': whatsapp_config['estado'] == 'configurado',
+                'estado': whatsapp_config['estado']
+            },
+            'ai': {
+                'configurado': ai_config['estado'] == 'configurado',
+                'estado': ai_config['estado']
+            }
+        }), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500

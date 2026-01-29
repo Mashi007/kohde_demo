@@ -12,7 +12,8 @@ import {
   ClipboardList,
   BarChart3,
   AlertTriangle,
-  MessageCircle
+  MessageCircle,
+  Settings
 } from 'lucide-react'
 
 const menuItems = [
@@ -28,6 +29,7 @@ const menuItems = [
   { path: '/charolas', label: 'Charolas', icon: BarChart3 },
   { path: '/mermas', label: 'Mermas', icon: AlertTriangle },
   { path: '/chat', label: 'Chat AI', icon: MessageCircle },
+  { path: '/configuracion', label: 'Configuración', icon: Settings },
 ]
 
 export default function Layout({ children }) {

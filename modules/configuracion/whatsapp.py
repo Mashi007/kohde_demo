@@ -1,274 +1,98 @@
 """
-Servicio de configuración para WhatsApp Business API.
+Lógica de negocio para configuración de WhatsApp.
 """
-import os
-import requests
-from typing import Dict, Optional, List
-from werkzeug.utils import secure_filename
-from pathlib import Path
-from config import Config
+from typing import Dict
 from modules.crm.notificaciones.whatsapp import whatsapp_service
+from config import Config
 
 class WhatsAppConfigService:
-    """Servicio para configurar y gestionar WhatsApp."""
+    """Servicio para gestión de configuración de WhatsApp."""
+    
+    @staticmethod
+    def obtener_configuracion() -> Dict:
+        """
+        Obtiene la configuración actual de WhatsApp.
+        
+        Returns:
+            Diccionario con la configuración
+        """
+        return {
+            'whatsapp_api_url': Config.WHATSAPP_API_URL,
+            'whatsapp_phone_number_id_configured': bool(Config.WHATSAPP_PHONE_NUMBER_ID),
+            'whatsapp_phone_number_id': Config.WHATSAPP_PHONE_NUMBER_ID,
+            'whatsapp_access_token_configured': bool(Config.WHATSAPP_ACCESS_TOKEN),
+            'whatsapp_access_token_preview': (
+                Config.WHATSAPP_ACCESS_TOKEN[:10] + '...' + Config.WHATSAPP_ACCESS_TOKEN[-4:] 
+                if Config.WHATSAPP_ACCESS_TOKEN and len(Config.WHATSAPP_ACCESS_TOKEN) > 14 
+                else 'No configurado'
+            ),
+            'whatsapp_verify_token': Config.WHATSAPP_VERIFY_TOKEN,
+            'estado': 'configurado' if (Config.WHATSAPP_ACCESS_TOKEN and Config.WHATSAPP_PHONE_NUMBER_ID) else 'no_configurado'
+        }
     
     @staticmethod
     def verificar_configuracion() -> Dict:
         """
-        Verifica que la configuración de WhatsApp esté completa.
+        Verifica si la configuración de WhatsApp es válida.
         
         Returns:
-            Diccionario con el estado de la configuración
+            Diccionario con el resultado de la verificación
         """
-        config = {
-            'api_url': Config.WHATSAPP_API_URL,
-            'access_token': '✅ Configurado' if Config.WHATSAPP_ACCESS_TOKEN else '❌ No configurado',
-            'phone_number_id': Config.WHATSAPP_PHONE_NUMBER_ID if Config.WHATSAPP_PHONE_NUMBER_ID else '❌ No configurado',
-            'verify_token': '✅ Configurado' if Config.WHATSAPP_VERIFY_TOKEN else '❌ No configurado',
-            'webhook_url': f"{Config.WHATSAPP_API_URL}/webhook",
-            'completo': all([
-                Config.WHATSAPP_ACCESS_TOKEN,
-                Config.WHATSAPP_PHONE_NUMBER_ID,
-                Config.WHATSAPP_VERIFY_TOKEN
-            ])
-        }
-        return config
-    
-    @staticmethod
-    def probar_conexion() -> Dict:
-        """
-        Prueba la conexión con WhatsApp API.
+        config = WhatsAppConfigService.obtener_configuracion()
         
-        Returns:
-            Resultado de la prueba
-        """
-        try:
-            if not Config.WHATSAPP_ACCESS_TOKEN or not Config.WHATSAPP_PHONE_NUMBER_ID:
-                return {
-                    'exito': False,
-                    'mensaje': 'Configuración incompleta'
-                }
-            
-            # Intentar obtener información del número de teléfono
-            url = f"{Config.WHATSAPP_API_URL}/{Config.WHATSAPP_PHONE_NUMBER_ID}"
-            headers = {
-                "Authorization": f"Bearer {Config.WHATSAPP_ACCESS_TOKEN}"
+        if not config['whatsapp_access_token_configured']:
+            return {
+                'valido': False,
+                'mensaje': 'Token de acceso de WhatsApp no configurado',
+                'detalles': 'Por favor, configura WHATSAPP_ACCESS_TOKEN en las variables de entorno'
             }
-            
-            response = requests.get(url, headers=headers, timeout=10)
-            
-            if response.status_code == 200:
-                data = response.json()
-                return {
-                    'exito': True,
-                    'mensaje': 'Conexión exitosa',
-                    'datos': {
-                        'display_phone_number': data.get('display_phone_number'),
-                        'quality_rating': data.get('quality_rating', {}).get('rating', 'N/A')
-                    }
-                }
-            else:
-                return {
-                    'exito': False,
-                    'mensaje': f'Error: {response.status_code}',
-                    'detalles': response.text
-                }
-                
+        
+        if not config['whatsapp_phone_number_id_configured']:
+            return {
+                'valido': False,
+                'mensaje': 'Phone Number ID de WhatsApp no configurado',
+                'detalles': 'Por favor, configura WHATSAPP_PHONE_NUMBER_ID en las variables de entorno'
+            }
+        
+        # Intentar verificar con el servicio
+        try:
+            resultado = whatsapp_service.verificar_conexion()
+            return {
+                'valido': resultado.get('conectado', False),
+                'mensaje': resultado.get('mensaje', 'Estado desconocido'),
+                'detalles': resultado.get('detalles', '')
+            }
         except Exception as e:
             return {
-                'exito': False,
-                'mensaje': f'Error de conexión: {str(e)}'
+                'valido': False,
+                'mensaje': 'Error al verificar configuración',
+                'detalles': str(e)
             }
     
     @staticmethod
-    def descargar_imagen_whatsapp(media_id: str) -> Optional[str]:
-        """
-        Descarga una imagen desde WhatsApp API.
-        
-        Args:
-            media_id: ID del medio en WhatsApp
-            
-        Returns:
-            Ruta del archivo descargado o None
-        """
-        try:
-            # Obtener URL del medio
-            url = f"{Config.WHATSAPP_API_URL}/{media_id}"
-            headers = {
-                "Authorization": f"Bearer {Config.WHATSAPP_ACCESS_TOKEN}"
-            }
-            
-            response = requests.get(url, headers=headers, timeout=30)
-            
-            if response.status_code != 200:
-                print(f"Error al obtener URL del medio: {response.status_code}")
-                return None
-            
-            media_data = response.json()
-            media_url = media_data.get('url')
-            
-            if not media_url:
-                print("No se encontró URL del medio")
-                return None
-            
-            # Descargar la imagen
-            image_response = requests.get(media_url, headers=headers, timeout=30)
-            
-            if image_response.status_code != 200:
-                print(f"Error al descargar imagen: {image_response.status_code}")
-                return None
-            
-            # Determinar extensión del archivo
-            content_type = media_data.get('mime_type', 'image/jpeg')
-            extension = '.jpg'
-            if 'png' in content_type:
-                extension = '.png'
-            elif 'pdf' in content_type:
-                extension = '.pdf'
-            
-            # Guardar archivo
-            filename = f"whatsapp_{media_id}{extension}"
-            filepath = Config.UPLOAD_FOLDER / filename
-            
-            # Asegurar que el directorio existe
-            filepath.parent.mkdir(parents=True, exist_ok=True)
-            
-            with open(filepath, 'wb') as f:
-                f.write(image_response.content)
-            
-            return str(filepath)
-            
-        except Exception as e:
-            print(f"Error al descargar imagen de WhatsApp: {e}")
-            import traceback
-            traceback.print_exc()
-            return None
-    
-    @staticmethod
-    def procesar_imagen_recibida(media_id: str, sender_id: str, tipo: str = 'factura') -> Dict:
-        """
-        Procesa una imagen recibida por WhatsApp.
-        
-        Args:
-            media_id: ID del medio en WhatsApp
-            sender_id: ID del remitente
-            tipo: Tipo de imagen ('factura', 'documento', etc.)
-            
-        Returns:
-            Resultado del procesamiento
-        """
-        try:
-            # Descargar imagen
-            filepath = WhatsAppConfigService.descargar_imagen_whatsapp(media_id)
-            
-            if not filepath:
-                return {
-                    'exito': False,
-                    'mensaje': 'No se pudo descargar la imagen'
-                }
-            
-            # Procesar según el tipo
-            if tipo == 'factura':
-                from modules.logistica.facturas import FacturaService
-                from models import db
-                
-                factura = FacturaService.procesar_factura_desde_imagen(
-                    db.session,
-                    filepath,
-                    tipo='proveedor'
-                )
-                
-                return {
-                    'exito': True,
-                    'mensaje': 'Factura procesada correctamente',
-                    'factura_id': factura.id,
-                    'numero_factura': factura.numero_factura,
-                    'total': float(factura.total)
-                }
-            else:
-                return {
-                    'exito': True,
-                    'mensaje': 'Imagen guardada',
-                    'filepath': filepath
-                }
-                
-        except Exception as e:
-            print(f"Error al procesar imagen: {e}")
-            import traceback
-            traceback.print_exc()
-            return {
-                'exito': False,
-                'mensaje': f'Error al procesar: {str(e)}'
-            }
-    
-    @staticmethod
-    def obtener_webhook_info() -> Dict:
-        """
-        Obtiene información sobre el webhook configurado.
-        
-        Returns:
-            Información del webhook
-        """
-        try:
-            if not Config.WHATSAPP_ACCESS_TOKEN or not Config.WHATSAPP_PHONE_NUMBER_ID:
-                return {
-                    'configurado': False,
-                    'mensaje': 'WhatsApp no está configurado'
-                }
-            
-            url = f"{Config.WHATSAPP_API_URL}/{Config.WHATSAPP_PHONE_NUMBER_ID}/subscribed_apps"
-            headers = {
-                "Authorization": f"Bearer {Config.WHATSAPP_ACCESS_TOKEN}"
-            }
-            
-            response = requests.get(url, headers=headers, timeout=10)
-            
-            if response.status_code == 200:
-                data = response.json()
-                return {
-                    'configurado': True,
-                    'apps': data.get('data', [])
-                }
-            else:
-                return {
-                    'configurado': False,
-                    'mensaje': f'Error: {response.status_code}'
-                }
-                
-        except Exception as e:
-            return {
-                'configurado': False,
-                'mensaje': f'Error: {str(e)}'
-            }
-    
-    @staticmethod
-    def enviar_mensaje_prueba(numero_destino: str) -> Dict:
+    def enviar_mensaje_prueba(numero: str, mensaje: str = "Mensaje de prueba desde ERP") -> Dict:
         """
         Envía un mensaje de prueba.
         
         Args:
-            numero_destino: Número de teléfono destino
+            numero: Número de teléfono destino (formato internacional sin +)
+            mensaje: Mensaje de prueba
             
         Returns:
-            Resultado del envío
+            Diccionario con el resultado
         """
         try:
-            mensaje = (
-                "✅ Prueba de configuración WhatsApp\n\n"
-                "Este es un mensaje de prueba del sistema ERP.\n"
-                "Si recibes este mensaje, la configuración está correcta."
-            )
-            
-            resultado = whatsapp_service.enviar_mensaje(numero_destino, mensaje)
-            
+            resultado = whatsapp_service.enviar_mensaje(numero, mensaje)
             return {
                 'exito': True,
-                'mensaje': 'Mensaje enviado correctamente',
-                'whatsapp_id': resultado.get('messages', [{}])[0].get('id')
+                'mensaje_id': resultado.get('mensaje_id'),
+                'mensaje': 'Mensaje enviado correctamente'
             }
-            
         except Exception as e:
             return {
                 'exito': False,
-                'mensaje': f'Error al enviar mensaje: {str(e)}'
+                'error': str(e)
             }
+
+# Instancia global del servicio
+whatsapp_config_service = WhatsAppConfigService()
