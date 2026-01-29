@@ -1,8 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import api from '../config/api'
 import toast from 'react-hot-toast'
-import { X, Search, CheckCircle2 } from 'lucide-react'
 
 export default function ItemForm({ item, onClose, onSuccess }) {
   const [formData, setFormData] = useState({
@@ -13,11 +12,10 @@ export default function ItemForm({ item, onClose, onSuccess }) {
     calorias_por_unidad: item?.calorias_por_unidad || null,
     activo: item?.activo !== undefined ? item.activo : true,
     label_ids: item?.labels?.map(l => l.id) || [],
+    costo_unitario_manual: item?.costo_unitario_actual || null,
   })
   
   const [codigoAutoGenerado, setCodigoAutoGenerado] = useState(!item?.codigo)
-  const [busquedaLabels, setBusquedaLabels] = useState('')
-  const [categoriaExpandida, setCategoriaExpandida] = useState(null)
 
   const queryClient = useQueryClient()
 
@@ -35,27 +33,23 @@ export default function ItemForm({ item, onClose, onSuccess }) {
     retry: 2,
   })
 
-  // Filtrar labels por búsqueda
-  const labelsFiltradas = labels?.filter(label => {
-    if (!busquedaLabels) return true
-    const busqueda = busquedaLabels.toLowerCase()
-    return (
-      label.nombre_es?.toLowerCase().includes(busqueda) ||
-      label.nombre_en?.toLowerCase().includes(busqueda) ||
-      label.categoria_principal?.toLowerCase().includes(busqueda)
-    )
-  }) || []
-
-  // Agrupar labels por categoría
-  const labelsPorCategoria = labelsFiltradas.reduce((acc, label) => {
+  // Preparar labels para el selector (agrupadas por categoría)
+  const labelsAgrupadas = labels?.reduce((acc, label) => {
     const cat = label.categoria_principal || 'Sin categoría'
     if (!acc[cat]) acc[cat] = []
     acc[cat].push(label)
     return acc
-  }, {})
+  }, {}) || {}
 
-  // Ordenar categorías
-  const categoriasOrdenadas = Object.keys(labelsPorCategoria).sort()
+  // Obtener todas las labels ordenadas por categoría y nombre
+  const todasLasLabels = labels?.sort((a, b) => {
+    const catA = a.categoria_principal || 'Sin categoría'
+    const catB = b.categoria_principal || 'Sin categoría'
+    if (catA !== catB) {
+      return catA.localeCompare(catB)
+    }
+    return a.nombre_es.localeCompare(b.nombre_es)
+  }) || []
 
   const createMutation = useMutation({
     mutationFn: (data) => api.post('/logistica/items', data),
@@ -70,6 +64,19 @@ export default function ItemForm({ item, onClose, onSuccess }) {
     },
   })
 
+  // Mutación para actualizar costo unitario manual de un item existente
+  const updateCostoMutation = useMutation({
+    mutationFn: ({ itemId, costo }) => api.put(`/logistica/items/${itemId}/costo`, { costo }),
+    onSuccess: () => {
+      toast.success('Costo unitario actualizado correctamente')
+      queryClient.invalidateQueries(['item', item?.id, 'costo'])
+      queryClient.invalidateQueries(['items'])
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.error || 'Error al actualizar costo unitario')
+    },
+  })
+
   const handleSubmit = (e) => {
     e.preventDefault()
     // Si el código debe generarse automáticamente, enviar sin código o vacío
@@ -77,31 +84,22 @@ export default function ItemForm({ item, onClose, onSuccess }) {
     if (codigoAutoGenerado) {
       datosEnvio.codigo = '' // El backend generará el código automáticamente
     }
+    
+    // Si hay costo manual, enviarlo como costo_unitario_actual
+    if (datosEnvio.costo_unitario_manual !== null && datosEnvio.costo_unitario_manual !== undefined) {
+      datosEnvio.costo_unitario_actual = datosEnvio.costo_unitario_manual
+    }
+    
+    // Eliminar costo_unitario_manual del objeto antes de enviar
+    delete datosEnvio.costo_unitario_manual
+    
     createMutation.mutate(datosEnvio)
   }
 
-  const toggleLabel = (labelId) => {
-    setFormData(prev => {
-      const currentIds = prev.label_ids || []
-      if (currentIds.includes(labelId)) {
-        return { ...prev, label_ids: currentIds.filter(id => id !== labelId) }
-      } else {
-        return { ...prev, label_ids: [...currentIds, labelId] }
-      }
-    })
-  }
-
-  const removeLabel = (labelId) => {
-    setFormData(prev => ({
-      ...prev,
-      label_ids: (prev.label_ids || []).filter(id => id !== labelId)
-    }))
-  }
-
-  const getSelectedLabels = () => {
-    if (!labels || !formData.label_ids) return []
-    return labels.filter(l => formData.label_ids.includes(l.id))
-  }
+  // Obtener el ID de la label seleccionada (primera del array o null)
+  const labelIdSeleccionada = formData.label_ids && formData.label_ids.length > 0 
+    ? formData.label_ids[0] 
+    : null
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -227,6 +225,50 @@ export default function ItemForm({ item, onClose, onSuccess }) {
         </div>
       )}
 
+      {/* Costo Unitario Manual (solo si no se puede calcular automáticamente) */}
+      {(!item?.id || (item?.id && itemConCosto && !itemConCosto.costo_unitario_promedio)) && (
+        <div>
+          <label className="block text-sm font-medium mb-2">
+            Costo Unitario Manual {!item?.id && <span className="text-slate-400">(Opcional)</span>}
+          </label>
+          <div className="flex gap-2">
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              value={formData.costo_unitario_manual || ''}
+              onChange={(e) => setFormData({ 
+                ...formData, 
+                costo_unitario_manual: e.target.value === '' ? null : parseFloat(e.target.value) 
+              })}
+              className="flex-1 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:border-purple-500"
+              placeholder="Ej: 25.50"
+            />
+            {item?.id && formData.costo_unitario_manual !== null && formData.costo_unitario_manual !== item?.costo_unitario_actual && (
+              <button
+                type="button"
+                onClick={() => {
+                  updateCostoMutation.mutate({
+                    itemId: item.id,
+                    costo: formData.costo_unitario_manual
+                  })
+                }}
+                disabled={updateCostoMutation.isPending}
+                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg disabled:opacity-50 whitespace-nowrap"
+              >
+                {updateCostoMutation.isPending ? 'Guardando...' : 'Actualizar Costo'}
+              </button>
+            )}
+          </div>
+          <p className="text-xs text-slate-400 mt-1">
+            {!item?.id 
+              ? 'Ingresa el costo unitario manual si no hay facturas aprobadas aún. Este valor se usará hasta que el sistema pueda calcular el promedio automáticamente.'
+              : 'Ingresa un costo unitario manual ya que el sistema no puede calcularlo automáticamente por falta de facturas aprobadas. Haz clic en "Actualizar Costo" para guardar el valor.'
+            }
+          </p>
+        </div>
+      )}
+
       <div>
         <label className="block text-sm font-medium mb-2">Categoría General *</label>
         <select
@@ -247,154 +289,63 @@ export default function ItemForm({ item, onClose, onSuccess }) {
         </p>
       </div>
 
-      {/* Labels seleccionadas */}
-      {getSelectedLabels().length > 0 && (
-        <div>
-          <label className="block text-sm font-medium mb-2">Labels Seleccionadas</label>
-          <div className="flex flex-wrap gap-2">
-            {getSelectedLabels().map(label => (
-              <span
-                key={label.id}
-                className="inline-flex items-center gap-1 px-3 py-1 bg-purple-600/20 text-purple-300 rounded-full text-sm border border-purple-500/50"
-              >
-                {label.nombre_es}
-                <button
-                  type="button"
-                  onClick={() => removeLabel(label.id)}
-                  className="hover:text-red-400"
-                >
-                  <X size={14} />
-                </button>
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Selector de Labels */}
+      {/* Selector de Clasificación de Alimentos */}
       <div>
         <label className="block text-sm font-medium mb-2">
           Clasificación de Alimentos
         </label>
         <p className="text-xs text-slate-400 mb-3">
-          Selecciona las clasificaciones que aplican a este item. Esto facilita la búsqueda y la generación de recetas/menús.
+          Selecciona la clasificación que aplica a este item. Esto facilita la búsqueda y la generación de recetas/menús.
         </p>
 
-        {/* Buscador de labels */}
-        <div className="mb-3 relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
-          <input
-            type="text"
-            value={busquedaLabels}
-            onChange={(e) => setBusquedaLabels(e.target.value)}
-            placeholder="Buscar clasificación (ej: cebolla, carne, lácteo...)"
-            className="w-full pl-10 pr-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:border-purple-500 text-sm"
-          />
-        </div>
-
-        {/* Contador de seleccionadas */}
-        {formData.label_ids && formData.label_ids.length > 0 && (
-          <div className="mb-3 p-2 bg-purple-600/20 border border-purple-500/50 rounded-lg">
-            <p className="text-sm text-purple-300">
-              <CheckCircle2 className="inline mr-2" size={16} />
-              {formData.label_ids.length} clasificación{formData.label_ids.length !== 1 ? 'es' : ''} seleccionada{formData.label_ids.length !== 1 ? 's' : ''}
-            </p>
-          </div>
-        )}
-
-        {/* Lista de labels */}
         {loadingLabels ? (
-          <div className="p-8 text-center border border-slate-600 rounded-lg bg-slate-800">
+          <div className="p-4 text-center border border-slate-600 rounded-lg bg-slate-800">
             <div className="animate-pulse">
-              <p className="text-slate-400 mb-2">Cargando clasificaciones...</p>
-              <p className="text-xs text-slate-500">Por favor espera</p>
+              <p className="text-slate-400 text-sm">Cargando clasificaciones...</p>
             </div>
           </div>
         ) : errorLabels ? (
-          <div className="p-8 text-center border border-red-500/50 rounded-lg bg-red-500/10">
-            <p className="text-red-400 mb-2">Error al cargar clasificaciones</p>
+          <div className="p-4 text-center border border-red-500/50 rounded-lg bg-red-500/10">
+            <p className="text-red-400 text-sm mb-1">Error al cargar clasificaciones</p>
             <p className="text-xs text-red-300">
               {errorLabels.message || 'No se pudieron cargar las clasificaciones'}
             </p>
           </div>
-        ) : categoriasOrdenadas.length === 0 ? (
-          <div className="p-8 text-center border border-slate-600 rounded-lg bg-slate-800">
-            <p className="text-slate-400 mb-2">
-              {busquedaLabels ? 'No se encontraron resultados' : 'No hay clasificaciones disponibles'}
-            </p>
+        ) : todasLasLabels.length === 0 ? (
+          <div className="p-4 text-center border border-slate-600 rounded-lg bg-slate-800">
+            <p className="text-slate-400 text-sm mb-1">No hay clasificaciones disponibles</p>
             <p className="text-xs text-slate-500">
-              {busquedaLabels ? (
-                <>
-                  No hay clasificaciones que coincidan con "{busquedaLabels}". 
-                  <button 
-                    type="button"
-                    onClick={() => setBusquedaLabels('')}
-                    className="text-purple-400 hover:text-purple-300 underline ml-1"
-                  >
-                    Limpiar búsqueda
-                  </button>
-                </>
-              ) : (
-                'Ejecuta el script de inicialización para cargar las clasificaciones: python scripts/init_food_labels.py'
-              )}
+              Ejecuta el script de inicialización para cargar las clasificaciones: python scripts/init_food_labels.py
             </p>
           </div>
         ) : (
-          <div className="max-h-96 overflow-y-auto bg-slate-800 border border-slate-600 rounded-lg p-4 space-y-4">
-            {categoriasOrdenadas.map((categoria) => {
-              const labelsCat = labelsPorCategoria[categoria]
-              const seleccionadasEnCategoria = labelsCat.filter(label => formData.label_ids?.includes(label.id)).length
-              
+          <select
+            value={labelIdSeleccionada || ''}
+            onChange={(e) => {
+              const selectedId = e.target.value ? parseInt(e.target.value) : null
+              setFormData(prev => ({
+                ...prev,
+                label_ids: selectedId ? [selectedId] : []
+              }))
+            }}
+            className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:border-purple-500"
+          >
+            <option value="">Selecciona una clasificación...</option>
+            {Object.keys(labelsAgrupadas).sort().map((categoria) => {
+              const labelsCat = labelsAgrupadas[categoria].sort((a, b) => 
+                a.nombre_es.localeCompare(b.nombre_es)
+              )
               return (
-                <div key={categoria} className="border-b border-slate-700 pb-3 last:border-b-0">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-sm font-semibold text-purple-400 uppercase tracking-wide">
-                      {categoria}
-                    </h4>
-                    <span className="text-xs text-slate-500">
-                      {seleccionadasEnCategoria > 0 && (
-                        <span className="text-purple-400 font-medium mr-1">
-                          {seleccionadasEnCategoria}/{labelsCat.length}
-                        </span>
-                      )}
-                      {labelsCat.length} opciones
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {labelsCat
-                      .sort((a, b) => a.nombre_es.localeCompare(b.nombre_es))
-                      .map(label => {
-                      const isSelected = formData.label_ids?.includes(label.id)
-                      return (
-                        <button
-                          key={label.id}
-                          type="button"
-                          onClick={() => toggleLabel(label.id)}
-                          className={`px-3 py-1.5 rounded-lg text-sm transition-all flex items-center gap-1.5 ${
-                            isSelected
-                              ? 'bg-purple-600 text-white border-2 border-purple-400 shadow-lg shadow-purple-500/20 font-medium'
-                              : 'bg-slate-700 text-slate-300 border border-slate-600 hover:bg-slate-600 hover:border-slate-500 hover:text-white'
-                          }`}
-                          title={label.descripcion || label.nombre_es}
-                        >
-                          {isSelected && <CheckCircle2 size={14} className="flex-shrink-0" />}
-                          <span>{label.nombre_es}</span>
-                        </button>
-                      )
-                    })}
-                  </div>
-                </div>
+                <optgroup key={categoria} label={categoria}>
+                  {labelsCat.map(label => (
+                    <option key={label.id} value={label.id}>
+                      {label.nombre_es}
+                    </option>
+                  ))}
+                </optgroup>
               )
             })}
-          </div>
-        )}
-
-        {/* Mensaje de ayuda */}
-        {formData.label_ids && formData.label_ids.length === 0 && !loadingLabels && (
-          <p className="text-xs text-yellow-400 mt-2 flex items-center gap-1">
-            <span>💡</span>
-            <span>Selecciona al menos una clasificación para facilitar la búsqueda y organización</span>
-          </p>
+          </select>
         )}
       </div>
 

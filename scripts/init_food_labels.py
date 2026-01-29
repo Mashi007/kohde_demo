@@ -18,8 +18,6 @@ FOOD_LABELS = [
      'categoria_principal': 'Verduras y hortalizas', 'descripcion': 'Lechuga, espinaca, acelga'},
     {'codigo': 'VEG_PAPA', 'nombre_es': 'Papa', 'nombre_en': 'Potato',
      'categoria_principal': 'Verduras y hortalizas', 'descripcion': 'Papa, camote, yuca'},
-    {'codigo': 'VEG_OTRAS', 'nombre_es': 'Otras Verduras', 'nombre_en': 'Other Vegetables',
-     'categoria_principal': 'Verduras y hortalizas', 'descripcion': 'Otras verduras y hortalizas'},
     
     # FRUTAS
     {'codigo': 'FRU_LIMON', 'nombre_es': 'Limón', 'nombre_en': 'Lemon',
@@ -30,32 +28,24 @@ FOOD_LABELS = [
      'categoria_principal': 'Frutas', 'descripcion': 'Manzana'},
     {'codigo': 'FRU_FRESAS', 'nombre_es': 'Fresas', 'nombre_en': 'Strawberries',
      'categoria_principal': 'Frutas', 'descripcion': 'Fresas, frutos rojos'},
-    {'codigo': 'FRU_OTRAS', 'nombre_es': 'Otras Frutas', 'nombre_en': 'Other Fruits',
-     'categoria_principal': 'Frutas', 'descripcion': 'Otras frutas'},
     
     # CARNES ROJAS
     {'codigo': 'CARNE_RES', 'nombre_es': 'Res', 'nombre_en': 'Beef',
-     'categoria_principal': 'Carnes rojas', 'descripcion': 'Carne de res, ternera'},
+     'categoria_principal': 'Carnes rojas', 'descripcion': 'Carne de res'},
     {'codigo': 'CARNE_CERDO', 'nombre_es': 'Cerdo', 'nombre_en': 'Pork',
      'categoria_principal': 'Carnes rojas', 'descripcion': 'Carne de cerdo'},
-    {'codigo': 'CARNE_OTRAS', 'nombre_es': 'Otras Carnes Rojas', 'nombre_en': 'Other Red Meats',
-     'categoria_principal': 'Carnes rojas', 'descripcion': 'Otras carnes rojas'},
+    {'codigo': 'CARNE_TERNERA', 'nombre_es': 'Ternera', 'nombre_en': 'Veal',
+     'categoria_principal': 'Carnes rojas', 'descripcion': 'Carne de ternera'},
     
     # AVES Y POLLO
     {'codigo': 'AVE_POLLO', 'nombre_es': 'Pollo', 'nombre_en': 'Chicken',
      'categoria_principal': 'Aves y pollo', 'descripcion': 'Pollo entero, pechuga, muslo'},
-    {'codigo': 'AVE_PAVO', 'nombre_es': 'Pavo', 'nombre_en': 'Turkey',
-     'categoria_principal': 'Aves y pollo', 'descripcion': 'Pavo'},
-    {'codigo': 'AVE_OTRAS', 'nombre_es': 'Otras Aves', 'nombre_en': 'Other Poultry',
-     'categoria_principal': 'Aves y pollo', 'descripcion': 'Otras aves'},
     
     # PESCADOS Y MARISCOS
-    {'codigo': 'PESCADO_FRESCO', 'nombre_es': 'Pescado Fresco', 'nombre_en': 'Fresh Fish',
+    {'codigo': 'PESCADO_FRESCO', 'nombre_es': 'Pescado', 'nombre_en': 'Fish',
      'categoria_principal': 'Pescados y mariscos', 'descripcion': 'Pescados frescos'},
-    {'codigo': 'MARISCO_CAMARON', 'nombre_es': 'Camarones', 'nombre_en': 'Shrimp',
-     'categoria_principal': 'Pescados y mariscos', 'descripcion': 'Camarones, langostinos'},
-    {'codigo': 'MARISCO_OTROS', 'nombre_es': 'Otros Mariscos', 'nombre_en': 'Other Seafood',
-     'categoria_principal': 'Pescados y mariscos', 'descripcion': 'Pulpo, calamar, mejillones, etc.'},
+    {'codigo': 'MARISCO_CAMARON', 'nombre_es': 'Mariscos', 'nombre_en': 'Seafood',
+     'categoria_principal': 'Pescados y mariscos', 'descripcion': 'Camarones, langostinos, pulpo, calamar, mejillones'},
     
     # PROTEÍNAS ALTERNATIVAS
     {'codigo': 'PROT_TOFU', 'nombre_es': 'Tofu', 'nombre_en': 'Tofu',
@@ -64,8 +54,6 @@ FOOD_LABELS = [
      'categoria_principal': 'Proteínas alternativas', 'descripcion': 'Seitán'},
     {'codigo': 'PROT_HAMBURGUESAS_VEG', 'nombre_es': 'Hamburguesas Vegetales', 'nombre_en': 'Vegetarian Burgers',
      'categoria_principal': 'Proteínas alternativas', 'descripcion': 'Hamburguesas vegetales'},
-    {'codigo': 'PROT_OTRAS', 'nombre_es': 'Otras Proteínas Alternativas', 'nombre_en': 'Other Alternative Proteins',
-     'categoria_principal': 'Proteínas alternativas', 'descripcion': 'Otras proteínas alternativas'},
     
     # LÁCTEOS Y HUEVOS
     {'codigo': 'LACTEO_LECHE', 'nombre_es': 'Leche', 'nombre_en': 'Milk',
@@ -112,7 +100,7 @@ FOOD_LABELS = [
      'categoria_principal': 'Salsas y envasados', 'descripcion': 'Aceite de oliva, vegetal'},
     {'codigo': 'SALSA_VINAGRE', 'nombre_es': 'Vinagre', 'nombre_en': 'Vinegar',
      'categoria_principal': 'Salsas y envasados', 'descripcion': 'Vinagre'},
-    {'codigo': 'SALSA_OTRAS', 'nombre_es': 'Otras Salsas', 'nombre_en': 'Other Sauces',
+    {'codigo': 'SALSA_PREPARADAS', 'nombre_es': 'Salsas Preparadas', 'nombre_en': 'Prepared Sauces',
      'categoria_principal': 'Salsas y envasados', 'descripcion': 'Otras salsas preparadas'},
     
     # BEBIDAS GASEOSAS
@@ -122,8 +110,6 @@ FOOD_LABELS = [
      'categoria_principal': 'Bebidas gaseosas', 'descripcion': 'Sprite, 7UP'},
     {'codigo': 'BEB_GINGER', 'nombre_es': 'Ginger Ale', 'nombre_en': 'Ginger Ale',
      'categoria_principal': 'Bebidas gaseosas', 'descripcion': 'Ginger Ale'},
-    {'codigo': 'BEB_GASEOSAS_OTRAS', 'nombre_es': 'Otras Gaseosas', 'nombre_en': 'Other Sodas',
-     'categoria_principal': 'Bebidas gaseosas', 'descripcion': 'Otras bebidas gaseosas'},
     
     # BEBIDAS NO ALCOHÓLICAS
     {'codigo': 'BEB_JUGO', 'nombre_es': 'Jugos', 'nombre_en': 'Juice',
@@ -156,14 +142,12 @@ FOOD_LABELS = [
      'categoria_principal': 'Panadería y repostería', 'descripcion': 'Levadura'},
     
     # CONGELADOS
-    {'codigo': 'CONG_PAPAS', 'nombre_es': 'Papas Fritas Congeladas', 'nombre_en': 'Frozen Fries',
+    {'codigo': 'CONG_PAPAS', 'nombre_es': 'Papas Fritas', 'nombre_en': 'Frozen Fries',
      'categoria_principal': 'Congelados', 'descripcion': 'Papas fritas congeladas'},
     {'codigo': 'CONG_VEGETALES', 'nombre_es': 'Vegetales Congelados', 'nombre_en': 'Frozen Vegetables',
      'categoria_principal': 'Congelados', 'descripcion': 'Vegetales congelados'},
     {'codigo': 'CONG_HELADOS', 'nombre_es': 'Helados', 'nombre_en': 'Ice Cream',
      'categoria_principal': 'Congelados', 'descripcion': 'Helados'},
-    {'codigo': 'CONG_OTROS', 'nombre_es': 'Otros Congelados', 'nombre_en': 'Other Frozen',
-     'categoria_principal': 'Congelados', 'descripcion': 'Otros productos congelados'},
     
     # ARTÍCULOS DE LIMPIEZA Y DESECHABLES
     {'codigo': 'LIMP_DETERGENTE', 'nombre_es': 'Detergentes', 'nombre_en': 'Detergents',
@@ -182,8 +166,6 @@ FOOD_LABELS = [
      'categoria_principal': 'Otros / suministros menores', 'descripcion': 'Vasos desechables'},
     {'codigo': 'OTRO_DECORACION', 'nombre_es': 'Decoración Comestible', 'nombre_en': 'Edible Decoration',
      'categoria_principal': 'Otros / suministros menores', 'descripcion': 'Decoración comestible'},
-    {'codigo': 'OTRO_OTROS', 'nombre_es': 'Otros Suministros', 'nombre_en': 'Other Supplies',
-     'categoria_principal': 'Otros / suministros menores', 'descripcion': 'Otros suministros menores'},
 ]
 
 def init_food_labels():
