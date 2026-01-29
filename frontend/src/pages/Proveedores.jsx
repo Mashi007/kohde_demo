@@ -115,7 +115,7 @@ export default function Proveedores() {
         variant="danger"
         isLoading={eliminarMutation.isPending}
       />
-    <div className="flex gap-6 h-[calc(100vh-4rem)]">
+      <div className="flex gap-6 h-[calc(100vh-4rem)]">
       {/* Panel izquierdo: Filtros por Labels */}
       <div className="w-64 bg-slate-800 rounded-lg border border-slate-700 p-4 overflow-y-auto">
         <div className="flex items-center gap-2 mb-4">
@@ -398,7 +398,7 @@ export default function Proveedores() {
           }}
         />
       </Modal>
-    </div>
+      </div>
     </>
   )
 }
