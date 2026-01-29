@@ -44,6 +44,7 @@ const menuStructure = [
     section: 'Logística',
     icon: Package,
     items: [
+      { path: '/compras', label: 'Compras', icon: ShoppingCart },
       { path: '/inventario', label: 'Inventario', icon: Package },
       { path: '/pedidos', label: 'Pedidos', icon: ClipboardList },
       { path: '/facturas', label: 'Facturas', icon: FileText },

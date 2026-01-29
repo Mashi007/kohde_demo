@@ -11,8 +11,10 @@ from modules.logistica.inventario import InventarioService
 from modules.logistica.requerimientos import RequerimientoService
 from modules.logistica.facturas import FacturaService
 from modules.logistica.pedidos import PedidoCompraService
+from modules.logistica.compras_stats import ComprasStatsService
 from models import ItemLabel
 from config import Config
+from datetime import datetime
 
 bp = Blueprint('logistica', __name__)
 
