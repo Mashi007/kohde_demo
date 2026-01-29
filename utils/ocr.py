@@ -21,25 +21,32 @@ class OCRProcessor:
         try:
             import json
             
-            # Prioridad 1: JSON desde variable de entorno (mejor para Render)
+            # Prioridad 1: JSON desde variable de entorno (mejor para Render manual)
             if Config.GOOGLE_APPLICATION_CREDENTIALS_JSON:
                 credentials_info = json.loads(Config.GOOGLE_APPLICATION_CREDENTIALS_JSON)
                 credentials = service_account.Credentials.from_service_account_info(credentials_info)
                 self.client = vision.ImageAnnotatorClient(credentials=credentials)
-            # Prioridad 2: Archivo desde ruta
+            # Prioridad 2: Workload Identity de Render (archivo automático)
+            elif Config.GOOGLE_APPLICATION_CREDENTIALS and os.path.exists(Config.GOOGLE_APPLICATION_CREDENTIALS):
+                # Render crea automáticamente el archivo en /tmp/gcloud-credentials.json
+                self.client = vision.ImageAnnotatorClient()
+            # Prioridad 3: Archivo desde ruta personalizada
             elif Config.GOOGLE_CREDENTIALS_PATH and os.path.exists(Config.GOOGLE_CREDENTIALS_PATH):
                 credentials = service_account.Credentials.from_service_account_file(
                     Config.GOOGLE_CREDENTIALS_PATH
                 )
                 self.client = vision.ImageAnnotatorClient(credentials=credentials)
-            # Prioridad 3: Variable de entorno estándar
+            # Prioridad 4: Variable de entorno estándar (sin archivo)
             elif Config.GOOGLE_APPLICATION_CREDENTIALS:
+                # Intentar usar Application Default Credentials
                 self.client = vision.ImageAnnotatorClient()
             else:
                 print("Advertencia: No se encontraron credenciales de Google Cloud Vision")
                 self.client = None
         except Exception as e:
             print(f"Error al inicializar cliente de Vision: {e}")
+            import traceback
+            traceback.print_exc()
             self.client = None
     
     def extract_text_from_image(self, image_path: str) -> str:

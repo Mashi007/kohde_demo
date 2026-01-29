@@ -44,8 +44,13 @@ class Config:
     # Ruta al archivo JSON de credenciales de Google Cloud
     GOOGLE_CREDENTIALS_PATH = os.getenv('GOOGLE_CREDENTIALS_PATH', '')
     
-    # Credenciales JSON como string (más fácil para Render)
+    # Credenciales JSON como string (más fácil para Render manual)
     GOOGLE_APPLICATION_CREDENTIALS_JSON = os.getenv('GOOGLE_APPLICATION_CREDENTIALS_JSON', '')
+    
+    # Workload Identity Federation (Render automático)
+    WORKLOAD_IDENTITY_PROVIDER = os.getenv('WORKLOAD_IDENTITY_PROVIDER', '')
+    SERVICE_ACCOUNT_EMAIL = os.getenv('SERVICE_ACCOUNT_EMAIL', '')
+    RENDER_SERVICE_ID = os.getenv('RENDER_SERVICE_ID', '')
     
     # WhatsApp Business API
     WHATSAPP_API_URL = os.getenv('WHATSAPP_API_URL', 'https://graph.facebook.com/v18.0')
