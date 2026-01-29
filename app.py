@@ -18,7 +18,8 @@ from routes import (
     compras_routes,
     planificacion_routes,
     configuracion_routes,
-    reportes_routes
+    reportes_routes,
+    chat_routes
 )
 from routes import whatsapp_webhook
 from routes import health
@@ -49,6 +50,7 @@ def create_app():
     app.register_blueprint(planificacion_routes.bp, url_prefix='/api/planificacion')
     app.register_blueprint(configuracion_routes.bp, url_prefix='/api/configuracion')
     app.register_blueprint(reportes_routes.bp, url_prefix='/api/reportes')
+    app.register_blueprint(chat_routes.bp, url_prefix='/api/chat')
     app.register_blueprint(whatsapp_webhook.bp, url_prefix='/whatsapp')
     
     # Crear tablas en la base de datos

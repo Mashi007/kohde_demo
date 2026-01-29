@@ -12,6 +12,7 @@ import Proveedores from './pages/Proveedores'
 import Pedidos from './pages/Pedidos'
 import Charolas from './pages/Charolas'
 import Mermas from './pages/Mermas'
+import Chat from './pages/Chat'
 
 function App() {
   return (
@@ -30,6 +31,7 @@ function App() {
         <Route path="/pedidos" element={<Pedidos />} />
         <Route path="/charolas" element={<Charolas />} />
         <Route path="/mermas" element={<Mermas />} />
+        <Route path="/chat" element={<Chat />} />
         </Routes>
       </Layout>
     </>

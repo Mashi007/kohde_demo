@@ -11,7 +11,8 @@ import {
   Truck,
   ClipboardList,
   BarChart3,
-  AlertTriangle
+  AlertTriangle,
+  MessageCircle
 } from 'lucide-react'
 
 const menuItems = [
@@ -26,6 +27,7 @@ const menuItems = [
   { path: '/pedidos', label: 'Pedidos', icon: ClipboardList },
   { path: '/charolas', label: 'Charolas', icon: BarChart3 },
   { path: '/mermas', label: 'Mermas', icon: AlertTriangle },
+  { path: '/chat', label: 'Chat AI', icon: MessageCircle },
 ]
 
 export default function Layout({ children }) {

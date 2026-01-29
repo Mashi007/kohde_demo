@@ -19,6 +19,7 @@ from models.requerimiento import Requerimiento, RequerimientoItem
 from models.contabilidad import CuentaContable
 from models.charola import Charola, CharolaItem
 from models.merma import Merma
+from models.chat import Conversacion, Mensaje
 
 __all__ = [
     'db',
@@ -41,4 +42,6 @@ __all__ = [
     'Charola',
     'CharolaItem',
     'Merma',
+    'Conversacion',
+    'Mensaje',
 ]
