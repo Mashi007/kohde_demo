@@ -10,7 +10,7 @@ export default function Proveedores() {
   
   const { data: proveedores } = useQuery({
     queryKey: ['proveedores'],
-    queryFn: () => api.get('/compras/proveedores').then(res => res.data),
+    queryFn: () => api.get('/crm/proveedores').then(res => res.data),
   })
 
   return (

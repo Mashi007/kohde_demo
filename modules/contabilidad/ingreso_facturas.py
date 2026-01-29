@@ -15,7 +15,7 @@ from models.factura import TipoFactura, EstadoFactura
 from utils.ocr import ocr_processor
 from utils.helpers import calcular_iva, calcular_total
 from config import Config
-from modules.notificaciones.whatsapp import whatsapp_service
+from modules.crm.notificaciones.whatsapp import whatsapp_service
 
 class FacturaService:
     """Servicio para gestión de facturas."""

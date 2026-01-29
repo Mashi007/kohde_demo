@@ -17,7 +17,7 @@ export default function ProveedorForm({ proveedor, onClose, onSuccess }) {
   const queryClient = useQueryClient()
 
   const createMutation = useMutation({
-    mutationFn: (data) => api.post('/compras/proveedores', data),
+    mutationFn: (data) => api.post('/crm/proveedores', data),
     onSuccess: () => {
       toast.success('Proveedor creado correctamente')
       queryClient.invalidateQueries(['proveedores'])

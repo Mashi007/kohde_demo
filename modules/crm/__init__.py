@@ -1,3 +1,4 @@
 """
-Módulo CRM (Clientes y Tickets).
+Módulo CRM (Customer Relationship Management).
+Incluye: Proveedores, Tickets y Notificaciones.
 """

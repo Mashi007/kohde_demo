@@ -7,7 +7,7 @@ from typing import Dict, Optional, List
 from werkzeug.utils import secure_filename
 from pathlib import Path
 from config import Config
-from modules.notificaciones.whatsapp import whatsapp_service
+from modules.crm.notificaciones.whatsapp import whatsapp_service
 
 class WhatsAppConfigService:
     """Servicio para configurar y gestionar WhatsApp."""

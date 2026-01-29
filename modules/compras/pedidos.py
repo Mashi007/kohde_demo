@@ -8,8 +8,8 @@ from models import PedidoCompra, PedidoCompraItem, Proveedor, Item
 from models.item import Item as ItemModel
 from models.pedido import EstadoPedido
 from utils.helpers import agrupar_items_por_proveedor, obtener_fecha_entrega_esperada
-from modules.notificaciones.whatsapp import whatsapp_service
-from modules.notificaciones.email import email_service
+from modules.crm.notificaciones.whatsapp import whatsapp_service
+from modules.crm.notificaciones.email import email_service
 
 class PedidoCompraService:
     """Servicio para gestión de pedidos de compra."""

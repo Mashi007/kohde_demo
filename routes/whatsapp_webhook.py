@@ -95,7 +95,7 @@ def handle_image_message(sender_id: str, image_data: dict):
         
         if resultado.get('exito'):
             # Enviar confirmación al remitente
-            from modules.notificaciones.whatsapp import whatsapp_service
+            from modules.crm.notificaciones.whatsapp import whatsapp_service
             mensaje = (
                 f"✅ Factura recibida\n\n"
                 f"Número: {resultado.get('numero_factura', 'N/A')}\n"
@@ -105,7 +105,7 @@ def handle_image_message(sender_id: str, image_data: dict):
             whatsapp_service.enviar_mensaje(sender_id, mensaje)
         else:
             # Enviar mensaje de error
-            from modules.notificaciones.whatsapp import whatsapp_service
+            from modules.crm.notificaciones.whatsapp import whatsapp_service
             whatsapp_service.enviar_mensaje(
                 sender_id,
                 f"❌ Error al procesar la factura: {resultado.get('mensaje', 'Error desconocido')}"
@@ -117,7 +117,7 @@ def handle_image_message(sender_id: str, image_data: dict):
         traceback.print_exc()
         # Enviar mensaje de error al usuario
         try:
-            from modules.notificaciones.whatsapp import whatsapp_service
+            from modules.crm.notificaciones.whatsapp import whatsapp_service
             whatsapp_service.enviar_mensaje(
                 sender_id,
                 "❌ Error al procesar la factura. Por favor, intente nuevamente."
