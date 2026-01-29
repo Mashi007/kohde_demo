@@ -45,13 +45,23 @@ def receive_message():
                 # Obtener número del remitente
                 sender_id = message.get('from')
                 
+                if 'message' not in message:
+                    continue
+                
+                msg = message['message']
+                
                 # Si el mensaje tiene imagen (factura)
-                if 'message' in message and 'image' in message['message']:
-                    handle_image_message(sender_id, message['message']['image'])
+                if 'image' in msg:
+                    handle_image_message(sender_id, msg['image'])
+                
+                # Si el mensaje tiene documento (PDF, etc.)
+                elif 'document' in msg:
+                    # Tratar documentos como imágenes para OCR
+                    handle_image_message(sender_id, msg['document'])
                 
                 # Si el mensaje es texto
-                elif 'message' in message and 'text' in message['message']:
-                    handle_text_message(sender_id, message['message']['text'])
+                elif 'text' in msg:
+                    handle_text_message(sender_id, msg['text'])
         
         return jsonify({'status': 'ok'}), 200
     
