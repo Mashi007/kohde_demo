@@ -57,15 +57,30 @@ def listar_items():
         # Agregar costo promedio calculado a cada item
         items_con_costo = []
         for item in items:
-            item_dict = item.to_dict()
-            costo_promedio = ItemService.calcular_costo_unitario_promedio(db.session, item.id)
-            item_dict['costo_unitario_promedio'] = costo_promedio
-            items_con_costo.append(item_dict)
+            try:
+                item_dict = item.to_dict()
+                costo_promedio = ItemService.calcular_costo_unitario_promedio(db.session, item.id)
+                item_dict['costo_unitario_promedio'] = costo_promedio
+                items_con_costo.append(item_dict)
+            except Exception as e:
+                import logging
+                logging.error(f"Error procesando item {item.id}: {str(e)}")
+                # Continuar con el siguiente item
+                try:
+                    item_dict = item.to_dict()
+                    item_dict['costo_unitario_promedio'] = None
+                    items_con_costo.append(item_dict)
+                except:
+                    continue
         
         return paginated_response(items_con_costo, skip=skip, limit=limit)
     except ValueError as e:
         return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
+        import traceback
+        import logging
+        logging.error(f"Error en listar_items: {str(e)}")
+        logging.error(traceback.format_exc())
         return error_response(str(e), 500, 'INTERNAL_ERROR')
 
 @bp.route('/items', methods=['POST'])
@@ -284,6 +299,10 @@ def obtener_stock_bajo():
         items = InventarioService.obtener_stock_bajo(db.session)
         return success_response(items)
     except Exception as e:
+        import traceback
+        import logging
+        logging.error(f"Error en obtener_stock_bajo: {str(e)}")
+        logging.error(traceback.format_exc())
         return error_response(str(e), 500, 'INTERNAL_ERROR')
 
 @bp.route('/inventario/<int:item_id>/verificar', methods=['POST'])
@@ -451,10 +470,25 @@ def listar_facturas():
         
         facturas = query.order_by(Factura.fecha_recepcion.desc()).offset(skip).limit(limit).all()
         
-        return paginated_response([f.to_dict() for f in facturas], skip=skip, limit=limit)
+        # Serializar facturas con manejo de errores
+        facturas_dict = []
+        for f in facturas:
+            try:
+                facturas_dict.append(f.to_dict())
+            except Exception as e:
+                import logging
+                logging.error(f"Error serializando factura {f.id}: {str(e)}")
+                # Continuar con la siguiente factura
+                continue
+        
+        return paginated_response(facturas_dict, skip=skip, limit=limit)
     except ValueError as e:
         return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
+        import traceback
+        import logging
+        logging.error(f"Error en listar_facturas: {str(e)}")
+        logging.error(traceback.format_exc())
         return error_response(str(e), 500, 'INTERNAL_ERROR')
 
 @bp.route('/facturas/ultima', methods=['GET'])
@@ -468,14 +502,25 @@ def obtener_ultima_factura():
             factura_dict = factura.to_dict()
             return success_response(factura_dict)
         except Exception as e:
+            import logging
+            import traceback
+            logging.error(f"Error serializando factura {factura.id}: {str(e)}")
+            logging.error(traceback.format_exc())
             # Retornar datos básicos si hay error en to_dict()
-            return success_response({
-                'id': factura.id,
-                'numero_factura': factura.numero_factura,
-                'estado': factura.estado.value if factura.estado else None,
-                'warning': 'Error al serializar datos completos'
-            })
+            try:
+                return success_response({
+                    'id': factura.id,
+                    'numero_factura': factura.numero_factura,
+                    'estado': factura.estado.value if factura.estado else None,
+                    'warning': 'Error al serializar datos completos'
+                })
+            except Exception as e2:
+                return error_response(f'Error al obtener factura: {str(e2)}', 500, 'INTERNAL_ERROR')
     except Exception as e:
+        import traceback
+        import logging
+        logging.error(f"Error en obtener_ultima_factura: {str(e)}")
+        logging.error(traceback.format_exc())
         return error_response(str(e), 500, 'INTERNAL_ERROR')
 
 @bp.route('/facturas/ingresar-imagen', methods=['POST'])

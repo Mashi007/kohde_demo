@@ -250,10 +250,25 @@ def listar_tickets():
             limit=limit
         )
         
-        return paginated_response([t.to_dict() for t in tickets], skip=skip, limit=limit)
+        # Serializar tickets con manejo de errores
+        tickets_dict = []
+        for t in tickets:
+            try:
+                tickets_dict.append(t.to_dict())
+            except Exception as e:
+                import logging
+                logging.error(f"Error serializando ticket {t.id}: {str(e)}")
+                # Continuar con el siguiente ticket
+                continue
+        
+        return paginated_response(tickets_dict, skip=skip, limit=limit)
     except ValueError as e:
         return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
+        import traceback
+        import logging
+        logging.error(f"Error en listar_tickets: {str(e)}")
+        logging.error(traceback.format_exc())
         return error_response(str(e), 500, 'INTERNAL_ERROR')
 
 @bp.route('/tickets', methods=['POST'])

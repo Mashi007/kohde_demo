@@ -1,7 +1,7 @@
 """
 Aplicación principal del ERP para cadena de restaurantes.
 """
-from flask import Flask
+from flask import Flask, request
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from sqlalchemy import create_engine
@@ -28,6 +28,13 @@ def create_app():
     """Factory function para crear la aplicación Flask."""
     app = Flask(__name__)
     app.config.from_object(Config)
+    
+    # Configurar logging
+    import logging
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
     
     # Habilitar CORS
     # Permitir requests desde el frontend

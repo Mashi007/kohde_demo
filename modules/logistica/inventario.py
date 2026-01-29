@@ -40,22 +40,34 @@ class InventarioService:
         Returns:
             Lista de items con stock bajo
         """
-        items_bajo_stock = db.query(Inventario).filter(
-            Inventario.cantidad_actual < Inventario.cantidad_minima
-        ).all()
-        
-        resultado = []
-        for inv in items_bajo_stock:
-            resultado.append({
-                'item_id': inv.item_id,
-                'nombre': inv.item.nombre if inv.item else 'N/A',
-                'cantidad_actual': float(inv.cantidad_actual),
-                'cantidad_minima': float(inv.cantidad_minima),
-                'unidad': inv.unidad,
-                'ubicacion': inv.ubicacion
-            })
-        
-        return resultado
+        try:
+            items_bajo_stock = db.query(Inventario).filter(
+                Inventario.cantidad_actual < Inventario.cantidad_minima
+            ).all()
+            
+            resultado = []
+            for inv in items_bajo_stock:
+                try:
+                    resultado.append({
+                        'item_id': inv.item_id,
+                        'nombre': inv.item.nombre if inv.item else 'N/A',
+                        'cantidad_actual': float(inv.cantidad_actual) if inv.cantidad_actual is not None else 0.0,
+                        'cantidad_minima': float(inv.cantidad_minima) if inv.cantidad_minima is not None else 0.0,
+                        'unidad': inv.unidad or 'unidad',
+                        'ubicacion': inv.ubicacion or 'N/A'
+                    })
+                except Exception as e:
+                    import logging
+                    logging.error(f"Error procesando inventario item_id={inv.item_id}: {str(e)}")
+                    continue
+            
+            return resultado
+        except Exception as e:
+            import logging
+            import traceback
+            logging.error(f"Error en obtener_stock_bajo: {str(e)}")
+            logging.error(traceback.format_exc())
+            raise
     
     @staticmethod
     def actualizar_stock(
