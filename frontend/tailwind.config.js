@@ -9,7 +9,6 @@ export default {
   },
   plugins: [],
   corePlugins: {
-    // Deshabilitar text-size-adjust si causa problemas
-    // textSizeAdjust: false,
+    textSizeAdjust: false, // Deshabilitar completamente text-size-adjust
   },
 }

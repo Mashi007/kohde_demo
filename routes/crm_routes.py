@@ -231,7 +231,10 @@ def listar_tickets():
         
         return jsonify([t.to_dict() for t in tickets]), 200
     except Exception as e:
-        return jsonify({'error': str(e)}), 400
+        import traceback
+        print(f"Error en listar_tickets: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
 
 @bp.route('/tickets', methods=['POST'])
 def crear_ticket():

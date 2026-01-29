@@ -19,8 +19,4 @@ body {
   box-sizing: border-box;
 }
 
-/* Corregir el error de -webkit-text-size-adjust */
-html {
-  -webkit-text-size-adjust: 100%;
-  text-size-adjust: 100%;
-}
+/* Eliminado: propiedades text-size-adjust que causan errores en algunos navegadores */

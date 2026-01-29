@@ -93,9 +93,22 @@ class TicketService:
                 # Estado inválido, ignorar filtro o retornar error
                 # Por ahora ignoramos el filtro si el estado no es válido
                 pass
+            except Exception as e:
+                # Otro tipo de error, loguear pero continuar
+                print(f"Error al filtrar tickets por estado '{estado}': {str(e)}")
+                pass
         
         if tipo:
-            query = query.filter(Ticket.tipo == TipoTicket[tipo.upper()])
+            try:
+                tipo_enum = TipoTicket[tipo.upper()]
+                query = query.filter(Ticket.tipo == tipo_enum)
+            except KeyError:
+                # Tipo inválido, ignorar filtro
+                print(f"Tipo de ticket inválido: {tipo}")
+                pass
+            except Exception as e:
+                print(f"Error al filtrar tickets por tipo '{tipo}': {str(e)}")
+                pass
         
         if asignado_a:
             query = query.filter(Ticket.asignado_a == asignado_a)

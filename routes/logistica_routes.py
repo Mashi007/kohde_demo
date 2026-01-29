@@ -393,6 +393,11 @@ def listar_facturas():
             except KeyError:
                 # Estado inválido, retornar error descriptivo
                 return jsonify({'error': f'Estado inválido: {estado}. Estados válidos: pendiente, parcial, aprobada, rechazada'}), 400
+            except Exception as e:
+                import traceback
+                print(f"Error al filtrar por estado en facturas: {str(e)}")
+                print(traceback.format_exc())
+                return jsonify({'error': f'Error al procesar filtro de estado: {str(e)}'}), 400
         
         # Filtrar facturas pendientes de confirmación (con items sin cantidad_aprobada)
         if pendiente_confirmacion:
@@ -423,7 +428,10 @@ def obtener_ultima_factura():
             return jsonify(None), 200  # Retornar null en lugar de error 404
         return jsonify(factura.to_dict()), 200
     except Exception as e:
-        return jsonify({'error': str(e)}), 400
+        import traceback
+        print(f"Error en obtener_ultima_factura: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
 
 @bp.route('/facturas/ingresar-imagen', methods=['POST'])
 def ingresar_factura_imagen():
