@@ -31,13 +31,13 @@ services:
       - key: IVA_PERCENTAGE
         value: 0.15
 
-  # Frontend - Static Site
+  # Frontend - Web Service (Express server for SPA routing)
   - type: web
     name: kfronend-demo
     env: node
     buildCommand: cd frontend && npm install && npm run build
     startCommand: cd frontend && node server.js
-    staticPublishPath: frontend/dist
+    # Removido staticPublishPath para usar Express server en lugar de static site
     envVars:
       - key: NODE_VERSION
         value: 18.x

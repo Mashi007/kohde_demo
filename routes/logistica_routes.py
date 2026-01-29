@@ -388,22 +388,38 @@ def listar_facturas():
         if estado:
             from models.factura import EstadoFactura
             try:
-                estado_enum = EstadoFactura[estado.upper()]
-                query = query.filter(Factura.estado == estado_enum)
-            except KeyError:
-                # Estado inválido, retornar error descriptivo
-                return jsonify({'error': f'Estado inválido: {estado}. Estados válidos: pendiente, parcial, aprobada, rechazada'}), 400
+                # Normalizar el estado: convertir a minúsculas y luego buscar en el enum
+                estado_normalizado = estado.lower()
+                # Mapear valores comunes a los valores del enum
+                estado_map = {
+                    'pendiente': EstadoFactura.PENDIENTE,
+                    'parcial': EstadoFactura.PARCIAL,
+                    'aprobada': EstadoFactura.APROBADA,
+                    'rechazada': EstadoFactura.RECHAZADA
+                }
+                if estado_normalizado in estado_map:
+                    estado_enum = estado_map[estado_normalizado]
+                    query = query.filter(Factura.estado == estado_enum)
+                else:
+                    # Intentar con el valor directamente en mayúsculas
+                    try:
+                        estado_enum = EstadoFactura[estado.upper()]
+                        query = query.filter(Factura.estado == estado_enum)
+                    except KeyError:
+                        return jsonify({'error': f'Estado inválido: {estado}. Estados válidos: pendiente, parcial, aprobada, rechazada'}), 400
             except Exception as e:
                 import traceback
                 print(f"Error al filtrar por estado en facturas: {str(e)}")
                 print(traceback.format_exc())
-                return jsonify({'error': f'Error al procesar filtro de estado: {str(e)}'}), 400
+                return jsonify({'error': f'Error al procesar filtro de estado: {str(e)}'}), 500
         
         # Filtrar facturas pendientes de confirmación (con items sin cantidad_aprobada)
         if pendiente_confirmacion:
             from models import FacturaItem
+            from models.factura import EstadoFactura as EstadoFacturaConfirmacion
+            # Usar exists y and_ que ya están importados al inicio del archivo
             query = query.filter(
-                Factura.estado == EstadoFactura.PENDIENTE,
+                Factura.estado == EstadoFacturaConfirmacion.PENDIENTE,
                 exists().where(
                     and_(
                         FacturaItem.factura_id == Factura.id,
@@ -415,8 +431,16 @@ def listar_facturas():
         facturas = query.order_by(Factura.fecha_recepcion.desc()).offset(skip).limit(limit).all()
         
         return jsonify([f.to_dict() for f in facturas]), 200
+    except KeyError as e:
+        import traceback
+        print(f"Error de clave en listar_facturas: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({'error': f'Error al procesar filtros: {str(e)}'}), 400
     except Exception as e:
-        return jsonify({'error': str(e)}), 400
+        import traceback
+        print(f"Error inesperado en listar_facturas: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
 
 @bp.route('/facturas/ultima', methods=['GET'])
 def obtener_ultima_factura():
@@ -426,7 +450,20 @@ def obtener_ultima_factura():
         factura = db.session.query(Factura).order_by(Factura.fecha_recepcion.desc()).first()
         if not factura:
             return jsonify(None), 200  # Retornar null en lugar de error 404
-        return jsonify(factura.to_dict()), 200
+        try:
+            factura_dict = factura.to_dict()
+            return jsonify(factura_dict), 200
+        except Exception as e:
+            import traceback
+            print(f"Error al serializar factura en obtener_ultima_factura: {str(e)}")
+            print(traceback.format_exc())
+            # Retornar datos básicos si hay error en to_dict()
+            return jsonify({
+                'id': factura.id,
+                'numero_factura': factura.numero_factura,
+                'estado': factura.estado.value if factura.estado else None,
+                'error': 'Error al serializar datos completos'
+            }), 200
     except Exception as e:
         import traceback
         print(f"Error en obtener_ultima_factura: {str(e)}")
