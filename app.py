@@ -46,10 +46,26 @@ def create_app():
     CORS(app, 
          origins=[origin.strip() for origin in cors_origins],
          supports_credentials=True,
-         allow_headers=['Content-Type', 'Authorization', 'X-Requested-With'],
+         allow_headers=['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
          methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
          expose_headers=['X-Total-Count', 'X-Page-Size', 'X-Page-Offset']
     )
+    
+    # Manejar solicitudes OPTIONS (preflight) explícitamente
+    @app.before_request
+    def handle_preflight():
+        """Maneja solicitudes OPTIONS (preflight) para CORS."""
+        from flask import request, jsonify
+        if request.method == 'OPTIONS':
+            response = jsonify({})
+            origin = request.headers.get('Origin')
+            if origin and origin in [origin.strip() for origin in cors_origins]:
+                response.headers['Access-Control-Allow-Origin'] = origin
+                response.headers['Access-Control-Allow-Credentials'] = 'true'
+                response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS, PATCH'
+                response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With, Accept'
+                response.headers['Access-Control-Max-Age'] = '3600'
+            return response
     
     # Agregar headers CORS a todas las respuestas
     @app.after_request
@@ -61,6 +77,8 @@ def create_app():
             if origin and origin in [origin.strip() for origin in cors_origins]:
                 response.headers['Access-Control-Allow-Origin'] = origin
                 response.headers['Access-Control-Allow-Credentials'] = 'true'
+                response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS, PATCH'
+                response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With, Accept'
         except Exception as e:
             # Si hay algún error obteniendo el origin, continuar sin él
             import logging
