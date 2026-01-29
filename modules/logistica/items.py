@@ -114,6 +114,24 @@ class ItemService:
         # Separar labels del resto de datos
         label_ids = datos.pop('label_ids', [])
         
+        # Convertir categoria string a enum si es necesario
+        if 'categoria' in datos and isinstance(datos['categoria'], str):
+            from models.item import CategoriaItem
+            try:
+                # Intentar convertir el string al enum usando el nombre del enum (mayúsculas)
+                categoria_str = datos['categoria'].upper()
+                datos['categoria'] = CategoriaItem[categoria_str]
+            except KeyError:
+                # Si falla, intentar buscar por valor (minúsculas)
+                categoria_valor = datos['categoria'].lower()
+                for cat_enum in CategoriaItem:
+                    if cat_enum.value == categoria_valor:
+                        datos['categoria'] = cat_enum
+                        break
+                else:
+                    # Si no se encuentra, usar OTROS por defecto
+                    datos['categoria'] = CategoriaItem.OTROS
+        
         item = Item(**datos)
         db.add(item)
         db.commit()

@@ -129,9 +129,9 @@ export default function ItemForm({ item, onClose, onSuccess }) {
       datosEnvio.codigo = '' // El backend generará el código automáticamente
     }
     
-    // Si hay costo manual, enviarlo como costo_unitario_actual
+    // Si hay costo manual, enviarlo como costo_unitario_actual (formateado a 2 decimales)
     if (datosEnvio.costo_unitario_manual !== null && datosEnvio.costo_unitario_manual !== undefined) {
-      datosEnvio.costo_unitario_actual = datosEnvio.costo_unitario_manual
+      datosEnvio.costo_unitario_actual = parseFloat(datosEnvio.costo_unitario_manual.toFixed(2))
     }
     
     // Eliminar costo_unitario_manual del objeto antes de enviar
@@ -272,14 +272,42 @@ export default function ItemForm({ item, onClose, onSuccess }) {
           </label>
           <div className="flex gap-2">
             <input
-              type="number"
-              step="0.01"
-              min="0"
-              value={formData.costo_unitario_manual || ''}
-              onChange={(e) => setFormData({ 
-                ...formData, 
-                costo_unitario_manual: e.target.value === '' ? null : parseFloat(e.target.value) 
-              })}
+              type="text"
+              inputMode="decimal"
+              value={formData.costo_unitario_manual !== null && formData.costo_unitario_manual !== undefined 
+                ? formData.costo_unitario_manual.toFixed(2)
+                : ''}
+              onChange={(e) => {
+                const valor = e.target.value.trim()
+                if (valor === '') {
+                  setFormData({ 
+                    ...formData, 
+                    costo_unitario_manual: null 
+                  })
+                } else {
+                  // Permitir solo números y un punto decimal
+                  const regex = /^\d*\.?\d{0,2}$/
+                  if (regex.test(valor)) {
+                    const numero = parseFloat(valor)
+                    if (!isNaN(numero) && numero >= 0) {
+                      setFormData({ 
+                        ...formData, 
+                        costo_unitario_manual: numero 
+                      })
+                    }
+                  }
+                }
+              }}
+              onBlur={(e) => {
+                // Formatear a 2 decimales cuando pierde el foco
+                if (formData.costo_unitario_manual !== null && formData.costo_unitario_manual !== undefined) {
+                  const valorFormateado = parseFloat(formData.costo_unitario_manual.toFixed(2))
+                  setFormData({ 
+                    ...formData, 
+                    costo_unitario_manual: valorFormateado 
+                  })
+                }
+              }}
               className="flex-1 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:border-purple-500"
               placeholder="Ej: 25.50"
             />
@@ -287,9 +315,11 @@ export default function ItemForm({ item, onClose, onSuccess }) {
               <button
                 type="button"
                 onClick={() => {
+                  // Formatear a 2 decimales antes de enviar
+                  const costoFormateado = parseFloat(formData.costo_unitario_manual.toFixed(2))
                   updateCostoMutation.mutate({
                     itemId: item.id,
-                    costo: formData.costo_unitario_manual
+                    costo: costoFormateado
                   })
                 }}
                 disabled={updateCostoMutation.isPending}
@@ -425,13 +455,47 @@ export default function ItemForm({ item, onClose, onSuccess }) {
         {mostrarFormLabel && (
           <LabelForm
             onClose={() => setMostrarFormLabel(false)}
-            onSuccess={(nuevaLabel) => {
-              // Seleccionar automáticamente la nueva clasificación creada
+            onSuccess={async (nuevaLabel) => {
               if (nuevaLabel && nuevaLabel.id) {
-                setFormData(prev => ({
-                  ...prev,
-                  label_ids: [nuevaLabel.id]
-                }))
+                try {
+                  // Primero seleccionar la nueva label inmediatamente para evitar que se vacíe
+                  setFormData(prev => ({
+                    ...prev,
+                    label_ids: [nuevaLabel.id]
+                  }))
+                  
+                  // Luego invalidar y refetch las queries en segundo plano
+                  queryClient.invalidateQueries(['labels'])
+                  
+                  // Refetch las labels para obtener la nueva (sin await para no bloquear)
+                  queryClient.refetchQueries({ queryKey: ['labels'] }).then(() => {
+                    // Asegurar que la selección se mantenga después del refetch
+                    setFormData(prev => {
+                      // Si ya está seleccionada, mantenerla
+                      if (prev.label_ids && prev.label_ids.includes(nuevaLabel.id)) {
+                        return prev
+                      }
+                      // Si no, seleccionarla
+                      return {
+                        ...prev,
+                        label_ids: [nuevaLabel.id]
+                      }
+                    })
+                  })
+                  
+                  // Cerrar el modal después de un pequeño delay
+                  setTimeout(() => {
+                    setMostrarFormLabel(false)
+                  }, 200)
+                } catch (error) {
+                  console.error('Error al actualizar labels:', error)
+                  // Aún así, mantener la selección
+                  setFormData(prev => ({
+                    ...prev,
+                    label_ids: [nuevaLabel.id]
+                  }))
+                  setMostrarFormLabel(false)
+                }
               }
             }}
           />
