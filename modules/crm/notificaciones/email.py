@@ -4,6 +4,7 @@ Integración con SendGrid para envío de emails.
 from sendgrid import SendGridAPIClient
 from sendgrid.helpers.mail import Mail
 from typing import Dict, List, Optional
+from pathlib import Path
 from config import Config
 
 class EmailService:
@@ -112,6 +113,56 @@ class EmailService:
             "Reporte de Inventario",
             html
         )
+    
+    def enviar_email_con_adjunto(
+        self,
+        destinatario: str,
+        asunto: str,
+        contenido_html: str,
+        archivo_adjunto: str
+    ) -> Dict:
+        """
+        Envía un email con un archivo adjunto.
+        
+        Args:
+            destinatario: Email del destinatario
+            asunto: Asunto del email
+            contenido_html: Contenido HTML del email
+            archivo_adjunto: Ruta del archivo a adjuntar
+            
+        Returns:
+            Respuesta de SendGrid
+        """
+        if not self.client:
+            raise Exception("SendGrid no configurado correctamente")
+        
+        message = Mail(
+            from_email=self.from_email,
+            to_emails=destinatario,
+            subject=asunto,
+            html_content=contenido_html
+        )
+        
+        # Adjuntar archivo
+        with open(archivo_adjunto, 'rb') as f:
+            data = f.read()
+            message.add_attachment(
+                data,
+                main_type='application',
+                sub_type='pdf',
+                filename=Path(archivo_adjunto).name
+            )
+        
+        try:
+            response = self.client.send(message)
+            return {
+                'status_code': response.status_code,
+                'body': response.body,
+                'headers': response.headers
+            }
+        except Exception as e:
+            print(f"Error al enviar email con adjunto: {e}")
+            raise
     
     def enviar_resumen_tickets(self, destinatario: str, tickets: List[Dict]) -> Dict:
         """

@@ -120,6 +120,71 @@ def listar_categorias_labels():
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
+# ========== RUTAS DE PEDIDOS AUTOMÁTICOS ==========
+
+@bp.route('/pedidos/aprobar/<int:pedido_id>', methods=['POST'])
+def aprobar_pedido(pedido_id):
+    """Aprueba un pedido y programa el envío automático 1 hora después."""
+    try:
+        from modules.logistica.pedidos_automaticos import PedidosAutomaticosService
+        datos = request.get_json()
+        usuario_id = datos.get('usuario_id', 1)
+        
+        pedido = PedidosAutomaticosService.aprobar_y_programar_envio(
+            db.session,
+            pedido_id,
+            usuario_id
+        )
+        
+        return jsonify({
+            'mensaje': 'Pedido aprobado. Se enviará automáticamente en 1 hora.',
+            'pedido': pedido.to_dict()
+        }), 200
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/pedidos/requerimientos-quincenales', methods=['GET'])
+def calcular_requerimientos_quincenales():
+    """Calcula requerimientos quincenales basados en programación."""
+    try:
+        from modules.planificacion.requerimientos import RequerimientosService
+        from datetime import date, timedelta
+        
+        fecha_inicio = request.args.get('fecha_inicio')
+        if fecha_inicio:
+            fecha_inicio = datetime.strptime(fecha_inicio, '%Y-%m-%d').date()
+        else:
+            fecha_inicio = date.today()
+        
+        resultado = RequerimientosService.calcular_requerimientos_quincenales(
+            db.session,
+            fecha_inicio
+        )
+        
+        # Convertir objetos a dicts
+        requerimientos_dict = []
+        for req in resultado['requerimientos']:
+            req_dict = {
+                'item_id': req['item_id'],
+                'item': req['item'].to_dict() if req['item'] else None,
+                'cantidad_necesaria': req['cantidad_necesaria'],
+                'cantidad_actual': req['cantidad_actual'],
+                'cantidad_minima': req['cantidad_minima'],
+                'cantidad_a_pedir': req['cantidad_a_pedir'],
+                'unidad': req['unidad'],
+                'proveedor_id': req['proveedor_id'],
+                'proveedor': req['proveedor'].to_dict() if req['proveedor'] else None
+            }
+            requerimientos_dict.append(req_dict)
+        
+        resultado['requerimientos'] = requerimientos_dict
+        
+        return jsonify(resultado), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
 # ========== RUTAS DE INVENTARIO ==========
 
 @bp.route('/inventario', methods=['GET'])

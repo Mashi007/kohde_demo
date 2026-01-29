@@ -117,7 +117,7 @@ def listar_programaciones():
 
 @bp.route('/programacion', methods=['POST'])
 def crear_programacion():
-    """Crea una nueva programación de menú."""
+    """Crea una nueva programación de menú y genera pedidos automáticamente."""
     try:
         datos = request.get_json()
         # Convertir fecha string a date
@@ -125,7 +125,31 @@ def crear_programacion():
             datos['fecha'] = datetime.strptime(datos['fecha'], '%Y-%m-%d').date()
         
         programacion = ProgramacionMenuService.crear_programacion(db.session, datos)
-        return jsonify(programacion.to_dict()), 201
+        
+        # Generar pedidos automáticamente después de crear la programación
+        try:
+            from modules.logistica.pedidos_automaticos import PedidosAutomaticosService
+            usuario_id = datos.get('usuario_id', 1)  # Por defecto usuario 1
+            pedidos = PedidosAutomaticosService.generar_pedidos_desde_programacion(
+                db.session,
+                fecha_inicio=programacion.fecha,
+                usuario_id=usuario_id
+            )
+            
+            return jsonify({
+                'programacion': programacion.to_dict(),
+                'pedidos_generados': len(pedidos),
+                'pedidos': [p.to_dict() for p in pedidos]
+            }), 201
+        except Exception as e:
+            # Si falla la generación de pedidos, igual retornar la programación
+            print(f"Error al generar pedidos automáticos: {e}")
+            return jsonify({
+                'programacion': programacion.to_dict(),
+                'pedidos_generados': 0,
+                'advertencia': 'Programación creada pero no se pudieron generar pedidos automáticos'
+            }), 201
+        
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
     except Exception as e:

@@ -145,6 +145,56 @@ class PedidoCompraService:
         return pedidos_creados
     
     @staticmethod
+    def recibir_pedido(db: Session, pedido_id: int) -> PedidoCompra:
+        """
+        Marca un pedido como recibido y actualiza el inventario.
+        
+        Args:
+            db: Sesión de base de datos
+            pedido_id: ID del pedido
+            
+        Returns:
+            Pedido recibido
+        """
+        from models import Inventario
+        
+        pedido = db.query(PedidoCompra).filter(PedidoCompra.id == pedido_id).first()
+        if not pedido:
+            raise ValueError("Pedido no encontrado")
+        
+        if pedido.estado != EstadoPedido.ENVIADO:
+            raise ValueError("Solo se pueden recibir pedidos en estado ENVIADO")
+        
+        pedido.estado = EstadoPedido.RECIBIDO
+        
+        # Actualizar inventario con los items recibidos
+        for pedido_item in pedido.items:
+            inventario = db.query(Inventario).filter(
+                Inventario.item_id == pedido_item.item_id
+            ).first()
+            
+            if inventario:
+                # Sumar cantidad recibida al inventario
+                cantidad_actual = float(inventario.cantidad_actual)
+                cantidad_recibida = float(pedido_item.cantidad)
+                inventario.cantidad_actual = cantidad_actual + cantidad_recibida
+                inventario.ultimo_costo_unitario = float(pedido_item.precio_unitario)
+                inventario.ultima_actualizacion = datetime.now()
+            else:
+                # Crear registro de inventario si no existe
+                inventario = Inventario(
+                    item_id=pedido_item.item_id,
+                    cantidad_actual=float(pedido_item.cantidad),
+                    unidad=pedido_item.item.unidad,
+                    ultimo_costo_unitario=float(pedido_item.precio_unitario)
+                )
+                db.add(inventario)
+        
+        db.commit()
+        db.refresh(pedido)
+        return pedido
+    
+    @staticmethod
     def enviar_pedido(db: Session, pedido_id: int) -> PedidoCompra:
         """
         Envía un pedido al proveedor (cambia estado a ENVIADO).
