@@ -17,7 +17,8 @@ from routes import (
     logistica_routes,
     compras_routes,
     planificacion_routes,
-    configuracion_routes
+    configuracion_routes,
+    reportes_routes
 )
 from routes import whatsapp_webhook
 from routes import health
