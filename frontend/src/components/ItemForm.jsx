@@ -115,9 +115,16 @@ export default function ItemForm({ item, onClose, onSuccess }) {
 
   const createMutation = useMutation({
     mutationFn: (data) => api.post('/logistica/items', data),
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.success('Item creado correctamente')
-      queryClient.invalidateQueries(['items'])
+      // Invalidar todas las queries relacionadas con items
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['items'] }),
+        queryClient.invalidateQueries({ queryKey: ['items-con-costo'] }),
+        queryClient.invalidateQueries({ queryKey: ['stock-bajo'] }),
+      ])
+      // Refetch inmediato para asegurar que los datos estén actualizados
+      await queryClient.refetchQueries({ queryKey: ['items'] })
       onSuccess?.()
       onClose()
     },

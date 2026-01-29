@@ -26,16 +26,20 @@ export default function Dashboard() {
   })
 
   // Obtener items con costo unitario promedio (top 10 más costosos)
+  // NOTA: Mostramos todos los items, no solo los que tienen costo promedio
   const { data: itemsConCosto } = useQuery({
     queryKey: ['items-con-costo'],
     queryFn: () => api.get('/logistica/items?limit=100').then(res => {
       // Extraer datos de respuesta paginada
       const items = extractData(res)
-      // Filtrar items con costo promedio y ordenar
-      return (Array.isArray(items) ? items : []).filter(item => item.costo_unitario_promedio)
+      // Filtrar items con costo promedio y ordenar (pero también mostrar items sin costo)
+      const itemsConCosto = (Array.isArray(items) ? items : [])
+        .filter(item => item.costo_unitario_promedio)
         .sort((a, b) => (b.costo_unitario_promedio || 0) - (a.costo_unitario_promedio || 0))
         .slice(0, 10)
+      return itemsConCosto
     }).catch(() => []),
+    staleTime: 30000, // Cache por 30 segundos
   })
 
   return (
