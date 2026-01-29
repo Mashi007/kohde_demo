@@ -260,26 +260,40 @@ class ItemService:
         Returns:
             Costo unitario promedio o None si no hay facturas aprobadas
         """
-        # Obtener las últimas 3 facturas aprobadas que contengan este item
-        facturas_items = db.query(FacturaItem).join(Factura).filter(
-            FacturaItem.item_id == item_id,
-            Factura.estado == EstadoFactura.APROBADA,
-            FacturaItem.cantidad_aprobada.isnot(None),
-            FacturaItem.cantidad_aprobada > 0,
-            FacturaItem.precio_unitario.isnot(None),
-            FacturaItem.precio_unitario > 0
-        ).order_by(desc(Factura.fecha_aprobacion)).limit(3).all()
-        
-        if not facturas_items:
+        try:
+            # Obtener las últimas 3 facturas aprobadas que contengan este item
+            # Usar with_entities para seleccionar solo las columnas necesarias y evitar problemas con columnas faltantes
+            facturas_items = db.query(
+                FacturaItem.precio_unitario,
+                FacturaItem.cantidad_aprobada
+            ).join(Factura).filter(
+                FacturaItem.item_id == item_id,
+                Factura.estado == EstadoFactura.APROBADA,
+                FacturaItem.cantidad_aprobada.isnot(None),
+                FacturaItem.cantidad_aprobada > 0,
+                FacturaItem.precio_unitario.isnot(None),
+                FacturaItem.precio_unitario > 0
+            ).order_by(desc(Factura.fecha_aprobacion)).limit(3).all()
+            
+            if not facturas_items:
+                return None
+            
+            # Calcular el promedio de los precios unitarios
+            precios = [float(fi.precio_unitario) for fi in facturas_items if fi.precio_unitario]
+            if not precios:
+                return None
+            
+            promedio = sum(precios) / len(precios)
+            return round(promedio, 2)
+        except Exception as e:
+            # Si hay un error (ej: columna unidad no existe), hacer rollback y retornar None
+            import logging
+            try:
+                db.rollback()
+            except:
+                pass
+            logging.warning(f"Error calculando costo promedio para item {item_id}: {str(e)}")
             return None
-        
-        # Calcular el promedio de los precios unitarios
-        precios = [float(fi.precio_unitario) for fi in facturas_items if fi.precio_unitario]
-        if not precios:
-            return None
-        
-        promedio = sum(precios) / len(precios)
-        return round(promedio, 2)
     
     @staticmethod
     def obtener_item_con_costo(db: Session, item_id: int) -> Optional[Dict]:

@@ -58,19 +58,30 @@ def listar_items():
         items_con_costo = []
         for item in items:
             try:
+                # Intentar serializar el item primero
                 item_dict = item.to_dict()
+                
+                # Calcular costo promedio (puede retornar None si hay error)
                 costo_promedio = ItemService.calcular_costo_unitario_promedio(db.session, item.id)
                 item_dict['costo_unitario_promedio'] = costo_promedio
+                
                 items_con_costo.append(item_dict)
             except Exception as e:
                 import logging
+                import traceback
                 logging.error(f"Error procesando item {item.id}: {str(e)}")
-                # Continuar con el siguiente item
+                logging.error(traceback.format_exc())
+                
+                # Intentar agregar el item sin costo promedio
                 try:
+                    # Hacer rollback de la transacción si hay error
+                    db.session.rollback()
                     item_dict = item.to_dict()
                     item_dict['costo_unitario_promedio'] = None
                     items_con_costo.append(item_dict)
-                except:
+                except Exception as e2:
+                    logging.error(f"Error crítico serializando item {item.id}: {str(e2)}")
+                    # Continuar con el siguiente item sin agregar este
                     continue
         
         return paginated_response(items_con_costo, skip=skip, limit=limit)
