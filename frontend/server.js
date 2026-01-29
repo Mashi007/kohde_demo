@@ -34,6 +34,12 @@ app.use((req, res, next) => {
   next();
 });
 
+// Manejar favicon.ico específicamente (evitar 404)
+app.get('/favicon.ico', (req, res) => {
+  // El favicon está embebido en el HTML como data URI, pero algunos navegadores lo solicitan
+  res.status(204).end(); // No Content
+});
+
 // Servir archivos estáticos (JS, CSS, imágenes, etc.)
 app.use(express.static(distPath, {
   maxAge: '1d',
@@ -57,11 +63,16 @@ app.get('*', (req, res, next) => {
   // Si tiene extensión de archivo estático, ya debería haber sido servido por express.static
   // Si llegamos aquí con una extensión estática, significa que no existe
   if (ext && staticExtensions.includes(ext.toLowerCase())) {
+    // Para .ico, retornar 204 (No Content) en lugar de 404
+    if (ext.toLowerCase() === '.ico') {
+      console.log(`[204] Favicon solicitado pero no existe como archivo: ${pathOnly}`);
+      return res.status(204).end();
+    }
     console.log(`[404] Archivo estático no encontrado: ${pathOnly}`);
     return res.status(404).send('Archivo no encontrado');
   }
   
-  // Para todas las demás rutas (incluyendo /items, /items?, /inventario, etc.), servir index.html
+  // Para todas las demás rutas (incluyendo /notificaciones, /items, /items?, etc.), servir index.html
   const indexPath = path.join(distPath, 'index.html');
   
   if (!existsSync(indexPath)) {
@@ -83,7 +94,7 @@ app.get('*', (req, res, next) => {
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
   
-  console.log(`[✓] Sirviendo index.html para ruta: ${pathOnly}`);
+  console.log(`[✓] Sirviendo index.html para ruta SPA: ${pathOnly}`);
   
   res.sendFile(indexPath, (err) => {
     if (err) {
