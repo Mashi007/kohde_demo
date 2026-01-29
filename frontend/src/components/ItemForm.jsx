@@ -133,6 +133,27 @@ export default function ItemForm({ item, onClose, onSuccess }) {
     },
   })
 
+  const updateMutation = useMutation({
+    mutationFn: (data) => api.put(`/logistica/items/${item?.id}`, data),
+    onSuccess: async () => {
+      toast.success('Item actualizado correctamente')
+      // Invalidar todas las queries relacionadas con items
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['items'] }),
+        queryClient.invalidateQueries({ queryKey: ['item', item?.id] }),
+        queryClient.invalidateQueries({ queryKey: ['items-con-costo'] }),
+        queryClient.invalidateQueries({ queryKey: ['stock-bajo'] }),
+      ])
+      // Refetch inmediato para asegurar que los datos estén actualizados
+      await queryClient.refetchQueries({ queryKey: ['items'] })
+      onSuccess?.()
+      onClose()
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.error || 'Error al actualizar item')
+    },
+  })
+
   // Mutación para actualizar costo unitario manual de un item existente
   const updateCostoMutation = useMutation({
     mutationFn: ({ itemId, costo }) => api.put(`/logistica/items/${itemId}/costo`, { costo }),
@@ -162,7 +183,12 @@ export default function ItemForm({ item, onClose, onSuccess }) {
     // Eliminar costo_unitario_manual del objeto antes de enviar
     delete datosEnvio.costo_unitario_manual
     
-    createMutation.mutate(datosEnvio)
+    // Si estamos editando, usar updateMutation, si no, createMutation
+    if (item?.id) {
+      updateMutation.mutate(datosEnvio)
+    } else {
+      createMutation.mutate(datosEnvio)
+    }
   }
 
   return (
@@ -239,6 +265,14 @@ export default function ItemForm({ item, onClose, onSuccess }) {
             required
             value={formData.nombre}
             onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
+            onBlur={(e) => {
+              // Formatear a primera letra mayúscula y resto minúsculas
+              const valor = e.target.value.trim()
+              if (valor) {
+                const formateado = valor.charAt(0).toUpperCase() + valor.slice(1).toLowerCase()
+                setFormData({ ...formData, nombre: formateado })
+              }
+            }}
             className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:border-purple-500"
           />
         </div>
@@ -561,10 +595,12 @@ export default function ItemForm({ item, onClose, onSuccess }) {
       <div className="flex gap-4 pt-4">
         <button
           type="submit"
-          disabled={createMutation.isPending}
+          disabled={createMutation.isPending || updateMutation.isPending}
           className="flex-1 bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg disabled:opacity-50"
         >
-          {createMutation.isPending ? 'Guardando...' : 'Crear Item'}
+          {(createMutation.isPending || updateMutation.isPending) 
+            ? 'Guardando...' 
+            : item?.id ? 'Actualizar Item' : 'Crear Item'}
         </button>
         <button
           type="button"

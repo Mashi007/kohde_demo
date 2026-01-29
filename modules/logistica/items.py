@@ -318,6 +318,48 @@ class ItemService:
         return item_dict
     
     @staticmethod
+    def eliminar_item(db: Session, item_id: int) -> bool:
+        """
+        Elimina un item (soft delete marcándolo como inactivo).
+        
+        Args:
+            db: Sesión de base de datos
+            item_id: ID del item
+            
+        Returns:
+            True si se eliminó correctamente
+        """
+        item = ItemService.obtener_item(db, item_id)
+        if not item:
+            raise ValueError("Item no encontrado")
+        
+        # Soft delete: marcar como inactivo en lugar de eliminar físicamente
+        item.activo = False
+        db.commit()
+        return True
+    
+    @staticmethod
+    def toggle_activo(db: Session, item_id: int) -> Item:
+        """
+        Activa o desactiva un item.
+        
+        Args:
+            db: Sesión de base de datos
+            item_id: ID del item
+            
+        Returns:
+            Item actualizado
+        """
+        item = ItemService.obtener_item(db, item_id)
+        if not item:
+            raise ValueError("Item no encontrado")
+        
+        item.activo = not item.activo
+        db.commit()
+        db.refresh(item)
+        return item
+    
+    @staticmethod
     def actualizar_costo_unitario(db: Session, item_id: int, costo: float) -> Item:
         """
         Actualiza el costo unitario de un item.

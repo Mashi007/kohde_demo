@@ -108,7 +108,12 @@ app.use(express.static(distPath, {
 // Capturar TODAS las rutas GET que no sean archivos estáticos
 app.get('*', (req, res) => {
   const url = req.url;
-  const pathOnly = url.split('?')[0];
+  // Limpiar el path: remover query string y trailing slash
+  let pathOnly = url.split('?')[0];
+  // Remover trailing slash excepto para root
+  if (pathOnly !== '/' && pathOnly.endsWith('/')) {
+    pathOnly = pathOnly.slice(0, -1);
+  }
   const ext = path.extname(pathOnly).toLowerCase();
   
   // Extensiones de archivos estáticos
@@ -123,7 +128,7 @@ app.get('*', (req, res) => {
   }
   
   // Para todas las demás rutas (sin extensión o rutas SPA), servir index.html
-  console.log(`[SPA] Sirviendo index.html para: ${pathOnly}`);
+  console.log(`[SPA] Sirviendo index.html para: ${pathOnly}${req.url.includes('?') ? ' (con query string)' : ''}`);
   
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');

@@ -62,8 +62,19 @@ def listar_items():
                 item_dict = item.to_dict()
                 
                 # Calcular costo promedio (puede retornar None si hay error)
-                costo_promedio = ItemService.calcular_costo_unitario_promedio(db.session, item.id)
-                item_dict['costo_unitario_promedio'] = costo_promedio
+                # Usar una nueva sesión para evitar problemas con transacciones abortadas
+                try:
+                    costo_promedio = ItemService.calcular_costo_unitario_promedio(db.session, item.id)
+                    item_dict['costo_unitario_promedio'] = costo_promedio
+                except Exception as costo_error:
+                    import logging
+                    logging.warning(f"Error calculando costo promedio para item {item.id}: {str(costo_error)}")
+                    # Hacer rollback y continuar sin costo promedio
+                    try:
+                        db.session.rollback()
+                    except:
+                        pass
+                    item_dict['costo_unitario_promedio'] = None
                 
                 items_con_costo.append(item_dict)
             except Exception as e:
@@ -75,9 +86,27 @@ def listar_items():
                 # Intentar agregar el item sin costo promedio
                 try:
                     # Hacer rollback de la transacción si hay error
-                    db.session.rollback()
-                    item_dict = item.to_dict()
-                    item_dict['costo_unitario_promedio'] = None
+                    try:
+                        db.session.rollback()
+                    except:
+                        pass
+                    
+                    # Crear un nuevo contexto de sesión para evitar problemas con transacciones abortadas
+                    from sqlalchemy.orm import Session
+                    # Intentar serializar sin labels si hay problema
+                    item_dict = {
+                        'id': item.id,
+                        'codigo': item.codigo,
+                        'nombre': item.nombre,
+                        'descripcion': item.descripcion,
+                        'categoria': item.categoria.value if item.categoria else None,
+                        'unidad': item.unidad,
+                        'calorias_por_unidad': float(item.calorias_por_unidad) if item.calorias_por_unidad else None,
+                        'costo_unitario_actual': float(item.costo_unitario_actual) if item.costo_unitario_actual else None,
+                        'activo': item.activo,
+                        'labels': [],
+                        'costo_unitario_promedio': None,
+                    }
                     items_con_costo.append(item_dict)
                 except Exception as e2:
                     logging.error(f"Error crítico serializando item {item.id}: {str(e2)}")
@@ -154,6 +183,27 @@ def actualizar_costo_item(item_id):
     item = ItemService.actualizar_costo_unitario(db.session, item_id, costo)
     db.session.commit()
     return success_response(item.to_dict(), message='Costo actualizado correctamente')
+
+@bp.route('/items/<int:item_id>', methods=['DELETE'])
+@handle_db_transaction
+def eliminar_item(item_id):
+    """Elimina un item (soft delete)."""
+    validate_positive_int(item_id, 'item_id')
+    
+    ItemService.eliminar_item(db.session, item_id)
+    db.session.commit()
+    return success_response(None, message='Item eliminado correctamente')
+
+@bp.route('/items/<int:item_id>/toggle-activo', methods=['PUT'])
+@handle_db_transaction
+def toggle_activo_item(item_id):
+    """Activa o desactiva un item."""
+    validate_positive_int(item_id, 'item_id')
+    
+    item = ItemService.toggle_activo(db.session, item_id)
+    db.session.commit()
+    estado = 'activado' if item.activo else 'desactivado'
+    return success_response(item.to_dict(), message=f'Item {estado} correctamente')
 
 # ========== RUTAS DE LABELS ==========
 

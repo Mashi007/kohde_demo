@@ -42,11 +42,23 @@ class Item(db.Model):
     requerimiento_items = relationship('RequerimientoItem', back_populates='item', lazy='dynamic')
     pedido_items = relationship('PedidoCompraItem', back_populates='item', lazy='dynamic')
     factura_items = relationship('FacturaItem', back_populates='item', lazy='dynamic')
-    labels = relationship('ItemLabel', secondary=item_labels, back_populates='items', lazy='dynamic')
+    labels = relationship('ItemLabel', secondary=item_labels, back_populates='items', lazy='select')
     costo_estandarizado = relationship('CostoItem', back_populates='item', uselist=False)
     
     def to_dict(self):
         """Convierte el modelo a diccionario."""
+        # Cargar labels de forma segura para evitar errores SQL
+        labels_list = []
+        try:
+            # Con lazy='select', labels ya es una lista, no un query
+            if self.labels:
+                labels_list = [label.to_dict() for label in self.labels]
+        except Exception as e:
+            # Si hay un error cargando labels, simplemente retornar lista vacía
+            import logging
+            logging.warning(f"Error cargando labels para item {self.id}: {str(e)}")
+            labels_list = []
+        
         return {
             'id': self.id,
             'codigo': self.codigo,
@@ -60,7 +72,7 @@ class Item(db.Model):
             'costo_unitario_actual': float(self.costo_unitario_actual) if self.costo_unitario_actual else None,
             'activo': self.activo,
             'fecha_creacion': self.fecha_creacion.isoformat() if self.fecha_creacion else None,
-            'labels': [label.to_dict() for label in self.labels] if self.labels else [],
+            'labels': labels_list,
         }
     
     def __repr__(self):
