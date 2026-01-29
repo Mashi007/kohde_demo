@@ -1,6 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
-import { copyFileSync, existsSync } from 'fs'
+import { copyFileSync, existsSync, writeFileSync, mkdirSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 
@@ -17,6 +17,12 @@ export default defineConfig({
         const src = join(__dirname, 'public', '_redirects')
         const dest = join(__dirname, 'dist', '_redirects')
         try {
+          // Crear directorio dist si no existe
+          const distDir = join(__dirname, 'dist')
+          if (!existsSync(distDir)) {
+            mkdirSync(distDir, { recursive: true })
+          }
+          
           if (existsSync(src)) {
             copyFileSync(src, dest)
             console.log('✓ _redirects copiado al build')
@@ -27,11 +33,24 @@ export default defineConfig({
               copyFileSync(altSrc, dest)
               console.log('✓ _redirects copiado al build (path alternativo)')
             } else {
-              console.warn('⚠ Archivo _redirects no encontrado en:', src, 'o', altSrc)
+              // Crear archivo _redirects si no existe
+              writeFileSync(dest, '/*    /index.html   200')
+              console.log('✓ Archivo _redirects creado en build')
             }
           }
         } catch (error) {
           console.warn('⚠ No se pudo copiar _redirects:', error.message)
+          // Intentar crear el archivo como fallback
+          try {
+            const distDir = join(__dirname, 'dist')
+            if (!existsSync(distDir)) {
+              mkdirSync(distDir, { recursive: true })
+            }
+            writeFileSync(dest, '/*    /index.html   200')
+            console.log('✓ Archivo _redirects creado como fallback')
+          } catch (e) {
+            console.warn('⚠ No se pudo crear _redirects:', e.message)
+          }
         }
       },
     },
