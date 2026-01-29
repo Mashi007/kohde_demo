@@ -2,10 +2,17 @@
 Modelos de Receta y RecetaIngrediente.
 """
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Numeric, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Numeric, ForeignKey, Enum
 from sqlalchemy.orm import relationship
+import enum
 
 from models import db
+
+class TipoReceta(enum.Enum):
+    """Tipos de receta según momento del día."""
+    DESAYUNO = 'desayuno'
+    ALMUERZO = 'almuerzo'
+    MERIENDA = 'merienda'
 
 class Receta(db.Model):
     """Modelo de receta."""
@@ -14,7 +21,9 @@ class Receta(db.Model):
     id = Column(Integer, primary_key=True)
     nombre = Column(String(200), nullable=False)
     descripcion = Column(Text, nullable=True)
+    tipo = Column(Enum(TipoReceta), nullable=False, default=TipoReceta.ALMUERZO)
     porciones = Column(Integer, nullable=False, default=1)
+    porcion_gramos = Column(Numeric(10, 2), nullable=True)  # Peso total de la receta en gramos
     calorias_totales = Column(Numeric(10, 2), nullable=True)
     costo_total = Column(Numeric(10, 2), nullable=True)
     calorias_por_porcion = Column(Numeric(10, 2), nullable=True)
@@ -28,24 +37,54 @@ class Receta(db.Model):
     programacion_items = relationship('ProgramacionMenuItem', back_populates='receta', lazy='dynamic')
     
     def calcular_totales(self):
-        """Calcula calorías y costos totales basado en ingredientes."""
+        """Calcula calorías, costos y peso total basado en ingredientes."""
         from decimal import Decimal
+        from modules.logistica.conversor_unidades import convertir_a_gramos
+        
         calorias_total = Decimal('0')
         costo_total = Decimal('0')
+        peso_total_gramos = Decimal('0')
         
         for ingrediente in self.ingredientes:
-            if ingrediente.item and ingrediente.item.calorias_por_unidad:
-                # Calcular calorías: cantidad × calorías_por_unidad
-                calorias_item = Decimal(str(ingrediente.cantidad)) * Decimal(str(ingrediente.item.calorias_por_unidad))
+            if not ingrediente.item:
+                continue
+                
+            cantidad = Decimal(str(ingrediente.cantidad))
+            unidad = ingrediente.unidad or ingrediente.item.unidad
+            
+            # Calcular calorías: cantidad × calorías_por_unidad
+            if ingrediente.item.calorias_por_unidad:
+                # Convertir cantidad a la unidad base del item para calcular calorías
+                if unidad.lower() != ingrediente.item.unidad.lower():
+                    # Si las unidades son diferentes, convertir primero
+                    cantidad_base = convertir_a_gramos(cantidad, unidad) / convertir_a_gramos(Decimal('1'), ingrediente.item.unidad)
+                    calorias_item = cantidad_base * Decimal(str(ingrediente.item.calorias_por_unidad))
+                else:
+                    calorias_item = cantidad * Decimal(str(ingrediente.item.calorias_por_unidad))
                 calorias_total += calorias_item
             
-            if ingrediente.item and ingrediente.item.costo_unitario_actual:
-                # Calcular costo: cantidad × costo_unitario_actual
-                costo_item = Decimal(str(ingrediente.cantidad)) * Decimal(str(ingrediente.item.costo_unitario_actual))
+            # Calcular costo: cantidad × costo_unitario_actual (convertido a unidad base)
+            if ingrediente.item.costo_unitario_actual:
+                # Convertir cantidad a la unidad base del item para calcular costo
+                if unidad.lower() != ingrediente.item.unidad.lower():
+                    cantidad_base = convertir_a_gramos(cantidad, unidad) / convertir_a_gramos(Decimal('1'), ingrediente.item.unidad)
+                    costo_item = cantidad_base * Decimal(str(ingrediente.item.costo_unitario_actual))
+                else:
+                    costo_item = cantidad * Decimal(str(ingrediente.item.costo_unitario_actual))
                 costo_total += costo_item
+            
+            # Calcular peso total en gramos
+            try:
+                peso_gramos = convertir_a_gramos(cantidad, unidad)
+                peso_total_gramos += peso_gramos
+            except:
+                # Si no se puede convertir, intentar usar cantidad directamente si ya está en gramos
+                if unidad.lower() in ['g', 'gramo', 'gramos']:
+                    peso_total_gramos += cantidad
         
         self.calorias_totales = calorias_total
         self.costo_total = costo_total
+        self.porcion_gramos = peso_total_gramos
         
         # Calcular por porción
         if self.porciones > 0:
@@ -58,7 +97,9 @@ class Receta(db.Model):
             'id': self.id,
             'nombre': self.nombre,
             'descripcion': self.descripcion,
+            'tipo': self.tipo.value if self.tipo else None,
             'porciones': self.porciones,
+            'porcion_gramos': float(self.porcion_gramos) if self.porcion_gramos else None,
             'calorias_totales': float(self.calorias_totales) if self.calorias_totales else None,
             'costo_total': float(self.costo_total) if self.costo_total else None,
             'calorias_por_porcion': float(self.calorias_por_porcion) if self.calorias_por_porcion else None,

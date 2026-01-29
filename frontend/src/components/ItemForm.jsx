@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import api from '../config/api'
 import toast from 'react-hot-toast'
@@ -29,27 +29,54 @@ export default function ItemForm({ item, onClose, onSuccess }) {
   // Cargar labels disponibles
   const { data: labels, isLoading: loadingLabels, error: errorLabels } = useQuery({
     queryKey: ['labels'],
-    queryFn: () => api.get('/logistica/labels?activo=true').then(res => res.data),
+    queryFn: async () => {
+      try {
+        const res = await api.get('/logistica/labels?activo=true')
+        const data = res.data || []
+        console.log('Labels cargadas:', data.length, data)
+        return data
+      } catch (error) {
+        console.error('Error cargando labels:', error)
+        console.error('Error completo:', error.response?.data || error.message)
+        throw error
+      }
+    },
     retry: 2,
+    staleTime: 5 * 60 * 1000, // Cache por 5 minutos
   })
 
   // Preparar labels para el selector (agrupadas por categoría)
-  const labelsAgrupadas = labels?.reduce((acc, label) => {
-    const cat = label.categoria_principal || 'Sin categoría'
-    if (!acc[cat]) acc[cat] = []
-    acc[cat].push(label)
-    return acc
-  }, {}) || {}
+  const labelsAgrupadas = useMemo(() => {
+    if (!labels || !Array.isArray(labels) || labels.length === 0) {
+      return {}
+    }
+    return labels.reduce((acc, label) => {
+      const cat = label.categoria_principal || 'Sin categoría'
+      if (!acc[cat]) acc[cat] = []
+      acc[cat].push(label)
+      return acc
+    }, {})
+  }, [labels])
 
   // Obtener todas las labels ordenadas por categoría y nombre
-  const todasLasLabels = labels?.sort((a, b) => {
-    const catA = a.categoria_principal || 'Sin categoría'
-    const catB = b.categoria_principal || 'Sin categoría'
-    if (catA !== catB) {
-      return catA.localeCompare(catB)
+  const todasLasLabels = useMemo(() => {
+    if (!labels || !Array.isArray(labels)) {
+      return []
     }
-    return a.nombre_es.localeCompare(b.nombre_es)
-  }) || []
+    return [...labels].sort((a, b) => {
+      const catA = a.categoria_principal || 'Sin categoría'
+      const catB = b.categoria_principal || 'Sin categoría'
+      if (catA !== catB) {
+        return catA.localeCompare(catB)
+      }
+      return a.nombre_es.localeCompare(b.nombre_es)
+    })
+  }, [labels])
+
+  // Obtener la label seleccionada
+  const labelIdSeleccionada = formData.label_ids && formData.label_ids.length > 0 
+    ? formData.label_ids[0] 
+    : null
 
   const createMutation = useMutation({
     mutationFn: (data) => api.post('/logistica/items', data),
@@ -312,40 +339,54 @@ export default function ItemForm({ item, onClose, onSuccess }) {
             </p>
           </div>
         ) : todasLasLabels.length === 0 ? (
-          <div className="p-4 text-center border border-slate-600 rounded-lg bg-slate-800">
-            <p className="text-slate-400 text-sm mb-1">No hay clasificaciones disponibles</p>
-            <p className="text-xs text-slate-500">
-              Ejecuta el script de inicialización para cargar las clasificaciones: python scripts/init_food_labels.py
+          <div className="p-4 text-center border border-yellow-500/50 rounded-lg bg-yellow-500/10">
+            <p className="text-yellow-400 text-sm mb-2 font-medium">⚠️ No hay clasificaciones disponibles</p>
+            <p className="text-xs text-yellow-300 mb-2">
+              Las clasificaciones de alimentos no se han inicializado en la base de datos.
+            </p>
+            <div className="text-xs text-yellow-200 bg-yellow-500/20 p-2 rounded mt-2 font-mono">
+              <p className="mb-1">Para inicializar, ejecuta en el servidor:</p>
+              <code className="block bg-slate-900/50 p-2 rounded">
+                python scripts/init_food_labels.py
+              </code>
+            </div>
+            <p className="text-xs text-slate-400 mt-2">
+              O verifica que el endpoint <code className="bg-slate-800 px-1 rounded">/logistica/labels</code> esté funcionando correctamente.
             </p>
           </div>
         ) : (
-          <select
-            value={labelIdSeleccionada || ''}
-            onChange={(e) => {
-              const selectedId = e.target.value ? parseInt(e.target.value) : null
-              setFormData(prev => ({
-                ...prev,
-                label_ids: selectedId ? [selectedId] : []
-              }))
-            }}
-            className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:border-purple-500"
-          >
-            <option value="">Selecciona una clasificación...</option>
-            {Object.keys(labelsAgrupadas).sort().map((categoria) => {
-              const labelsCat = labelsAgrupadas[categoria].sort((a, b) => 
-                a.nombre_es.localeCompare(b.nombre_es)
-              )
-              return (
-                <optgroup key={categoria} label={categoria}>
-                  {labelsCat.map(label => (
-                    <option key={label.id} value={label.id}>
-                      {label.nombre_es}
-                    </option>
-                  ))}
-                </optgroup>
-              )
-            })}
-          </select>
+          <div>
+            <select
+              value={labelIdSeleccionada || ''}
+              onChange={(e) => {
+                const selectedId = e.target.value ? parseInt(e.target.value) : null
+                setFormData(prev => ({
+                  ...prev,
+                  label_ids: selectedId ? [selectedId] : []
+                }))
+              }}
+              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:border-purple-500"
+            >
+              <option value="">Selecciona una clasificación...</option>
+              {Object.keys(labelsAgrupadas).sort().map((categoria) => {
+                const labelsCat = labelsAgrupadas[categoria].sort((a, b) => 
+                  a.nombre_es.localeCompare(b.nombre_es)
+                )
+                return (
+                  <optgroup key={categoria} label={categoria}>
+                    {labelsCat.map(label => (
+                      <option key={label.id} value={label.id}>
+                        {label.nombre_es}
+                      </option>
+                    ))}
+                  </optgroup>
+                )
+              })}
+            </select>
+            <p className="text-xs text-slate-400 mt-1">
+              {todasLasLabels.length} clasificación{todasLasLabels.length !== 1 ? 'es' : ''} disponible{todasLasLabels.length !== 1 ? 's' : ''}
+            </p>
+          </div>
         )}
       </div>
 

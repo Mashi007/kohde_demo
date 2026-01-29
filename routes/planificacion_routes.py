@@ -17,6 +17,7 @@ def listar_recetas():
     """Lista recetas con filtros opcionales."""
     try:
         activa = request.args.get('activa')
+        tipo = request.args.get('tipo')  # desayuno, almuerzo, merienda
         busqueda = request.args.get('busqueda')
         skip = int(request.args.get('skip', 0))
         limit = int(request.args.get('limit', 100))
@@ -26,6 +27,7 @@ def listar_recetas():
         recetas = RecetaService.listar_recetas(
             db.session,
             activa=activa_bool,
+            tipo=tipo,
             busqueda=busqueda,
             skip=skip,
             limit=limit

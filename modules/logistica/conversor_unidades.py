@@ -130,6 +130,36 @@ def convertir_a_unidad_base(cantidad: float, unidad_origen: str) -> Optional[Tup
     
     return (cantidad_base, unidad_base)
 
+def convertir_a_gramos(cantidad, unidad: str):
+    """
+    Convierte una cantidad a gramos.
+    
+    Args:
+        cantidad: Cantidad a convertir (puede ser Decimal o float)
+        unidad: Unidad de origen
+        
+    Returns:
+        Cantidad en gramos (Decimal)
+    """
+    from decimal import Decimal
+    
+    cantidad = Decimal(str(cantidad))
+    unidad_lower = unidad.lower()
+    
+    # Si ya está en gramos
+    if unidad_lower in ['g', 'gramo', 'gramos']:
+        return cantidad
+    
+    # Convertir a kg primero usando CONVERSIONES
+    if unidad_lower in CONVERSIONES:
+        factor_a_kg = CONVERSIONES[unidad_lower]
+        cantidad_kg = cantidad * Decimal(str(factor_a_kg))
+        # Convertir kg a gramos (1 kg = 1000 g)
+        return cantidad_kg * Decimal('1000')
+    
+    # Si no se puede convertir, retornar 0
+    return Decimal('0')
+
 def convertir_unidad(cantidad: float, unidad_origen: str, unidad_destino: str) -> Optional[float]:
     """
     Convierte una cantidad de una unidad a otra compatible.

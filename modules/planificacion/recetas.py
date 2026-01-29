@@ -22,6 +22,14 @@ class RecetaService:
         """
         ingredientes_data = datos.pop('ingredientes', [])
         
+        # Convertir tipo string a enum si es necesario
+        if isinstance(datos.get('tipo'), str):
+            from models.receta import TipoReceta
+            try:
+                datos['tipo'] = TipoReceta[datos['tipo'].upper()]
+            except KeyError:
+                datos['tipo'] = TipoReceta.ALMUERZO  # Valor por defecto
+        
         receta = Receta(**datos)
         db.add(receta)
         db.flush()  # Para obtener el ID
@@ -56,6 +64,7 @@ class RecetaService:
     def listar_recetas(
         db: Session,
         activa: Optional[bool] = None,
+        tipo: Optional[str] = None,
         busqueda: Optional[str] = None,
         skip: int = 0,
         limit: int = 100
@@ -66,6 +75,7 @@ class RecetaService:
         Args:
             db: Sesión de base de datos
             activa: Filtrar por estado activa
+            tipo: Filtrar por tipo (desayuno, almuerzo, merienda)
             busqueda: Búsqueda por nombre
             skip: Número de registros a saltar
             limit: Límite de registros
@@ -74,16 +84,24 @@ class RecetaService:
             Lista de recetas
         """
         from sqlalchemy import or_
+        from models.receta import TipoReceta
         
         query = db.query(Receta)
         
         if activa is not None:
             query = query.filter(Receta.activa == activa)
         
+        if tipo:
+            try:
+                tipo_enum = TipoReceta[tipo.upper()]
+                query = query.filter(Receta.tipo == tipo_enum)
+            except KeyError:
+                pass  # Tipo inválido, ignorar filtro
+        
         if busqueda:
             query = query.filter(Receta.nombre.ilike(f'%{busqueda}%'))
         
-        return query.offset(skip).limit(limit).all()
+        return query.order_by(Receta.nombre).offset(skip).limit(limit).all()
     
     @staticmethod
     def actualizar_receta(db: Session, receta_id: int, datos: Dict) -> Receta:
