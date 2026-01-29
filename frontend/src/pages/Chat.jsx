@@ -205,7 +205,7 @@ export default function Chat() {
       {/* Área de chat */}
       <div className="flex-1 flex flex-col bg-slate-900">
         {conversacionActual ? (
-          <>
+          <div className="flex-1 flex flex-col">
             {/* Mensajes */}
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
               {cargandoMensajes ? (
@@ -285,7 +285,7 @@ export default function Chat() {
                 </button>
               </div>
             </form>
-          </>
+          </div>
         ) : (
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
