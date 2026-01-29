@@ -48,6 +48,7 @@ const menuStructure = [
       { path: '/compras', label: 'Compras', icon: ShoppingCart },
       { path: '/inventario', label: 'Inventario', icon: Package },
       { path: '/pedidos', label: 'Pedidos', icon: ClipboardList },
+      { path: '/pedidos-internos', label: 'Pedidos Internos', icon: Package },
       { path: '/facturas', label: 'Facturas', icon: FileText },
       { path: '/costos', label: 'Costos', icon: DollarSign },
     ]

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import api from '../config/api'
 import toast from 'react-hot-toast'
@@ -19,9 +19,26 @@ export default function ItemForm({ item, onClose, onSuccess }) {
     costo_unitario_manual: item?.costo_unitario_actual || null,
   })
   
+  // Estado separado para el valor del input de costo (como string para permitir escritura libre)
+  const [costoInputValue, setCostoInputValue] = useState('')
+  
   const [codigoAutoGenerado, setCodigoAutoGenerado] = useState(!item?.codigo)
 
   const queryClient = useQueryClient()
+
+  // Inicializar costoInputValue cuando se carga un item existente o cambia el costo
+  useEffect(() => {
+    if (item?.costo_unitario_actual !== null && item?.costo_unitario_actual !== undefined) {
+      const valor = item.costo_unitario_actual.toString()
+      setCostoInputValue(valor)
+      setFormData(prev => ({
+        ...prev,
+        costo_unitario_manual: item.costo_unitario_actual
+      }))
+    } else {
+      setCostoInputValue('')
+    }
+  }, [item?.costo_unitario_actual])
 
   // Cargar item con costo promedio si es edición
   const { data: itemConCosto } = useQuery({
@@ -274,38 +291,48 @@ export default function ItemForm({ item, onClose, onSuccess }) {
             <input
               type="text"
               inputMode="decimal"
-              value={formData.costo_unitario_manual !== null && formData.costo_unitario_manual !== undefined 
-                ? formData.costo_unitario_manual.toFixed(2)
-                : ''}
+              value={costoInputValue}
               onChange={(e) => {
                 const valor = e.target.value.trim()
+                
+                // Permitir vacío
                 if (valor === '') {
+                  setCostoInputValue('')
                   setFormData({ 
                     ...formData, 
                     costo_unitario_manual: null 
                   })
-                } else {
-                  // Permitir solo números y un punto decimal
-                  const regex = /^\d*\.?\d{0,2}$/
-                  if (regex.test(valor)) {
-                    const numero = parseFloat(valor)
-                    if (!isNaN(numero) && numero >= 0) {
-                      setFormData({ 
-                        ...formData, 
-                        costo_unitario_manual: numero 
-                      })
-                    }
+                  return
+                }
+                
+                // Permitir solo números y un punto decimal con hasta 2 decimales
+                const regex = /^\d*\.?\d{0,2}$/
+                if (regex.test(valor)) {
+                  // Actualizar el valor del input (como string para permitir escritura libre)
+                  setCostoInputValue(valor)
+                  
+                  // Convertir a número y guardar en formData
+                  const numero = parseFloat(valor)
+                  if (!isNaN(numero) && numero >= 0) {
+                    setFormData({ 
+                      ...formData, 
+                      costo_unitario_manual: numero 
+                    })
                   }
                 }
               }}
               onBlur={(e) => {
                 // Formatear a 2 decimales cuando pierde el foco
-                if (formData.costo_unitario_manual !== null && formData.costo_unitario_manual !== undefined) {
-                  const valorFormateado = parseFloat(formData.costo_unitario_manual.toFixed(2))
-                  setFormData({ 
-                    ...formData, 
-                    costo_unitario_manual: valorFormateado 
-                  })
+                if (costoInputValue && costoInputValue !== '') {
+                  const numero = parseFloat(costoInputValue)
+                  if (!isNaN(numero) && numero >= 0) {
+                    const valorFormateado = parseFloat(numero.toFixed(2))
+                    setCostoInputValue(valorFormateado.toString())
+                    setFormData({ 
+                      ...formData, 
+                      costo_unitario_manual: valorFormateado 
+                    })
+                  }
                 }
               }}
               className="flex-1 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:border-purple-500"

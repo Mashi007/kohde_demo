@@ -11,6 +11,7 @@ import Programacion from './pages/Programacion'
 import Proveedores from './pages/Proveedores'
 import Notificaciones from './pages/Notificaciones'
 import Pedidos from './pages/Pedidos'
+import PedidosInternos from './pages/PedidosInternos'
 import Charolas from './pages/Charolas'
 import Mermas from './pages/Mermas'
 import Chat from './pages/Chat'
@@ -34,6 +35,7 @@ function App() {
         <Route path="/proveedores" element={<Proveedores />} />
         <Route path="/notificaciones" element={<Notificaciones />} />
         <Route path="/pedidos" element={<Pedidos />} />
+        <Route path="/pedidos-internos" element={<PedidosInternos />} />
         <Route path="/charolas" element={<Charolas />} />
         <Route path="/mermas" element={<Mermas />} />
         <Route path="/compras" element={<ComprasDashboard />} />

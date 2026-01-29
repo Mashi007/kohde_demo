@@ -15,6 +15,7 @@ from models.receta import Receta, RecetaIngrediente
 from models.ticket import Ticket
 from models.inventario import Inventario
 from models.pedido import PedidoCompra, PedidoCompraItem
+from models.pedido_interno import PedidoInterno, PedidoInternoItem
 from models.programacion import ProgramacionMenu, ProgramacionMenuItem
 from models.requerimiento import Requerimiento, RequerimientoItem
 from models.contabilidad import CuentaContable
@@ -38,6 +39,8 @@ __all__ = [
     'Inventario',
     'PedidoCompra',
     'PedidoCompraItem',
+    'PedidoInterno',
+    'PedidoInternoItem',
     'ProgramacionMenu',
     'ProgramacionMenuItem',
     'Requerimiento',

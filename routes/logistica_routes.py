@@ -12,6 +12,7 @@ from modules.logistica.inventario import InventarioService
 from modules.logistica.requerimientos import RequerimientoService
 from modules.logistica.facturas import FacturaService
 from modules.logistica.pedidos import PedidoCompraService
+from modules.logistica.pedidos_internos import PedidoInternoService
 from modules.logistica.compras_stats import ComprasStatsService
 from modules.logistica.costos import CostoService
 from models import ItemLabel
@@ -894,5 +895,107 @@ def listar_costos_recetas():
     except Exception as e:
         import traceback
         print(f"Error en listar_costos_recetas: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
+
+# ========== RUTAS DE PEDIDOS INTERNOS (BODEGA → COCINA) ==========
+
+@bp.route('/pedidos-internos', methods=['GET'])
+def listar_pedidos_internos():
+    """Lista pedidos internos con filtros opcionales."""
+    try:
+        estado = request.args.get('estado')
+        fecha_desde = request.args.get('fecha_desde')
+        fecha_hasta = request.args.get('fecha_hasta')
+        skip = int(request.args.get('skip', 0))
+        limit = int(request.args.get('limit', 100))
+        
+        fecha_desde_dt = None
+        fecha_hasta_dt = None
+        
+        if fecha_desde:
+            fecha_desde_dt = datetime.fromisoformat(fecha_desde.replace('Z', '+00:00'))
+        if fecha_hasta:
+            fecha_hasta_dt = datetime.fromisoformat(fecha_hasta.replace('Z', '+00:00'))
+        
+        pedidos = PedidoInternoService.listar_pedidos_internos(
+            db.session,
+            estado=estado,
+            fecha_desde=fecha_desde_dt,
+            fecha_hasta=fecha_hasta_dt,
+            skip=skip,
+            limit=limit
+        )
+        
+        return jsonify([p.to_dict() for p in pedidos]), 200
+    except Exception as e:
+        import traceback
+        print(f"Error en listar_pedidos_internos: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/pedidos-internos', methods=['POST'])
+def crear_pedido_interno():
+    """Crea un nuevo pedido interno."""
+    try:
+        datos = request.get_json()
+        pedido = PedidoInternoService.crear_pedido_interno(db.session, datos)
+        return jsonify(pedido.to_dict()), 201
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        import traceback
+        print(f"Error en crear_pedido_interno: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/pedidos-internos/<int:pedido_id>', methods=['GET'])
+def obtener_pedido_interno(pedido_id):
+    """Obtiene un pedido interno por ID."""
+    try:
+        pedido = PedidoInternoService.obtener_pedido_interno(db.session, pedido_id)
+        if not pedido:
+            return jsonify({'error': 'Pedido interno no encontrado'}), 404
+        return jsonify(pedido.to_dict()), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/pedidos-internos/<int:pedido_id>/confirmar', methods=['POST'])
+def confirmar_entrega_pedido_interno(pedido_id):
+    """Confirma la entrega de un pedido interno y actualiza el inventario."""
+    try:
+        datos = request.get_json()
+        recibido_por_id = datos.get('recibido_por_id')
+        recibido_por_nombre = datos.get('recibido_por_nombre')
+        
+        if not recibido_por_id or not recibido_por_nombre:
+            return jsonify({'error': 'recibido_por_id y recibido_por_nombre son requeridos'}), 400
+        
+        pedido = PedidoInternoService.confirmar_entrega(
+            db.session,
+            pedido_id,
+            recibido_por_id,
+            recibido_por_nombre
+        )
+        return jsonify(pedido.to_dict()), 200
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        import traceback
+        print(f"Error en confirmar_entrega_pedido_interno: {str(e)}")
+        print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/pedidos-internos/<int:pedido_id>/cancelar', methods=['POST'])
+def cancelar_pedido_interno(pedido_id):
+    """Cancela un pedido interno pendiente."""
+    try:
+        pedido = PedidoInternoService.cancelar_pedido(db.session, pedido_id)
+        return jsonify(pedido.to_dict()), 200
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        import traceback
+        print(f"Error en cancelar_pedido_interno: {str(e)}")
         print(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
