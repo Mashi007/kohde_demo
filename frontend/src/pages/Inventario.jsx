@@ -31,7 +31,7 @@ export default function Inventario() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             {silos.map((silo) => {
               const nivelLlenado = Math.min(100, silo.nivel_llenado || 0)
-              const porcentajeMinimo = Math.min(100, (silo.stock_minimo / Math.max(silo.stock_total, silo.stock_minimo)) * 100)
+              const porcentajeMinimo = Math.min(100, silo.porcentaje_minimo || 0)
               
               return (
                 <div 

@@ -155,16 +155,20 @@ class InventarioService:
             item_dict = inv.to_dict()
             
             # Obtener último ingreso (factura aprobada más reciente con este item)
+            from models.factura import EstadoFactura, TipoFactura
+            from models.requerimiento import EstadoRequerimiento
+            
             ultimo_ingreso = db.query(FacturaItem).join(Factura).filter(
                 FacturaItem.item_id == inv.item_id,
-                Factura.estado == 'aprobada',
-                Factura.tipo == 'proveedor'
+                Factura.estado == EstadoFactura.APROBADA,
+                Factura.tipo == TipoFactura.PROVEEDOR,
+                FacturaItem.cantidad_aprobada.isnot(None)
             ).order_by(desc(Factura.fecha_aprobacion)).first()
             
             # Obtener último egreso (requerimiento entregado más reciente con este item)
             ultimo_egreso = db.query(RequerimientoItem).join(Requerimiento).filter(
                 RequerimientoItem.item_id == inv.item_id,
-                Requerimiento.estado == 'entregado',
+                Requerimiento.estado == EstadoRequerimiento.ENTREGADO,
                 RequerimientoItem.cantidad_entregada.isnot(None)
             ).order_by(desc(Requerimiento.fecha)).first()
             
@@ -173,7 +177,7 @@ class InventarioService:
             
             item_dict['ultimo_ingreso'] = {
                 'fecha': ultimo_ingreso.factura.fecha_aprobacion.isoformat() if ultimo_ingreso and ultimo_ingreso.factura.fecha_aprobacion else None,
-                'cantidad': float(ultimo_ingreso.cantidad) if ultimo_ingreso else None,
+                'cantidad': float(ultimo_ingreso.cantidad_aprobada) if ultimo_ingreso and ultimo_ingreso.cantidad_aprobada else None,
                 'factura_numero': ultimo_ingreso.factura.numero_factura if ultimo_ingreso else None,
                 'proveedor': ultimo_ingreso.factura.proveedor.nombre if ultimo_ingreso and ultimo_ingreso.factura.proveedor else None,
             } if ultimo_ingreso else None
@@ -224,3 +228,70 @@ class InventarioService:
             'valor_total_inventario': valor_total,
             'porcentaje_stock_bajo': round((items_stock_bajo / total_items * 100) if total_items > 0 else 0, 2),
         }
+    
+    @staticmethod
+    def obtener_top_10_items_mas_comprados(db: Session) -> List[Dict]:
+        """
+        Obtiene los 10 items más comprados basado en facturas aprobadas.
+        Se calcula por cantidad total comprada y frecuencia de compra.
+        Los datos se actualizan automáticamente cuando se aprueban facturas.
+        
+        Returns:
+            Lista de diccionarios con los top 10 items más comprados (silos)
+        """
+        from models.factura import EstadoFactura, TipoFactura
+        
+        # Consulta para obtener los items más comprados
+        # Sumamos cantidad_aprobada de facturas aprobadas de proveedores
+        resultado_query = db.query(
+            FacturaItem.item_id,
+            func.sum(FacturaItem.cantidad_aprobada).label('total_comprado'),
+            func.count(FacturaItem.id).label('frecuencia_compra'),
+            func.max(Factura.fecha_aprobacion).label('ultima_compra')
+        ).join(Factura).filter(
+            Factura.estado == EstadoFactura.APROBADA,
+            Factura.tipo == TipoFactura.PROVEEDOR,
+            FacturaItem.item_id.isnot(None),
+            FacturaItem.cantidad_aprobada.isnot(None)
+        ).group_by(FacturaItem.item_id).order_by(
+            func.sum(FacturaItem.cantidad_aprobada).desc()
+        ).limit(10).all()
+        
+        resultado = []
+        for row in resultado_query:
+            item_id = row.item_id
+            total_comprado = float(row.total_comprado) if row.total_comprado else 0
+            frecuencia_compra = row.frecuencia_compra or 0
+            ultima_compra = row.ultima_compra
+            
+            # Obtener información del inventario para este item
+            inventario = db.query(Inventario).filter(Inventario.item_id == item_id).first()
+            item = db.query(Item).filter(Item.id == item_id).first()
+            
+            if inventario and item:
+                # Calcular porcentaje de llenado del silo
+                stock_actual = float(inventario.cantidad_actual)
+                stock_minimo = float(inventario.cantidad_minima)
+                
+                # El "silo" se llena hasta el stock mínimo, luego el exceso
+                # Usamos el stock mínimo como referencia base para el 100%
+                nivel_maximo = max(stock_minimo * 2, stock_actual) if stock_minimo > 0 else max(stock_actual, 1)
+                nivel_llenado = (stock_actual / nivel_maximo * 100) if nivel_maximo > 0 else 0
+                porcentaje_minimo = (stock_minimo / nivel_maximo * 100) if nivel_maximo > 0 else 0
+                
+                resultado.append({
+                    'item_id': item_id,
+                    'item_nombre': item.nombre,
+                    'unidad': inventario.unidad,
+                    'stock_total': stock_actual,
+                    'stock_minimo': stock_minimo,
+                    'stock_disponible': max(0, stock_actual - stock_minimo),
+                    'total_comprado': total_comprado,
+                    'frecuencia_compra': frecuencia_compra,
+                    'ultima_compra': ultima_compra.isoformat() if ultima_compra else None,
+                    'porcentaje_minimo': round(porcentaje_minimo, 1),
+                    'nivel_llenado': round(nivel_llenado, 1),
+                    'estado': 'critico' if stock_actual < stock_minimo * 0.5 else 'bajo' if stock_actual < stock_minimo else 'ok',
+                })
+        
+        return resultado
