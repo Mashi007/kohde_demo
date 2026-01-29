@@ -17,10 +17,10 @@ from routes import (
     logistica_routes,
     compras_routes,
     planificacion_routes,
-    configuracion_routes,
-    health
+    configuracion_routes
 )
 from routes import whatsapp_webhook
+from routes import health
 
 def create_app():
     """Factory function para crear la aplicación Flask."""
