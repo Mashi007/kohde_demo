@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
-import api from '../config/api'
+import api, { extractData } from '../config/api'
 import toast from 'react-hot-toast'
 
 export default function MermaForm({ merma, onClose, onSuccess }) {
@@ -17,10 +17,15 @@ export default function MermaForm({ merma, onClose, onSuccess }) {
 
   const queryClient = useQueryClient()
 
-  const { data: items } = useQuery({
+  const { data: itemsResponse } = useQuery({
     queryKey: ['items'],
-    queryFn: () => api.get('/logistica/items').then(res => res.data),
+    queryFn: () => api.get('/logistica/items').then(res => {
+      const items = extractData(res)
+      return Array.isArray(items) ? items : []
+    }),
   })
+  
+  const items = Array.isArray(itemsResponse) ? itemsResponse : []
 
   const createMutation = useMutation({
     mutationFn: (data) => api.post('/reportes/mermas', data),

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import api from '../config/api'
+import api, { extractData } from '../config/api'
 import { Package, Plus, X, Save } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -16,7 +16,10 @@ export default function PedidoInternoForm({ pedido, onClose, onSuccess }) {
   // Cargar items disponibles
   const { data: itemsDisponibles } = useQuery({
     queryKey: ['items'],
-    queryFn: () => api.get('/logistica/items?limit=1000').then(res => res.data),
+    queryFn: () => api.get('/logistica/items?limit=1000').then(res => {
+      const items = extractData(res)
+      return Array.isArray(items) ? items : []
+    }),
   })
 
   // Cargar inventario para verificar stock

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState, useEffect } from 'react'
-import api from '../config/api'
+import api, { extractData } from '../config/api'
 import { debounce } from '../utils/debounce'
 import { ShoppingCart, Plus, Search, X } from 'lucide-react'
 import Modal from '../components/Modal'
@@ -25,13 +25,16 @@ export default function Items() {
     }
   }, [busqueda])
   
-  const { data: items, isLoading } = useQuery({
+  const { data: itemsResponse, isLoading } = useQuery({
     queryKey: ['items', busquedaDebounced],
     queryFn: () => {
       const params = busquedaDebounced ? { busqueda: busquedaDebounced } : {}
-      return api.get('/logistica/items', { params }).then(res => res.data)
+      return api.get('/logistica/items', { params }).then(extractData)
     },
   })
+
+  // Asegurar que items sea un array
+  const items = Array.isArray(itemsResponse) ? itemsResponse : []
 
   return (
     <div>

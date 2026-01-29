@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
-import api from '../config/api'
+import api, { extractData } from '../config/api'
 import toast from 'react-hot-toast'
 import { X, Plus, Calculator } from 'lucide-react'
 
@@ -22,10 +22,15 @@ export default function RecetaForm({ receta, onClose, onSuccess }) {
   const queryClient = useQueryClient()
 
   // Cargar items disponibles
-  const { data: items, isLoading: loadingItems } = useQuery({
+  const { data: itemsResponse, isLoading: loadingItems } = useQuery({
     queryKey: ['items'],
-    queryFn: () => api.get('/logistica/items?activo=true&limit=1000').then(res => res.data),
+    queryFn: () => api.get('/logistica/items?activo=true&limit=1000').then(res => {
+      const items = extractData(res)
+      return Array.isArray(items) ? items : []
+    }),
   })
+  
+  const items = Array.isArray(itemsResponse) ? itemsResponse : []
 
   // Cálculos automáticos
   const [calculos, setCalculos] = useState({

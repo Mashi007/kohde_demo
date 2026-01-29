@@ -20,3 +20,8 @@ body {
 }
 
 /* Eliminado: propiedades text-size-adjust que causan errores en algunos navegadores */
+/* Sobrescribir cualquier valor de text-size-adjust que pueda generar Tailwind */
+html {
+  -webkit-text-size-adjust: 100% !important;
+  text-size-adjust: 100% !important;
+}

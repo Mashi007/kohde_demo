@@ -123,4 +123,26 @@ api.interceptors.response.use(
   }
 )
 
+/**
+ * Helper para extraer datos de respuestas paginadas o directas
+ * Maneja tanto respuestas con estructura {data: [...], pagination: {...}} como arrays directos
+ */
+export const extractData = (response) => {
+  const data = response.data
+  // Si la respuesta tiene estructura paginada, extraer el array
+  if (data && typeof data === 'object' && 'data' in data && Array.isArray(data.data)) {
+    return data.data
+  }
+  // Si es un array directo, retornarlo
+  if (Array.isArray(data)) {
+    return data
+  }
+  // Si es un objeto con 'data' pero no es array (respuesta de success_response)
+  if (data && typeof data === 'object' && 'data' in data) {
+    return data.data
+  }
+  // En otros casos, retornar el dato completo
+  return data
+}
+
 export default api

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import api from '../config/api'
+import api, { extractData } from '../config/api'
 import { Package, FileText, MessageSquare, AlertTriangle, DollarSign } from 'lucide-react'
 import LoadingSpinner from '../components/LoadingSpinner'
 import SkeletonLoader from '../components/SkeletonLoader'
@@ -29,9 +29,12 @@ export default function Dashboard() {
   const { data: itemsConCosto } = useQuery({
     queryKey: ['items-con-costo'],
     queryFn: () => api.get('/logistica/items?limit=100').then(res => {
+      // Extraer datos de respuesta paginada
+      const items = extractData(res)
       // Filtrar items con costo promedio y ordenar
-      const items = res.data.filter(item => item.costo_unitario_promedio)
-      return items.sort((a, b) => (b.costo_unitario_promedio || 0) - (a.costo_unitario_promedio || 0)).slice(0, 10)
+      return (Array.isArray(items) ? items : []).filter(item => item.costo_unitario_promedio)
+        .sort((a, b) => (b.costo_unitario_promedio || 0) - (a.costo_unitario_promedio || 0))
+        .slice(0, 10)
     }).catch(() => []),
   })
 
