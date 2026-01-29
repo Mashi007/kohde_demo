@@ -43,15 +43,15 @@ class FacturaService:
         # 2. Extraer datos con OCR
         datos_ocr = ocr_processor.extract_invoice_data(imagen_path)
         
-        # 3. Buscar o crear proveedor/cliente
+        # 3. Buscar o crear proveedor
         if tipo == 'proveedor':
             proveedor = FacturaService._buscar_o_crear_proveedor(db, datos_ocr)
             cliente_id = None
             proveedor_id = proveedor.id
         else:
-            cliente = FacturaService._buscar_o_crear_cliente(db, datos_ocr)
-            cliente_id = cliente.id
+            # Cliente removido - facturas de cliente ahora sin proveedor
             proveedor_id = None
+            cliente_id = None
         
         # 4. Verificar duplicados
         factura_existente = db.query(Factura).filter(
