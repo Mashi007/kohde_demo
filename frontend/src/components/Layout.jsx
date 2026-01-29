@@ -19,14 +19,16 @@ import {
   Users
 } from 'lucide-react'
 
-// Estructura de menú con secciones
+// Estructura de menú con secciones agrupadas
 const menuStructure = [
+  // Dashboard (sin agrupación)
   {
     section: null,
     items: [
       { path: '/', label: 'Dashboard', icon: LayoutDashboard },
     ]
   },
+  // CRM - Gestión de relaciones con clientes y proveedores
   {
     section: 'CRM',
     icon: Users,
@@ -35,16 +37,18 @@ const menuStructure = [
       { path: '/proveedores', label: 'Proveedores', icon: Truck },
     ]
   },
+  // Logística - Gestión de inventario, compras y facturas
   {
     section: 'Logística',
     icon: Package,
     items: [
-      { path: '/facturas', label: 'Facturas', icon: FileText },
-      { path: '/inventario', label: 'Inventario', icon: Package },
       { path: '/items', label: 'Items', icon: ShoppingCart },
+      { path: '/inventario', label: 'Inventario', icon: Package },
       { path: '/pedidos', label: 'Pedidos', icon: ClipboardList },
+      { path: '/facturas', label: 'Facturas', icon: FileText },
     ]
   },
+  // Planificación - Recetas y programación de producción
   {
     section: 'Planificación',
     icon: Calendar,
@@ -53,6 +57,7 @@ const menuStructure = [
       { path: '/programacion', label: 'Programación', icon: Calendar },
     ]
   },
+  // Reportes - Análisis y reportes operativos
   {
     section: 'Reportes',
     icon: BarChart3,
@@ -61,6 +66,7 @@ const menuStructure = [
       { path: '/mermas', label: 'Mermas', icon: AlertTriangle },
     ]
   },
+  // Herramientas - Utilidades del sistema
   {
     section: null,
     items: [
