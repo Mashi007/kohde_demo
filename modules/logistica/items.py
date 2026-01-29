@@ -4,7 +4,7 @@ Lógica de negocio para gestión de items (catálogo de productos).
 from typing import List, Optional, Dict
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
-from models import Item, Inventario
+from models import Item, Inventario, ItemLabel
 from utils.validators import validate_positive_number
 
 class ItemService:
@@ -28,10 +28,20 @@ class ItemService:
             if existente:
                 raise ValueError("Ya existe un item con este código")
         
+        # Separar labels del resto de datos
+        label_ids = datos.pop('label_ids', [])
+        
         item = Item(**datos)
         db.add(item)
         db.commit()
         db.refresh(item)
+        
+        # Asignar labels si se proporcionaron
+        if label_ids:
+            labels = db.query(ItemLabel).filter(ItemLabel.id.in_(label_ids)).all()
+            item.labels = labels
+            db.commit()
+            db.refresh(item)
         
         # Crear registro de inventario inicial si se especifica cantidad inicial
         if 'cantidad_inicial' in datos:
@@ -116,6 +126,9 @@ class ItemService:
             if existente:
                 raise ValueError("Ya existe un item con este código")
         
+        # Separar labels del resto de datos
+        label_ids = datos.pop('label_ids', None)
+        
         # Actualizar campos
         for key, value in datos.items():
             if hasattr(item, key) and key != 'id':
@@ -124,6 +137,11 @@ class ItemService:
                     if isinstance(value, str):
                         value = CategoriaItem[value.upper()]
                 setattr(item, key, value)
+        
+        # Actualizar labels si se proporcionaron
+        if label_ids is not None:
+            labels = db.query(ItemLabel).filter(ItemLabel.id.in_(label_ids)).all()
+            item.labels = labels
         
         db.commit()
         db.refresh(item)

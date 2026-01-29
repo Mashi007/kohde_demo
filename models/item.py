@@ -7,6 +7,7 @@ from sqlalchemy.orm import relationship
 import enum
 
 from models import db
+from models.item_label import item_labels
 
 class CategoriaItem(enum.Enum):
     """Categorías de items."""
@@ -38,6 +39,7 @@ class Item(db.Model):
     requerimiento_items = relationship('RequerimientoItem', back_populates='item', lazy='dynamic')
     pedido_items = relationship('PedidoCompraItem', back_populates='item', lazy='dynamic')
     factura_items = relationship('FacturaItem', back_populates='item', lazy='dynamic')
+    labels = relationship('ItemLabel', secondary=item_labels, back_populates='items', lazy='dynamic')
     
     def to_dict(self):
         """Convierte el modelo a diccionario."""
@@ -54,6 +56,7 @@ class Item(db.Model):
             'costo_unitario_actual': float(self.costo_unitario_actual) if self.costo_unitario_actual else None,
             'activo': self.activo,
             'fecha_creacion': self.fecha_creacion.isoformat() if self.fecha_creacion else None,
+            'labels': [label.to_dict() for label in self.labels] if self.labels else [],
         }
     
     def __repr__(self):

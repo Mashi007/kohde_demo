@@ -10,6 +10,7 @@ db = SQLAlchemy()
 from models.proveedor import Proveedor
 from models.factura import Factura, FacturaItem
 from models.item import Item
+from models.item_label import ItemLabel
 from models.receta import Receta, RecetaIngrediente
 from models.ticket import Ticket
 from models.inventario import Inventario
@@ -28,6 +29,7 @@ __all__ = [
     'Factura',
     'FacturaItem',
     'Item',
+    'ItemLabel',
     'Receta',
     'RecetaIngrediente',
     'Ticket',

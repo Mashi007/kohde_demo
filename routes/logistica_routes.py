@@ -11,6 +11,7 @@ from modules.logistica.inventario import InventarioService
 from modules.logistica.requerimientos import RequerimientoService
 from modules.logistica.facturas import FacturaService
 from modules.logistica.pedidos import PedidoCompraService
+from models import ItemLabel
 from config import Config
 
 bp = Blueprint('logistica', __name__)
@@ -86,6 +87,38 @@ def actualizar_costo_item(item_id):
         return jsonify({'error': str(e)}), 400
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+# ========== RUTAS DE LABELS ==========
+
+@bp.route('/labels', methods=['GET'])
+def listar_labels():
+    """Lista todas las labels disponibles."""
+    try:
+        categoria = request.args.get('categoria_principal')
+        activo = request.args.get('activo', 'true')
+        
+        query = db.session.query(ItemLabel)
+        
+        if categoria:
+            query = query.filter(ItemLabel.categoria_principal == categoria)
+        
+        if activo.lower() == 'true':
+            query = query.filter(ItemLabel.activo == True)
+        
+        labels = query.order_by(ItemLabel.categoria_principal, ItemLabel.nombre_es).all()
+        return jsonify([l.to_dict() for l in labels]), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@bp.route('/labels/categorias', methods=['GET'])
+def listar_categorias_labels():
+    """Lista las categorías principales de labels."""
+    try:
+        categorias = db.session.query(ItemLabel.categoria_principal).distinct().all()
+        categorias_list = [cat[0] for cat in categorias]
+        return jsonify(categorias_list), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
 
 # ========== RUTAS DE INVENTARIO ==========
 
