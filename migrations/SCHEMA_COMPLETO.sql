@@ -356,16 +356,21 @@ COMMENT ON TABLE cuentas_contables IS 'Plan contable jerárquico';
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS charolas (
     id SERIAL PRIMARY KEY,
-    fecha DATE NOT NULL,
+    numero_charola VARCHAR(50) UNIQUE NOT NULL,
+    fecha_servicio TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     ubicacion VARCHAR(100) NOT NULL,
-    tiempo_comida VARCHAR(20) NOT NULL CHECK (tiempo_comida IN ('desayuno', 'almuerzo', 'cena')),
-    cantidad_servidas INTEGER NOT NULL DEFAULT 0,
+    tiempo_comida VARCHAR(50) NOT NULL CHECK (tiempo_comida IN ('desayuno', 'almuerzo', 'cena')),
+    personas_servidas INTEGER NOT NULL DEFAULT 0,
+    total_ventas NUMERIC(10, 2) NOT NULL DEFAULT 0,
+    costo_total NUMERIC(10, 2) NOT NULL DEFAULT 0,
+    ganancia NUMERIC(10, 2) NOT NULL DEFAULT 0,
     observaciones TEXT,
-    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+    fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
-CREATE INDEX idx_charolas_fecha ON charolas(fecha);
+CREATE INDEX idx_charolas_fecha ON charolas(fecha_servicio);
 CREATE INDEX idx_charolas_ubicacion ON charolas(ubicacion);
+CREATE INDEX idx_charolas_numero ON charolas(numero_charola);
 
 COMMENT ON TABLE charolas IS 'Registro de charolas/platos servidos';
 
@@ -375,11 +380,18 @@ COMMENT ON TABLE charolas IS 'Registro de charolas/platos servidos';
 CREATE TABLE IF NOT EXISTS charola_items (
     id SERIAL PRIMARY KEY,
     charola_id INTEGER NOT NULL REFERENCES charolas(id) ON DELETE CASCADE,
+    item_id INTEGER REFERENCES items(id),
     receta_id INTEGER REFERENCES recetas(id),
-    cantidad INTEGER NOT NULL DEFAULT 1
+    nombre_item VARCHAR(200) NOT NULL,
+    cantidad NUMERIC(10, 2) NOT NULL,
+    precio_unitario NUMERIC(10, 2) NOT NULL,
+    costo_unitario NUMERIC(10, 2) NOT NULL,
+    subtotal NUMERIC(10, 2) NOT NULL,
+    costo_subtotal NUMERIC(10, 2) NOT NULL
 );
 
 CREATE INDEX idx_charola_items_charola ON charola_items(charola_id);
+CREATE INDEX idx_charola_items_item ON charola_items(item_id);
 CREATE INDEX idx_charola_items_receta ON charola_items(receta_id);
 
 -- ============================================================================
@@ -387,17 +399,22 @@ CREATE INDEX idx_charola_items_receta ON charola_items(receta_id);
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS mermas (
     id SERIAL PRIMARY KEY,
-    fecha DATE NOT NULL,
     item_id INTEGER NOT NULL REFERENCES items(id),
+    fecha_merma TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('vencimiento', 'deterioro', 'preparacion', 'servicio', 'otro')),
     cantidad NUMERIC(10, 2) NOT NULL,
     unidad VARCHAR(20) NOT NULL,
-    motivo VARCHAR(100) NOT NULL,
-    observaciones TEXT,
-    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+    costo_unitario NUMERIC(10, 2) NOT NULL,
+    costo_total NUMERIC(10, 2) NOT NULL,
+    motivo TEXT,
+    ubicacion VARCHAR(100),
+    registrado_por INTEGER,
+    fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
-CREATE INDEX idx_mermas_fecha ON mermas(fecha);
+CREATE INDEX idx_mermas_fecha ON mermas(fecha_merma);
 CREATE INDEX idx_mermas_item ON mermas(item_id);
+CREATE INDEX idx_mermas_tipo ON mermas(tipo);
 
 COMMENT ON TABLE mermas IS 'Registro de mermas/pérdidas de inventario';
 
@@ -407,11 +424,16 @@ COMMENT ON TABLE mermas IS 'Registro de mermas/pérdidas de inventario';
 CREATE TABLE IF NOT EXISTS conversaciones (
     id SERIAL PRIMARY KEY,
     titulo VARCHAR(200),
+    usuario_id INTEGER,
+    contexto_modulo VARCHAR(50),
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    ultima_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+    fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    activa BOOLEAN DEFAULT TRUE NOT NULL
 );
 
 CREATE INDEX idx_conversaciones_fecha ON conversaciones(fecha_creacion);
+CREATE INDEX idx_conversaciones_usuario ON conversaciones(usuario_id);
+CREATE INDEX idx_conversaciones_activa ON conversaciones(activa);
 
 COMMENT ON TABLE conversaciones IS 'Conversaciones del módulo Chat AI';
 
@@ -421,13 +443,15 @@ COMMENT ON TABLE conversaciones IS 'Conversaciones del módulo Chat AI';
 CREATE TABLE IF NOT EXISTS mensajes (
     id SERIAL PRIMARY KEY,
     conversacion_id INTEGER NOT NULL REFERENCES conversaciones(id) ON DELETE CASCADE,
-    rol VARCHAR(20) NOT NULL CHECK (rol IN ('usuario', 'asistente')),
+    tipo VARCHAR(20) NOT NULL CHECK (tipo IN ('usuario', 'asistente', 'sistema')),
     contenido TEXT NOT NULL,
-    fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
+    tokens_usados INTEGER,
+    fecha_envio TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
 );
 
 CREATE INDEX idx_mensajes_conversacion ON mensajes(conversacion_id);
-CREATE INDEX idx_mensajes_fecha ON mensajes(fecha_creacion);
+CREATE INDEX idx_mensajes_fecha ON mensajes(fecha_envio);
+CREATE INDEX idx_mensajes_tipo ON mensajes(tipo);
 
 COMMENT ON TABLE mensajes IS 'Mensajes de las conversaciones del Chat AI';
 
