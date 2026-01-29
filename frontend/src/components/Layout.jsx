@@ -44,17 +44,17 @@ const menuStructure = [
     section: 'Logística',
     icon: Package,
     items: [
-      { path: '/items', label: 'Items', icon: ShoppingCart },
       { path: '/inventario', label: 'Inventario', icon: Package },
       { path: '/pedidos', label: 'Pedidos', icon: ClipboardList },
       { path: '/facturas', label: 'Facturas', icon: FileText },
     ]
   },
-  // Planificación - Recetas y programación de producción
+  // Planificación - Items, recetas y programación de producción
   {
     section: 'Planificación',
     icon: Calendar,
     items: [
+      { path: '/items', label: 'Items', icon: ShoppingCart },
       { path: '/recetas', label: 'Recetas', icon: ChefHat },
       { path: '/programacion', label: 'Programación', icon: Calendar },
     ]
