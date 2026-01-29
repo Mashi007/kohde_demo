@@ -66,6 +66,23 @@ def actualizar_cliente(cliente_id):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@bp.route('/clientes/<int:cliente_id>', methods=['DELETE'])
+def eliminar_cliente(cliente_id):
+    """Elimina un cliente (marca como inactivo)."""
+    try:
+        cliente = ClienteService.obtener_cliente(db.session, cliente_id)
+        if not cliente:
+            return jsonify({'error': 'Cliente no encontrado'}), 404
+        
+        # Marcar como inactivo en lugar de eliminar físicamente
+        cliente.activo = False
+        db.session.commit()
+        
+        return jsonify({'mensaje': 'Cliente eliminado correctamente'}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
 @bp.route('/clientes/<int:cliente_id>/facturas', methods=['GET'])
 def obtener_facturas_cliente(cliente_id):
     """Obtiene el historial de facturas de un cliente."""
