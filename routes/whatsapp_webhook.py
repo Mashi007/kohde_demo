@@ -50,14 +50,17 @@ def receive_message():
                 
                 msg = message['message']
                 
+                # Obtener nombre del remitente si está disponible
+                sender_name = message.get('profile', {}).get('name')
+                
                 # Si el mensaje tiene imagen (factura)
                 if 'image' in msg:
-                    handle_image_message(sender_id, msg['image'])
+                    handle_image_message(sender_id, msg['image'], sender_name)
                 
                 # Si el mensaje tiene documento (PDF, etc.)
                 elif 'document' in msg:
                     # Tratar documentos como imágenes para OCR
-                    handle_image_message(sender_id, msg['document'])
+                    handle_image_message(sender_id, msg['document'], sender_name)
                 
                 # Si el mensaje es texto
                 elif 'text' in msg:
@@ -69,13 +72,14 @@ def receive_message():
         print(f"Error al procesar webhook: {e}")
         return jsonify({'error': str(e)}), 500
 
-def handle_image_message(sender_id: str, image_data: dict):
+def handle_image_message(sender_id: str, image_data: dict, sender_name: str = None):
     """
     Maneja mensajes con imágenes (facturas).
     
     Args:
-        sender_id: ID del remitente
+        sender_id: ID del remitente (teléfono)
         image_data: Datos de la imagen del mensaje
+        sender_name: Nombre del remitente (opcional)
     """
     try:
         # Obtener ID de la imagen
@@ -84,23 +88,26 @@ def handle_image_message(sender_id: str, image_data: dict):
         if not image_id:
             return
         
-        # Usar el servicio de configuración para procesar
-        from modules.configuracion.whatsapp import WhatsAppConfigService
+        # Procesar factura desde WhatsApp
+        from modules.logistica.facturas_whatsapp import FacturasWhatsAppService
         
-        resultado = WhatsAppConfigService.procesar_imagen_recibida(
+        resultado = FacturasWhatsAppService.procesar_factura_desde_whatsapp(
+            db.session,
             image_id,
             sender_id,
-            tipo='factura'
+            sender_name
         )
         
         if resultado.get('exito'):
             # Enviar confirmación al remitente
             from modules.crm.notificaciones.whatsapp import whatsapp_service
             mensaje = (
-                f"✅ Factura recibida\n\n"
+                f"✅ Factura recibida y procesada\n\n"
                 f"Número: {resultado.get('numero_factura', 'N/A')}\n"
-                f"Total: ${resultado.get('total', 0):,.2f}\n\n"
-                f"La factura está pendiente de aprobación en el sistema."
+                f"Proveedor: {resultado.get('proveedor', 'No identificado')}\n"
+                f"Total: ${resultado.get('total', 0):,.2f}\n"
+                f"Items detectados: {resultado.get('items', 0)}\n\n"
+                f"La factura está pendiente de confirmación en el sistema."
             )
             whatsapp_service.enviar_mensaje(sender_id, mensaje)
         else:
@@ -108,7 +115,8 @@ def handle_image_message(sender_id: str, image_data: dict):
             from modules.crm.notificaciones.whatsapp import whatsapp_service
             whatsapp_service.enviar_mensaje(
                 sender_id,
-                f"❌ Error al procesar la factura: {resultado.get('mensaje', 'Error desconocido')}"
+                f"❌ Error al procesar la factura: {resultado.get('mensaje', 'Error desconocido')}\n\n"
+                f"Por favor, verifica que la imagen sea clara y contenga información de factura."
             )
         
     except Exception as e:

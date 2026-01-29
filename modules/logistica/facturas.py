@@ -120,7 +120,8 @@ class FacturaService:
         factura_id: int,
         items_aprobados: List[Dict],
         usuario_id: int,
-        aprobar_parcial: bool = False
+        aprobar_parcial: bool = False,
+        observaciones: str = None
     ) -> Factura:
         """
         Aprueba una factura y actualiza inventario.
@@ -144,7 +145,12 @@ class FacturaService:
         
         # Actualizar cantidad aprobada en cada item
         todos_aprobados = True
+        total_aprobado = 0
+        total_facturado = 0
+        
         for item_factura in factura.items:
+            total_facturado += float(item_factura.cantidad_facturada)
+            
             item_aprobado = next(
                 (i for i in items_aprobados if i['factura_item_id'] == item_factura.id),
                 None
@@ -153,33 +159,109 @@ class FacturaService:
             if item_aprobado:
                 cantidad_aprobada = float(item_aprobado['cantidad_aprobada'])
                 item_factura.cantidad_aprobada = cantidad_aprobada
+                total_aprobado += cantidad_aprobada
                 
                 # Si la cantidad aprobada es menor a la facturada, es parcial
                 if cantidad_aprobada < float(item_factura.cantidad_facturada):
                     todos_aprobados = False
             else:
-                todos_aprobados = False
+                # Si no se proporciona cantidad aprobada, usar la facturada
+                item_factura.cantidad_aprobada = float(item_factura.cantidad_facturada)
+                total_aprobado += float(item_factura.cantidad_facturada)
+        
+        # Verificar si se aprobó el 100%
+        porcentaje_aprobado = (total_aprobado / total_facturado * 100) if total_facturado > 0 else 0
         
         # Actualizar estado de factura
-        if todos_aprobados:
+        if todos_aprobados and porcentaje_aprobado >= 100:
             factura.estado = EstadoFactura.APROBADA
-        elif aprobar_parcial:
+        elif porcentaje_aprobado > 0:
             factura.estado = EstadoFactura.PARCIAL
         else:
-            raise ValueError("No se puede aprobar parcialmente sin el flag aprobar_parcial")
+            raise ValueError("Debe aprobar al menos un item")
         
         factura.aprobado_por = usuario_id
         factura.fecha_aprobacion = datetime.utcnow()
+        if observaciones:
+            factura.observaciones = observaciones
         
         # Actualizar inventario solo con items aprobados
         for item_factura in factura.items:
-            if item_factura.cantidad_aprobada and item_factura.item_id:
+            if item_factura.cantidad_aprobada and item_factura.cantidad_aprobada > 0 and item_factura.item_id:
                 FacturaService._actualizar_inventario(
                     db,
                     item_factura.item_id,
                     float(item_factura.cantidad_aprobada),
                     float(item_factura.precio_unitario)
                 )
+        
+        db.commit()
+        db.refresh(factura)
+        return factura
+    
+    @staticmethod
+    def rechazar_factura(
+        db: Session,
+        factura_id: int,
+        usuario_id: int,
+        motivo: str
+    ) -> Factura:
+        """
+        Rechaza una factura.
+        
+        Args:
+            db: Sesión de base de datos
+            factura_id: ID de la factura
+            usuario_id: ID del usuario que rechaza
+            motivo: Motivo del rechazo
+            
+        Returns:
+            Factura rechazada
+        """
+        factura = db.query(Factura).filter(Factura.id == factura_id).first()
+        if not factura:
+            raise ValueError("Factura no encontrada")
+        
+        if factura.estado == EstadoFactura.APROBADA:
+            raise ValueError("No se puede rechazar una factura aprobada")
+        
+        factura.estado = EstadoFactura.RECHAZADA
+        factura.observaciones = motivo
+        factura.aprobado_por = usuario_id
+        factura.fecha_aprobacion = datetime.utcnow()
+        
+        db.commit()
+        db.refresh(factura)
+        return factura
+    
+    @staticmethod
+    def enviar_a_revision(
+        db: Session,
+        factura_id: int,
+        usuario_id: int,
+        observaciones: str
+    ) -> Factura:
+        """
+        Envía una factura a revisión (mantiene estado PENDIENTE pero con observaciones).
+        
+        Args:
+            db: Sesión de base de datos
+            factura_id: ID de la factura
+            usuario_id: ID del usuario que envía a revisión
+            observaciones: Observaciones sobre qué necesita revisión
+            
+        Returns:
+            Factura en revisión
+        """
+        factura = db.query(Factura).filter(Factura.id == factura_id).first()
+        if not factura:
+            raise ValueError("Factura no encontrada")
+        
+        if factura.estado != EstadoFactura.PENDIENTE:
+            raise ValueError("Solo se pueden enviar a revisión facturas pendientes")
+        
+        factura.observaciones = observaciones
+        # Mantener estado PENDIENTE para que pueda ser reprocesada
         
         db.commit()
         db.refresh(factura)

@@ -42,6 +42,12 @@ class Factura(db.Model):
     fecha_aprobacion = Column(DateTime, nullable=True)
     observaciones = Column(Text, nullable=True)
     
+    # Información del remitente (quien envía por WhatsApp)
+    remitente_nombre = Column(String(200), nullable=True)  # Nombre de quien envía
+    remitente_telefono = Column(String(20), nullable=True)  # Teléfono de quien envía
+    recibida_por_whatsapp = Column(Boolean, default=False, nullable=False)  # Si fue recibida por WhatsApp
+    whatsapp_message_id = Column(String(100), nullable=True)  # ID del mensaje de WhatsApp
+    
     # Relaciones
     # cliente removido (módulo Cliente eliminado)
     proveedor = relationship('Proveedor', back_populates='facturas')
@@ -66,6 +72,10 @@ class Factura(db.Model):
             'aprobado_por': self.aprobado_por,
             'fecha_aprobacion': self.fecha_aprobacion.isoformat() if self.fecha_aprobacion else None,
             'observaciones': self.observaciones,
+            'remitente_nombre': self.remitente_nombre,
+            'remitente_telefono': self.remitente_telefono,
+            'recibida_por_whatsapp': self.recibida_por_whatsapp,
+            'whatsapp_message_id': self.whatsapp_message_id,
             'items': [item.to_dict() for item in self.items] if self.items else [],
         }
     

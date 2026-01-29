@@ -283,6 +283,7 @@ def listar_facturas():
         proveedor_id = request.args.get('proveedor_id', type=int)
         cliente_id = request.args.get('cliente_id', type=int)
         estado = request.args.get('estado')
+        pendiente_confirmacion = request.args.get('pendiente_confirmacion', 'false').lower() == 'true'
         skip = int(request.args.get('skip', 0))
         limit = int(request.args.get('limit', 100))
         
@@ -298,9 +299,35 @@ def listar_facturas():
             from models.factura import EstadoFactura
             query = query.filter(Factura.estado == EstadoFactura[estado.upper()])
         
+        # Filtrar facturas pendientes de confirmación (con items sin cantidad_aprobada)
+        if pendiente_confirmacion:
+            from models import FacturaItem
+            from sqlalchemy import exists
+            query = query.filter(
+                Factura.estado == EstadoFactura.PENDIENTE,
+                exists().where(
+                    and_(
+                        FacturaItem.factura_id == Factura.id,
+                        FacturaItem.cantidad_aprobada.is_(None)
+                    )
+                )
+            )
+        
         facturas = query.order_by(Factura.fecha_recepcion.desc()).offset(skip).limit(limit).all()
         
         return jsonify([f.to_dict() for f in facturas]), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 400
+
+@bp.route('/facturas/ultima', methods=['GET'])
+def obtener_ultima_factura():
+    """Obtiene la última factura ingresada."""
+    try:
+        from models import Factura
+        factura = db.session.query(Factura).order_by(Factura.fecha_recepcion.desc()).first()
+        if not factura:
+            return jsonify({'error': 'No hay facturas'}), 404
+        return jsonify(factura.to_dict()), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
@@ -358,6 +385,7 @@ def aprobar_factura(factura_id):
         items_aprobados = datos.get('items_aprobados', [])
         usuario_id = datos.get('usuario_id')
         aprobar_parcial = datos.get('aprobar_parcial', False)
+        observaciones = datos.get('observaciones')
         
         if not usuario_id:
             return jsonify({'error': 'usuario_id requerido'}), 400
@@ -367,7 +395,56 @@ def aprobar_factura(factura_id):
             factura_id,
             items_aprobados,
             usuario_id,
-            aprobar_parcial
+            aprobar_parcial,
+            observaciones
+        )
+        
+        return jsonify(factura.to_dict()), 200
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/facturas/<int:factura_id>/rechazar', methods=['POST'])
+def rechazar_factura(factura_id):
+    """Rechaza una factura."""
+    try:
+        datos = request.get_json()
+        usuario_id = datos.get('usuario_id')
+        motivo = datos.get('motivo', 'Factura rechazada')
+        
+        if not usuario_id:
+            return jsonify({'error': 'usuario_id requerido'}), 400
+        
+        factura = FacturaService.rechazar_factura(
+            db.session,
+            factura_id,
+            usuario_id,
+            motivo
+        )
+        
+        return jsonify(factura.to_dict()), 200
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/facturas/<int:factura_id>/revision', methods=['POST'])
+def enviar_a_revision(factura_id):
+    """Envía una factura a revisión."""
+    try:
+        datos = request.get_json()
+        usuario_id = datos.get('usuario_id')
+        observaciones = datos.get('observaciones', '')
+        
+        if not usuario_id:
+            return jsonify({'error': 'usuario_id requerido'}), 400
+        
+        factura = FacturaService.enviar_a_revision(
+            db.session,
+            factura_id,
+            usuario_id,
+            observaciones
         )
         
         return jsonify(factura.to_dict()), 200

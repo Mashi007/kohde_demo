@@ -1,16 +1,32 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import api from '../config/api'
-import { Upload, FileText, CheckCircle, XCircle } from 'lucide-react'
+import { Upload, FileText, CheckCircle, XCircle, Eye, Image as ImageIcon } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 import Modal from '../components/Modal'
 import FacturaUploadForm from '../components/FacturaUploadForm'
+import FacturaOCRModal from '../components/FacturaOCRModal'
+import toast from 'react-hot-toast'
 
 export default function Facturas() {
   const [tipoFiltro, setTipoFiltro] = useState('')
   const [showUploadModal, setShowUploadModal] = useState(false)
+  const [facturaOCRAbierta, setFacturaOCRAbierta] = useState(null)
 
+  // Última factura ingresada (para dashboard)
+  const { data: ultimaFactura } = useQuery({
+    queryKey: ['factura-ultima'],
+    queryFn: () => api.get('/logistica/facturas/ultima').then(res => res.data).catch(() => null),
+  })
+
+  // Facturas pendientes de confirmación
+  const { data: facturasPendientes, isLoading: isLoadingPendientes } = useQuery({
+    queryKey: ['facturas-pendientes'],
+    queryFn: () => api.get('/logistica/facturas?pendiente_confirmacion=true&estado=pendiente').then(res => res.data),
+  })
+
+  // Todas las facturas
   const { data: facturas, isLoading } = useQuery({
     queryKey: ['facturas', tipoFiltro],
     queryFn: () => 
@@ -41,6 +57,116 @@ export default function Facturas() {
         </button>
       </div>
 
+      {/* Última factura ingresada (Dashboard) */}
+      {ultimaFactura && (
+        <div className="bg-slate-800 p-6 rounded-lg border border-slate-700 mb-6">
+          <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+            <FileText size={20} />
+            Última Factura Ingresada
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
+            <div>
+              <p className="text-xs text-slate-400 mb-1">Remitente</p>
+              <p className="font-semibold">{ultimaFactura.remitente_nombre || 'N/A'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-400 mb-1">Teléfono</p>
+              <p className="font-semibold">{ultimaFactura.remitente_telefono || 'N/A'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-400 mb-1">Imagen</p>
+              {ultimaFactura.imagen_url ? (
+                <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-slate-600">
+                  <img
+                    src={ultimaFactura.imagen_url}
+                    alt="Factura"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ) : (
+                <div className="w-16 h-16 rounded-lg bg-slate-700 flex items-center justify-center">
+                  <ImageIcon size={20} className="text-slate-400" />
+                </div>
+              )}
+            </div>
+            <div>
+              <p className="text-xs text-slate-400 mb-1">Factura #{ultimaFactura.numero_factura}</p>
+              <p className="font-semibold">${parseFloat(ultimaFactura.total || 0).toLocaleString('es-ES', { minimumFractionDigits: 2 })}</p>
+            </div>
+            <div>
+              <button
+                onClick={() => setFacturaOCRAbierta(ultimaFactura)}
+                className="w-full bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg flex items-center justify-center gap-2"
+              >
+                <Eye size={18} />
+                Ver OCR
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Facturas pendientes de confirmación */}
+      {facturasPendientes && facturasPendientes.length > 0 && (
+        <div className="bg-slate-800 p-6 rounded-lg border border-slate-700 mb-6">
+          <h2 className="text-lg font-bold mb-4">Facturas Pendientes de Confirmación</h2>
+          <div className="space-y-3">
+            {facturasPendientes.slice(0, 5).map((factura) => (
+              <div key={factura.id} className="bg-slate-700/50 p-4 rounded-lg border border-slate-600">
+                <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
+                  <div>
+                    <p className="text-xs text-slate-400 mb-1">Remitente</p>
+                    <p className="font-semibold">{factura.remitente_nombre || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400 mb-1">Teléfono</p>
+                    <p className="font-semibold">{factura.remitente_telefono || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400 mb-1">Imagen</p>
+                    {factura.imagen_url ? (
+                      <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-slate-600 cursor-pointer hover:opacity-80"
+                           onClick={() => window.open(factura.imagen_url, '_blank')}>
+                        <img
+                          src={factura.imagen_url}
+                          alt="Factura"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-16 h-16 rounded-lg bg-slate-700 flex items-center justify-center">
+                        <ImageIcon size={20} className="text-slate-400" />
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-xs text-slate-400 mb-1">Factura #{factura.numero_factura}</p>
+                    <p className="font-semibold">${parseFloat(factura.total || 0).toLocaleString('es-ES', { minimumFractionDigits: 2 })}</p>
+                    <p className="text-xs text-slate-400">
+                      {factura.items?.length || 0} items
+                    </p>
+                  </div>
+                  <div>
+                    <button
+                      onClick={() => {
+                        // Cargar factura completa con items
+                        api.get(`/logistica/facturas/${factura.id}`)
+                          .then(res => setFacturaOCRAbierta(res.data))
+                          .catch(err => toast.error('Error al cargar factura'))
+                      }}
+                      className="w-full bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg flex items-center justify-center gap-2"
+                    >
+                      <Eye size={18} />
+                      Confirmar OCR
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <Modal
         isOpen={showUploadModal}
         onClose={() => setShowUploadModal(false)}
@@ -50,6 +176,12 @@ export default function Facturas() {
           onClose={() => setShowUploadModal(false)}
         />
       </Modal>
+
+      <FacturaOCRModal
+        factura={facturaOCRAbierta}
+        isOpen={!!facturaOCRAbierta}
+        onClose={() => setFacturaOCRAbierta(null)}
+      />
 
       {/* Filtros */}
       <div className="mb-6 flex gap-4">
@@ -88,6 +220,11 @@ export default function Facturas() {
                   <p className="text-slate-400 text-sm">
                     {format(new Date(factura.fecha_emision), 'dd MMM yyyy', { locale: es })}
                   </p>
+                  {factura.remitente_nombre && (
+                    <p className="text-slate-500 text-xs mt-1">
+                      Enviada por: {factura.remitente_nombre} ({factura.remitente_telefono})
+                    </p>
+                  )}
                 </div>
                 <div className="text-right">
                   <p className="text-2xl font-bold">${parseFloat(factura.total).toLocaleString('es-ES', { minimumFractionDigits: 2 })}</p>
@@ -97,26 +234,17 @@ export default function Facturas() {
                 </div>
               </div>
               {factura.estado === 'pendiente' && (
-                <div className="mt-4 pt-4 border-t border-slate-700">
+                <div className="mt-4 pt-4 border-t border-slate-700 flex gap-3">
                   <button 
-                    onClick={async () => {
-                      try {
-                        await api.post(`/logistica/facturas/${factura.id}/aprobar`, {
-                          usuario_id: 1, // TODO: Obtener del contexto de usuario
-                          items_aprobados: factura.items?.map(item => ({
-                            factura_item_id: item.id,
-                            cantidad_aprobada: item.cantidad_facturada
-                          })) || [],
-                          aprobar_parcial: false
-                        })
-                        window.location.reload()
-                      } catch (error) {
-                        alert(error.response?.data?.error || 'Error al aprobar factura')
-                      }
+                    onClick={() => {
+                      api.get(`/logistica/facturas/${factura.id}`)
+                        .then(res => setFacturaOCRAbierta(res.data))
+                        .catch(err => toast.error('Error al cargar factura'))
                     }}
-                    className="bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg text-sm"
+                    className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg text-sm flex items-center gap-2"
                   >
-                    Revisar y Aprobar
+                    <Eye size={16} />
+                    Confirmar OCR
                   </button>
                 </div>
               )}

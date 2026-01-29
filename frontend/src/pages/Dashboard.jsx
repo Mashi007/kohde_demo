@@ -18,6 +18,11 @@ export default function Dashboard() {
     queryFn: () => api.get('/crm/tickets?estado=abierto').then(res => res.data),
   })
 
+  const { data: ultimaFactura } = useQuery({
+    queryKey: ['factura-ultima'],
+    queryFn: () => api.get('/logistica/facturas/ultima').then(res => res.data).catch(() => null),
+  })
+
   return (
     <div>
       <h1 className="text-3xl font-bold mb-8">Dashboard</h1>
@@ -60,6 +65,54 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Última Factura Ingresada */}
+      {ultimaFactura && (
+        <div className="bg-slate-800 p-6 rounded-lg border border-slate-700 mb-6">
+          <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+            <FileText size={24} />
+            Última Factura Ingresada
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 items-center">
+            <div>
+              <p className="text-xs text-slate-400 mb-1">Remitente</p>
+              <p className="font-semibold">{ultimaFactura.remitente_nombre || 'N/A'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-400 mb-1">Teléfono</p>
+              <p className="font-semibold">{ultimaFactura.remitente_telefono || 'N/A'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-400 mb-1">Imagen</p>
+              {ultimaFactura.imagen_url ? (
+                <div className="relative w-16 h-16 rounded-lg overflow-hidden border border-slate-600">
+                  <img
+                    src={ultimaFactura.imagen_url}
+                    alt="Factura"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ) : (
+                <div className="w-16 h-16 rounded-lg bg-slate-700 flex items-center justify-center">
+                  <FileText size={20} className="text-slate-400" />
+                </div>
+              )}
+            </div>
+            <div>
+              <p className="text-xs text-slate-400 mb-1">Factura #{ultimaFactura.numero_factura}</p>
+              <p className="font-semibold">${parseFloat(ultimaFactura.total || 0).toLocaleString('es-ES', { minimumFractionDigits: 2 })}</p>
+            </div>
+            <div>
+              <a
+                href="/facturas"
+                className="block w-full bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg text-center text-sm"
+              >
+                Ver Detalles
+              </a>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Alertas de Stock Bajo */}
       {stockBajo && stockBajo.length > 0 && (
