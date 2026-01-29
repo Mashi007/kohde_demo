@@ -68,6 +68,11 @@ class Config:
     SENDGRID_API_KEY = os.getenv('SENDGRID_API_KEY', '')
     EMAIL_FROM = os.getenv('EMAIL_FROM', 'noreply@restaurantes.com')
     
+    # OpenAI / Chat AI
+    OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
+    OPENAI_MODEL = os.getenv('OPENAI_MODEL', 'gpt-3.5-turbo')
+    OPENAI_BASE_URL = os.getenv('OPENAI_BASE_URL', 'https://api.openai.com/v1')
+    
     # Almacenamiento de imágenes
     UPLOAD_FOLDER = BASE_DIR / 'uploads' / 'facturas'
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max
