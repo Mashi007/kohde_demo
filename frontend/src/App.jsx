@@ -10,6 +10,8 @@ import Recetas from './pages/Recetas'
 import Programacion from './pages/Programacion'
 import Proveedores from './pages/Proveedores'
 import Pedidos from './pages/Pedidos'
+import Charolas from './pages/Charolas'
+import Mermas from './pages/Mermas'
 
 function App() {
   return (
@@ -24,8 +26,10 @@ function App() {
           <Route path="/items" element={<Items />} />
           <Route path="/recetas" element={<Recetas />} />
           <Route path="/programacion" element={<Programacion />} />
-          <Route path="/proveedores" element={<Proveedores />} />
-          <Route path="/pedidos" element={<Pedidos />} />
+        <Route path="/proveedores" element={<Proveedores />} />
+        <Route path="/pedidos" element={<Pedidos />} />
+        <Route path="/charolas" element={<Charolas />} />
+        <Route path="/mermas" element={<Mermas />} />
         </Routes>
       </Layout>
     </>

@@ -17,6 +17,10 @@ from models.pedido import PedidoCompra, PedidoCompraItem
 from models.programacion import ProgramacionMenu, ProgramacionMenuItem
 from models.requerimiento import Requerimiento, RequerimientoItem
 from models.contabilidad import CuentaContable
+from models.charola import Charola, CharolaItem
+from models.merma import Merma
+from models.charola import Charola
+from models.merma import Merma
 
 __all__ = [
     'db',
@@ -36,4 +40,6 @@ __all__ = [
     'Requerimiento',
     'RequerimientoItem',
     'CuentaContable',
+    'Charola',
+    'Merma',
 ]

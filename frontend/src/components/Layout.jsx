@@ -9,7 +9,9 @@ import {
   ChefHat,
   Calendar,
   Truck,
-  ClipboardList
+  ClipboardList,
+  BarChart3,
+  AlertTriangle
 } from 'lucide-react'
 
 const menuItems = [
@@ -22,6 +24,8 @@ const menuItems = [
   { path: '/programacion', label: 'Programación', icon: Calendar },
   { path: '/proveedores', label: 'Proveedores', icon: Truck },
   { path: '/pedidos', label: 'Pedidos', icon: ClipboardList },
+  { path: '/charolas', label: 'Charolas', icon: BarChart3 },
+  { path: '/mermas', label: 'Mermas', icon: AlertTriangle },
 ]
 
 export default function Layout({ children }) {
