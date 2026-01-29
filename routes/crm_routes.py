@@ -6,9 +6,11 @@ from flask import Blueprint, request, jsonify
 from sqlalchemy.orm import Session
 from models import db, Item
 from modules.crm.tickets import TicketService
+from modules.crm.tickets_automaticos import TicketsAutomaticosService
 from modules.crm.proveedores import ProveedorService
 from modules.crm.notificaciones.whatsapp import whatsapp_service
 from modules.crm.notificaciones.email import email_service
+from datetime import datetime
 
 bp = Blueprint('crm', __name__)
 
@@ -300,5 +302,132 @@ def resolver_ticket(ticket_id):
         return jsonify(ticket.to_dict()), 200
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# ========== RUTAS DE TICKETS AUTOMÁTICOS ==========
+
+@bp.route('/tickets/verificar-automaticos', methods=['POST'])
+def verificar_tickets_automaticos():
+    """Ejecuta todas las verificaciones automáticas y genera tickets."""
+    try:
+        datos = request.get_json() or {}
+        fecha_str = datos.get('fecha')
+        
+        fecha = None
+        if fecha_str:
+            fecha = datetime.strptime(fecha_str, '%Y-%m-%d').date()
+        
+        resultado = TicketsAutomaticosService.ejecutar_verificaciones_completas(
+            db.session,
+            fecha=fecha
+        )
+        
+        return jsonify(resultado), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/tickets/verificar-charolas', methods=['POST'])
+def verificar_charolas():
+    """Verifica charolas vs planificación y genera tickets."""
+    try:
+        datos = request.get_json() or {}
+        fecha_str = datos.get('fecha')
+        
+        fecha = None
+        if fecha_str:
+            fecha = datetime.strptime(fecha_str, '%Y-%m-%d').date()
+        
+        tickets = TicketsAutomaticosService.verificar_charolas_vs_planificacion(
+            db.session,
+            fecha=fecha
+        )
+        
+        return jsonify({
+            'tickets_generados': len(tickets),
+            'tickets': [t.to_dict() for t in tickets]
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/tickets/verificar-mermas', methods=['POST'])
+def verificar_mermas():
+    """Verifica mermas contra límites y genera tickets."""
+    try:
+        datos = request.get_json() or {}
+        fecha_str = datos.get('fecha')
+        
+        fecha = None
+        if fecha_str:
+            fecha = datetime.strptime(fecha_str, '%Y-%m-%d').date()
+        
+        tickets = TicketsAutomaticosService.verificar_mermas_limites(
+            db.session,
+            fecha=fecha
+        )
+        
+        return jsonify({
+            'tickets_generados': len(tickets),
+            'tickets': [t.to_dict() for t in tickets]
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/tickets/verificar-inventario', methods=['POST'])
+def verificar_inventario():
+    """Verifica inventario bajo mínimo y genera tickets."""
+    try:
+        tickets = TicketsAutomaticosService.verificar_inventario_seguridad(db.session)
+        
+        return jsonify({
+            'tickets_generados': len(tickets),
+            'tickets': [t.to_dict() for t in tickets]
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/tickets/verificar-programacion', methods=['POST'])
+def verificar_programacion():
+    """Verifica programación faltante y genera tickets."""
+    try:
+        datos = request.get_json() or {}
+        fecha_str = datos.get('fecha')
+        
+        fecha = None
+        if fecha_str:
+            fecha = datetime.strptime(fecha_str, '%Y-%m-%d').date()
+        
+        tickets = TicketsAutomaticosService.verificar_programacion_faltante(
+            db.session,
+            fecha=fecha
+        )
+        
+        return jsonify({
+            'tickets_generados': len(tickets),
+            'tickets': [t.to_dict() for t in tickets]
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/tickets/verificar-reportes', methods=['POST'])
+def verificar_reportes():
+    """Verifica reportes faltantes después del tiempo límite."""
+    try:
+        datos = request.get_json() or {}
+        fecha_str = datos.get('fecha')
+        
+        fecha = None
+        if fecha_str:
+            fecha = datetime.strptime(fecha_str, '%Y-%m-%d').date()
+        
+        tickets = TicketsAutomaticosService.verificar_reportes_faltantes(
+            db.session,
+            fecha=fecha
+        )
+        
+        return jsonify({
+            'tickets_generados': len(tickets),
+            'tickets': [t.to_dict() for t in tickets]
+        }), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500

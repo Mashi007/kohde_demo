@@ -6,6 +6,7 @@ from datetime import datetime
 from models import db
 from modules.planificacion.recetas import RecetaService
 from modules.planificacion.programacion import ProgramacionMenuService
+from modules.crm.tickets_automaticos import TicketsAutomaticosService
 
 bp = Blueprint('planificacion', __name__)
 
@@ -125,6 +126,15 @@ def crear_programacion():
             datos['fecha'] = datetime.strptime(datos['fecha'], '%Y-%m-%d').date()
         
         programacion = ProgramacionMenuService.crear_programacion(db.session, datos)
+        
+        # Verificar programación y generar tickets si faltan items/proveedores
+        try:
+            TicketsAutomaticosService.verificar_proveedores_items_insuficientes(
+                db.session,
+                programacion.id
+            )
+        except Exception as e:
+            print(f"Error al verificar proveedores automáticos: {e}")
         
         # Generar pedidos automáticamente después de crear la programación
         try:

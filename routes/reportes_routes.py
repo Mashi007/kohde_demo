@@ -7,6 +7,7 @@ from datetime import datetime
 from models import db
 from modules.reportes.charolas import CharolaService
 from modules.reportes.mermas import MermaService
+from modules.crm.tickets_automaticos import TicketsAutomaticosService
 
 bp = Blueprint('reportes', __name__)
 
@@ -56,6 +57,14 @@ def crear_charola():
             datos['fecha_servicio'] = datetime.fromisoformat(datos['fecha_servicio'].replace('Z', '+00:00'))
         
         charola = CharolaService.crear_charola(db.session, datos)
+        
+        # Verificar límites y generar tickets automáticos
+        try:
+            fecha_servicio = charola.fecha_servicio.date() if hasattr(charola.fecha_servicio, 'date') else datetime.now().date()
+            TicketsAutomaticosService.verificar_charolas_vs_planificacion(db.session, fecha_servicio)
+        except Exception as e:
+            print(f"Error al verificar charolas automáticas: {e}")
+        
         return jsonify(charola.to_dict()), 201
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
@@ -143,6 +152,14 @@ def crear_merma():
             datos['fecha_merma'] = datetime.fromisoformat(datos['fecha_merma'].replace('Z', '+00:00'))
         
         merma = MermaService.crear_merma(db.session, datos)
+        
+        # Verificar límites y generar tickets automáticos
+        try:
+            fecha_merma = merma.fecha_merma.date() if hasattr(merma.fecha_merma, 'date') else datetime.now().date()
+            TicketsAutomaticosService.verificar_mermas_limites(db.session, fecha_merma)
+        except Exception as e:
+            print(f"Error al verificar mermas automáticas: {e}")
+        
         return jsonify(merma.to_dict()), 201
     except ValueError as e:
         return jsonify({'error': str(e)}), 400
