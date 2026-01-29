@@ -100,8 +100,7 @@ class OCRProcessor:
         Returns:
             Diccionario con datos extraídos de la factura
         """
-        if not self.client:
-            raise Exception("Cliente de Google Cloud Vision no inicializado")
+        self._ensure_client()
         
         # Extraer texto completo
         texto_completo = self.extract_text_from_image(image_path)
