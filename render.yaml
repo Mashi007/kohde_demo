@@ -36,11 +36,13 @@ services:
     name: kfronend-demo
     env: node
     buildCommand: cd frontend && npm install && npm run build
-    startCommand: cd frontend && npx serve -s dist -l $PORT
+    startCommand: cd frontend && node server.js
     staticPublishPath: frontend/dist
     envVars:
       - key: NODE_VERSION
         value: 18.x
+      - key: PORT
+        sync: false
 
   # PostgreSQL Database
   - type: pgsql
