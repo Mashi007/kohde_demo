@@ -1,7 +1,11 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { copyFileSync, existsSync } from 'fs'
-import { join } from 'path'
+import { join, dirname } from 'path'
+import { fileURLToPath } from 'url'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
 
 export default defineConfig({
   plugins: [
@@ -16,6 +20,8 @@ export default defineConfig({
           if (existsSync(src)) {
             copyFileSync(src, dest)
             console.log('✓ _redirects copiado al build')
+          } else {
+            console.warn('⚠ Archivo _redirects no encontrado en:', src)
           }
         } catch (error) {
           console.warn('⚠ No se pudo copiar _redirects:', error.message)

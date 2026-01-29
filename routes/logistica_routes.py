@@ -140,6 +140,51 @@ def listar_categorias_labels():
     except Exception as e:
         return jsonify({'error': str(e)}), 400
 
+@bp.route('/labels', methods=['POST'])
+def crear_label():
+    """Crea una nueva label/clasificación de alimentos."""
+    try:
+        from models.item_label import ItemLabel
+        
+        datos = request.get_json()
+        
+        # Validar campos requeridos
+        if not datos.get('nombre_es'):
+            return jsonify({'error': 'El nombre en español es requerido'}), 400
+        if not datos.get('categoria_principal'):
+            return jsonify({'error': 'La categoría principal es requerida'}), 400
+        
+        # Generar código si no se proporciona
+        codigo = datos.get('codigo')
+        if not codigo:
+            # Generar código basado en categoría y nombre
+            categoria_prefijo = datos['categoria_principal'][:3].upper().replace(' ', '_')
+            nombre_prefijo = datos['nombre_es'][:5].upper().replace(' ', '_')
+            codigo = f'{categoria_prefijo}_{nombre_prefijo}'
+        
+        # Verificar si ya existe una label con el mismo código
+        existing = ItemLabel.query.filter_by(codigo=codigo).first()
+        if existing:
+            return jsonify({'error': f'Ya existe una clasificación con el código {codigo}'}), 400
+        
+        # Crear nueva label
+        nueva_label = ItemLabel(
+            codigo=codigo,
+            nombre_es=datos['nombre_es'],
+            nombre_en=datos.get('nombre_en', datos['nombre_es']),
+            categoria_principal=datos['categoria_principal'],
+            descripcion=datos.get('descripcion', ''),
+            activo=datos.get('activo', True)
+        )
+        
+        db.session.add(nueva_label)
+        db.session.commit()
+        
+        return jsonify(nueva_label.to_dict()), 201
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
+
 # ========== RUTAS DE PEDIDOS AUTOMÁTICOS ==========
 
 @bp.route('/pedidos/aprobar/<int:pedido_id>', methods=['POST'])

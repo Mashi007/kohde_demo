@@ -2,8 +2,12 @@ import { useState, useMemo } from 'react'
 import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import api from '../config/api'
 import toast from 'react-hot-toast'
+import LabelForm from './LabelForm'
+import { Plus } from 'lucide-react'
 
 export default function ItemForm({ item, onClose, onSuccess }) {
+  const [mostrarFormLabel, setMostrarFormLabel] = useState(false)
+  
   const [formData, setFormData] = useState({
     codigo: item?.codigo || '',
     nombre: item?.nombre || '',
@@ -73,10 +77,23 @@ export default function ItemForm({ item, onClose, onSuccess }) {
     })
   }, [labels])
 
-  // Obtener la label seleccionada
-  const labelIdSeleccionada = formData.label_ids && formData.label_ids.length > 0 
-    ? formData.label_ids[0] 
-    : null
+  // Obtener la categoría seleccionada basada en el label_id actual
+  const categoriaSeleccionada = useMemo(() => {
+    if (!formData.label_ids || formData.label_ids.length === 0 || !labels) {
+      return ''
+    }
+    const labelSeleccionada = labels.find(l => l.id === formData.label_ids[0])
+    return labelSeleccionada?.categoria_principal || ''
+  }, [formData.label_ids, labels])
+
+  // Obtener todas las categorías únicas ordenadas
+  const categoriasDisponibles = useMemo(() => {
+    if (!labels || !Array.isArray(labels)) {
+      return []
+    }
+    const categorias = new Set(labels.map(l => l.categoria_principal).filter(Boolean))
+    return Array.from(categorias).sort()
+  }, [labels])
 
   const createMutation = useMutation({
     mutationFn: (data) => api.post('/logistica/items', data),
@@ -122,11 +139,6 @@ export default function ItemForm({ item, onClose, onSuccess }) {
     
     createMutation.mutate(datosEnvio)
   }
-
-  // Obtener el ID de la label seleccionada (primera del array o null)
-  const labelIdSeleccionada = formData.label_ids && formData.label_ids.length > 0 
-    ? formData.label_ids[0] 
-    : null
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -356,37 +368,73 @@ export default function ItemForm({ item, onClose, onSuccess }) {
           </div>
         ) : (
           <div>
-            <select
-              value={labelIdSeleccionada || ''}
-              onChange={(e) => {
-                const selectedId = e.target.value ? parseInt(e.target.value) : null
-                setFormData(prev => ({
-                  ...prev,
-                  label_ids: selectedId ? [selectedId] : []
-                }))
-              }}
-              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:border-purple-500"
-            >
-              <option value="">Selecciona una clasificación...</option>
-              {Object.keys(labelsAgrupadas).sort().map((categoria) => {
-                const labelsCat = labelsAgrupadas[categoria].sort((a, b) => 
-                  a.nombre_es.localeCompare(b.nombre_es)
-                )
-                return (
-                  <optgroup key={categoria} label={categoria}>
-                    {labelsCat.map(label => (
-                      <option key={label.id} value={label.id}>
-                        {label.nombre_es}
-                      </option>
-                    ))}
-                  </optgroup>
-                )
-              })}
-            </select>
+            <div className="flex items-center gap-2 mb-2">
+              <select
+                value={categoriaSeleccionada}
+                onChange={(e) => {
+                  const categoriaSeleccionada = e.target.value
+                  if (!categoriaSeleccionada) {
+                    setFormData(prev => ({
+                      ...prev,
+                      label_ids: []
+                    }))
+                    return
+                  }
+                  
+                  // Buscar el primer label de la categoría seleccionada
+                  const labelsDeCategoria = labelsAgrupadas[categoriaSeleccionada] || []
+                  if (labelsDeCategoria.length > 0) {
+                    const primerLabel = labelsDeCategoria[0]
+                    setFormData(prev => ({
+                      ...prev,
+                      label_ids: [primerLabel.id]
+                    }))
+                  }
+                }}
+                className="flex-1 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:border-purple-500"
+              >
+                <option value="">Selecciona una categoría...</option>
+                {categoriasDisponibles.map((categoria) => (
+                  <option key={categoria} value={categoria}>
+                    {categoria}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => setMostrarFormLabel(true)}
+                className="px-3 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap"
+                title="Crear nueva clasificación"
+              >
+                <Plus className="w-4 h-4" />
+                <span className="hidden sm:inline">Nueva</span>
+              </button>
+            </div>
+            {categoriaSeleccionada && (
+              <p className="text-xs text-slate-400 mt-1">
+                Categoría seleccionada: <span className="text-purple-400 font-medium">{categoriaSeleccionada}</span>
+              </p>
+            )}
             <p className="text-xs text-slate-400 mt-1">
-              {todasLasLabels.length} clasificación{todasLasLabels.length !== 1 ? 'es' : ''} disponible{todasLasLabels.length !== 1 ? 's' : ''}
+              {categoriasDisponibles.length} categoría{categoriasDisponibles.length !== 1 ? 's' : ''} disponible{categoriasDisponibles.length !== 1 ? 's' : ''}
             </p>
           </div>
+        )}
+        
+        {/* Modal para crear nueva clasificación */}
+        {mostrarFormLabel && (
+          <LabelForm
+            onClose={() => setMostrarFormLabel(false)}
+            onSuccess={(nuevaLabel) => {
+              // Seleccionar automáticamente la nueva clasificación creada
+              if (nuevaLabel && nuevaLabel.id) {
+                setFormData(prev => ({
+                  ...prev,
+                  label_ids: [nuevaLabel.id]
+                }))
+              }
+            }}
+          />
         )}
       </div>
 
