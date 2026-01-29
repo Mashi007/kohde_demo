@@ -29,8 +29,9 @@ export default function ItemForm({ item, onClose, onSuccess }) {
   // Inicializar costoInputValue cuando se carga un item existente o cambia el costo
   useEffect(() => {
     if (item?.costo_unitario_actual !== null && item?.costo_unitario_actual !== undefined) {
-      const valor = item.costo_unitario_actual.toString()
-      setCostoInputValue(valor)
+      // Formatear a 2 decimales automáticamente
+      const valorFormateado = parseFloat(item.costo_unitario_actual).toFixed(2)
+      setCostoInputValue(valorFormateado)
       setFormData(prev => ({
         ...prev,
         costo_unitario_manual: item.costo_unitario_actual
@@ -322,16 +323,37 @@ export default function ItemForm({ item, onClose, onSuccess }) {
                 }
               }}
               onBlur={(e) => {
-                // Formatear a 2 decimales cuando pierde el foco
+                // Formatear a 2 decimales automáticamente cuando pierde el foco
                 if (costoInputValue && costoInputValue !== '') {
                   const numero = parseFloat(costoInputValue)
                   if (!isNaN(numero) && numero >= 0) {
-                    const valorFormateado = parseFloat(numero.toFixed(2))
-                    setCostoInputValue(valorFormateado.toString())
+                    // Usar toFixed(2) directamente para mantener formato "XX.XX" siempre
+                    const valorFormateadoString = numero.toFixed(2)
+                    const valorFormateado = parseFloat(valorFormateadoString)
+                    setCostoInputValue(valorFormateadoString) // Mantener formato "54.00" no "54"
                     setFormData({ 
                       ...formData, 
                       costo_unitario_manual: valorFormateado 
                     })
+                  }
+                } else {
+                  // Si está vacío, asegurar que formData también esté en null
+                  setFormData({ 
+                    ...formData, 
+                    costo_unitario_manual: null 
+                  })
+                }
+              }}
+              onFocus={(e) => {
+                // Cuando obtiene el foco, asegurar formato de 2 decimales si hay valor
+                if (costoInputValue && costoInputValue !== '') {
+                  const numero = parseFloat(costoInputValue)
+                  if (!isNaN(numero)) {
+                    const valorFormateadoString = numero.toFixed(2)
+                    // Solo actualizar si el formato es diferente (ej: "54" -> "54.00")
+                    if (costoInputValue !== valorFormateadoString) {
+                      setCostoInputValue(valorFormateadoString)
+                    }
                   }
                 }
               }}
