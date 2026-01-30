@@ -40,7 +40,7 @@ def create_app():
     # Permitir requests desde el frontend
     import os
     cors_origins = os.getenv('CORS_ORIGINS', 
-        'https://kfronend-demo.onrender.com,http://localhost:3000,http://localhost:5173'
+        'https://kohde-demo-1.onrender.com,https://kfronend-demo.onrender.com,http://localhost:3000,http://localhost:5173'
     ).split(',')
     
     CORS(app, 

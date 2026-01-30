@@ -32,12 +32,14 @@ services:
         value: 0.15
 
   # Frontend - Web Service (Express server for SPA routing)
+  # IMPORTANTE: Este servicio DEBE ser "Web Service", NO "Static Site"
+  # Si está configurado como Static Site en Render, las rutas no funcionarán al refrescar
   - type: web
     name: kfronend-demo
     env: node
     buildCommand: cd frontend && npm install && npm run build
     startCommand: cd frontend && node server.js
-    # Removido staticPublishPath para usar Express server en lugar de static site
+    # NO usar staticPublishPath - esto convertiría el servicio en Static Site
     envVars:
       - key: NODE_VERSION
         value: 18.x

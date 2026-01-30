@@ -92,6 +92,12 @@ app.get('/favicon.ico', (req, res) => {
 // SERVIR ARCHIVOS ESTÁTICOS
 // ============================================================================
 
+// Middleware de logging para debug
+app.use((req, res, next) => {
+  console.log(`[REQUEST] ${req.method} ${req.url}`);
+  next();
+});
+
 // IMPORTANTE: fallthrough: true permite que continúe al siguiente middleware si el archivo no existe
 app.use(express.static(distPath, {
   maxAge: '1d',
@@ -105,8 +111,8 @@ app.use(express.static(distPath, {
 // HANDLER SPA - DEBE IR DESPUÉS DE express.static
 // ============================================================================
 
-// Capturar TODAS las rutas GET que no sean archivos estáticos
-app.get('*', (req, res) => {
+// Función helper para servir index.html
+const serveIndexHtml = (req, res) => {
   const url = req.url;
   // Limpiar el path: remover query string y trailing slash
   let pathOnly = url.split('?')[0];
@@ -122,13 +128,15 @@ app.get('*', (req, res) => {
   // Si tiene extensión de archivo estático y llegamos aquí, no existe
   if (ext && staticExtensions.includes(ext)) {
     if (ext === '.ico') {
+      console.log(`[STATIC] Favicon solicitado, retornando 204`);
       return res.status(204).end();
     }
+    console.log(`[STATIC] Archivo estático no encontrado: ${pathOnly}`);
     return res.status(404).json({ error: 'Archivo no encontrado' });
   }
   
   // Para todas las demás rutas (sin extensión o rutas SPA), servir index.html
-  console.log(`[SPA] Sirviendo index.html para: ${pathOnly}${req.url.includes('?') ? ' (con query string)' : ''}`);
+  console.log(`[SPA] Sirviendo index.html para: ${req.method} ${pathOnly}${req.url.includes('?') ? ' (con query string)' : ''}`);
   
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -140,13 +148,19 @@ app.get('*', (req, res) => {
     if (err) {
       if (!res.headersSent) {
         console.error(`[ERROR] Error al servir index.html para ${pathOnly}:`, err.message);
+        console.error(`[ERROR] Stack:`, err.stack);
         res.status(500).json({ error: 'Error interno del servidor' });
       }
     } else {
-      console.log(`[✓] index.html servido para: ${pathOnly}`);
+      console.log(`[✓] index.html servido correctamente para: ${pathOnly}`);
     }
   });
-});
+};
+
+// Capturar TODAS las rutas que no sean archivos estáticos
+// IMPORTANTE: Este handler debe ser el último middleware antes del manejo de errores
+app.get('*', serveIndexHtml);
+app.head('*', serveIndexHtml);
 
 // ============================================================================
 // MANEJO DE ERRORES

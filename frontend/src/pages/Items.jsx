@@ -217,7 +217,6 @@ export default function Items() {
                   <th className="px-6 py-3 text-left">Código</th>
                   <th className="px-6 py-3 text-left">Nombre</th>
                   <th className="px-6 py-3 text-left">Categoría</th>
-                  <th className="px-6 py-3 text-left">Labels</th>
                   <th className="px-6 py-3 text-left">Unidad</th>
                   <th className="px-6 py-3 text-left">Calorías</th>
                   <th className="px-6 py-3 text-left">Costo/Unidad</th>
@@ -234,27 +233,6 @@ export default function Items() {
                   <td className="px-6 py-4">{item.codigo}</td>
                   <td className="px-6 py-4">{item.nombre}</td>
                   <td className="px-6 py-4 capitalize">{item.categoria?.replace('_', ' ')}</td>
-                  <td className="px-6 py-4">
-                    {item.labels && item.labels.length > 0 ? (
-                      <div className="flex flex-wrap gap-1">
-                        {item.labels.slice(0, 3).map(label => (
-                          <span
-                            key={label.id}
-                            className="px-2 py-0.5 bg-purple-600/20 text-purple-300 rounded text-xs border border-purple-500/50"
-                          >
-                            {label.nombre_es}
-                          </span>
-                        ))}
-                        {item.labels.length > 3 && (
-                          <span className="px-2 py-0.5 text-slate-400 text-xs">
-                            +{item.labels.length - 3}
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      <span className="text-slate-500 text-sm">Sin labels</span>
-                    )}
-                  </td>
                   <td className="px-6 py-4">{item.unidad}</td>
                   <td className="px-6 py-4">
                     {item.calorias_por_unidad ? (
