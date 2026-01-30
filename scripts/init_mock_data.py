@@ -548,74 +548,228 @@ def init_inventario(items):
     print(f"  Total inventarios creados: {inventario_creado}")
 
 def init_facturas(proveedores, items):
-    """Inicializa facturas de prueba con items."""
-    print("\n4. INICIALIZANDO FACTURAS...")
+    """Inicializa 20 facturas de prueba con items relacionados."""
+    print("\n4. INICIALIZANDO FACTURAS (20 FACTURAS)...")
     
     if not proveedores or not items:
         print("  ⚠ No hay proveedores o items, saltando facturas")
         return []
     
-    # Crear algunas facturas aprobadas para poder calcular costos promedio
-    facturas_data = [
-        {
-            'numero_factura': 'FAC-2024-001',
+    # Crear mapa de items por categoría para facilitar selección
+    items_por_proveedor = {}
+    for item in items:
+        prov_id = item.proveedor_autorizado_id
+        if prov_id:
+            if prov_id not in items_por_proveedor:
+                items_por_proveedor[prov_id] = []
+            items_por_proveedor[prov_id].append(item)
+    
+    # Si un proveedor no tiene items, usar items generales
+    items_generales = [item for item in items if item.categoria == 'MATERIA_PRIMA'][:20]
+    
+    # Generar 20 facturas variadas
+    facturas_data = []
+    base_date = datetime.now()
+    
+    # Facturas aprobadas (8 facturas) - para calcular costos promedio
+    for i in range(1, 9):
+        prov = proveedores[i % len(proveedores)]
+        prov_items = items_por_proveedor.get(prov.id, items_generales[:5])
+        if not prov_items:
+            prov_items = items_generales[:5]
+        
+        num_items = min(3, len(prov_items))
+        factura_items = []
+        subtotal = Decimal('0')
+        
+        for j in range(num_items):
+            item = prov_items[j % len(prov_items)]
+            cantidad = Decimal(str(10 + (i * 2) + j))
+            precio = item.costo_unitario_actual or Decimal('1.00')
+            if precio is None:
+                precio = Decimal('1.00')
+            item_subtotal = cantidad * precio
+            subtotal += item_subtotal
+            
+            factura_items.append({
+                'item': item,
+                'cantidad': cantidad,
+                'precio_unitario': precio,
+                'cantidad_aprobada': cantidad,  # Aprobada completamente
+                'unidad': item.unidad,
+                'descripcion': item.nombre
+            })
+        
+        iva = subtotal * Decimal('0.12')  # IVA 12%
+        total = subtotal + iva
+        
+        facturas_data.append({
+            'numero_factura': f'FAC-2024-{i:03d}',
             'tipo': TipoFactura.PROVEEDOR,
-            'proveedor_id': proveedores[0].id,
-            'fecha_emision': datetime.now() - timedelta(days=30),
-            'fecha_recepcion': datetime.now() - timedelta(days=29),
-            'subtotal': Decimal('150.00'),
-            'iva': Decimal('18.00'),
-            'total': Decimal('168.00'),
+            'proveedor_id': prov.id,
+            'fecha_emision': base_date - timedelta(days=60-i*5),
+            'fecha_recepcion': base_date - timedelta(days=59-i*5),
+            'subtotal': subtotal,
+            'iva': iva,
+            'total': total,
             'estado': EstadoFactura.APROBADA,
             'aprobado_por': 1,
-            'fecha_aprobacion': datetime.now() - timedelta(days=28),
-            'items': [
-                {'item_id': items[0].id, 'cantidad': 50, 'precio_unitario': 1.50, 'cantidad_aprobada': 50},
-                {'item_id': items[1].id, 'cantidad': 30, 'precio_unitario': 2.00, 'cantidad_aprobada': 30},
-                {'item_id': items[2].id, 'cantidad': 100, 'precio_unitario': 0.80, 'cantidad_aprobada': 100},
-            ]
-        },
-        {
-            'numero_factura': 'FAC-2024-002',
+            'fecha_aprobacion': base_date - timedelta(days=58-i*5),
+            'items': factura_items
+        })
+    
+    # Facturas pendientes (5 facturas)
+    for i in range(9, 14):
+        prov = proveedores[i % len(proveedores)]
+        prov_items = items_por_proveedor.get(prov.id, items_generales[:5])
+        if not prov_items:
+            prov_items = items_generales[:5]
+        
+        num_items = min(4, len(prov_items))
+        factura_items = []
+        subtotal = Decimal('0')
+        
+        for j in range(num_items):
+            item = prov_items[j % len(prov_items)]
+            cantidad = Decimal(str(15 + (i * 2) + j))
+            precio = item.costo_unitario_actual or Decimal('1.00')
+            if precio is None:
+                precio = Decimal('1.00')
+            item_subtotal = cantidad * precio
+            subtotal += item_subtotal
+            
+            factura_items.append({
+                'item': item,
+                'cantidad': cantidad,
+                'precio_unitario': precio,
+                'cantidad_aprobada': None,  # Pendiente de aprobación
+                'unidad': item.unidad,
+                'descripcion': item.nombre
+            })
+        
+        iva = subtotal * Decimal('0.12')
+        total = subtotal + iva
+        
+        facturas_data.append({
+            'numero_factura': f'FAC-2024-{i:03d}',
             'tipo': TipoFactura.PROVEEDOR,
-            'proveedor_id': proveedores[1].id,
-            'fecha_emision': datetime.now() - timedelta(days=20),
-            'fecha_recepcion': datetime.now() - timedelta(days=19),
-            'subtotal': Decimal('200.00'),
-            'iva': Decimal('24.00'),
-            'total': Decimal('224.00'),
-            'estado': EstadoFactura.APROBADA,
-            'aprobado_por': 1,
-            'fecha_aprobacion': datetime.now() - timedelta(days=18),
-            'items': [
-                {'item_id': items[3].id, 'cantidad': 20, 'precio_unitario': 5.50, 'cantidad_aprobada': 20},
-                {'item_id': items[4].id, 'cantidad': 15, 'precio_unitario': 8.00, 'cantidad_aprobada': 15},
-            ]
-        },
-        {
-            'numero_factura': 'FAC-2024-003',
+            'proveedor_id': prov.id,
+            'fecha_emision': base_date - timedelta(days=20-i+9),
+            'fecha_recepcion': base_date - timedelta(days=19-i+9),
+            'subtotal': subtotal,
+            'iva': iva,
+            'total': total,
+            'estado': EstadoFactura.PENDIENTE,
+            'items': factura_items
+        })
+    
+    # Facturas parciales (4 facturas)
+    for i in range(14, 18):
+        prov = proveedores[i % len(proveedores)]
+        prov_items = items_por_proveedor.get(prov.id, items_generales[:5])
+        if not prov_items:
+            prov_items = items_generales[:5]
+        
+        num_items = min(3, len(prov_items))
+        factura_items = []
+        subtotal = Decimal('0')
+        
+        for j in range(num_items):
+            item = prov_items[j % len(prov_items)]
+            cantidad = Decimal(str(20 + (i * 2) + j))
+            precio = item.costo_unitario_actual or Decimal('1.00')
+            if precio is None:
+                precio = Decimal('1.00')
+            item_subtotal = cantidad * precio
+            subtotal += item_subtotal
+            
+            # Aprobar parcialmente (80% de la cantidad)
+            cantidad_aprobada = cantidad * Decimal('0.8')
+            
+            factura_items.append({
+                'item': item,
+                'cantidad': cantidad,
+                'precio_unitario': precio,
+                'cantidad_aprobada': cantidad_aprobada,
+                'unidad': item.unidad,
+                'descripcion': item.nombre
+            })
+        
+        iva = subtotal * Decimal('0.12')
+        total = subtotal + iva
+        
+        facturas_data.append({
+            'numero_factura': f'FAC-2024-{i:03d}',
             'tipo': TipoFactura.PROVEEDOR,
-            'proveedor_id': proveedores[0].id,
-            'fecha_emision': datetime.now() - timedelta(days=10),
-            'fecha_recepcion': datetime.now() - timedelta(days=9),
-            'subtotal': Decimal('120.00'),
-            'iva': Decimal('14.40'),
-            'total': Decimal('134.40'),
-            'estado': EstadoFactura.APROBADA,
+            'proveedor_id': prov.id,
+            'fecha_emision': base_date - timedelta(days=10-i+14),
+            'fecha_recepcion': base_date - timedelta(days=9-i+14),
+            'subtotal': subtotal,
+            'iva': iva,
+            'total': total,
+            'estado': EstadoFactura.PARCIAL,
             'aprobado_por': 1,
-            'fecha_aprobacion': datetime.now() - timedelta(days=8),
-            'items': [
-                {'item_id': items[0].id, 'cantidad': 40, 'precio_unitario': 1.45, 'cantidad_aprobada': 40},
-                {'item_id': items[6].id, 'cantidad': 20, 'precio_unitario': 1.20, 'cantidad_aprobada': 20},
-                {'item_id': items[7].id, 'cantidad': 10, 'precio_unitario': 6.50, 'cantidad_aprobada': 10},
-            ]
-        }
-    ]
+            'fecha_aprobacion': base_date - timedelta(days=8-i+14),
+            'observaciones': 'Aprobación parcial - pendiente revisión de algunos items',
+            'items': factura_items
+        })
+    
+    # Facturas rechazadas (3 facturas)
+    for i in range(18, 21):
+        prov = proveedores[i % len(proveedores)]
+        prov_items = items_por_proveedor.get(prov.id, items_generales[:5])
+        if not prov_items:
+            prov_items = items_generales[:5]
+        
+        num_items = min(2, len(prov_items))
+        factura_items = []
+        subtotal = Decimal('0')
+        
+        for j in range(num_items):
+            item = prov_items[j % len(prov_items)]
+            cantidad = Decimal(str(25 + (i * 2) + j))
+            precio = item.costo_unitario_actual or Decimal('1.00')
+            if precio is None:
+                precio = Decimal('1.00')
+            item_subtotal = cantidad * precio
+            subtotal += item_subtotal
+            
+            factura_items.append({
+                'item': item,
+                'cantidad': cantidad,
+                'precio_unitario': precio,
+                'cantidad_aprobada': Decimal('0'),  # Rechazada
+                'unidad': item.unidad,
+                'descripcion': item.nombre
+            })
+        
+        iva = subtotal * Decimal('0.12')
+        total = subtotal + iva
+        
+        facturas_data.append({
+            'numero_factura': f'FAC-2024-{i:03d}',
+            'tipo': TipoFactura.PROVEEDOR,
+            'proveedor_id': prov.id,
+            'fecha_emision': base_date - timedelta(days=5-i+18),
+            'fecha_recepcion': base_date - timedelta(days=4-i+18),
+            'subtotal': subtotal,
+            'iva': iva,
+            'total': total,
+            'estado': EstadoFactura.RECHAZADA,
+            'aprobado_por': 1,
+            'fecha_aprobacion': base_date - timedelta(days=3-i+18),
+            'observaciones': 'Factura rechazada - productos no cumplen especificaciones',
+            'items': factura_items
+        })
     
     facturas_creadas = []
     for fact_data in facturas_data:
         # Separar items de la factura
         items_factura = fact_data.pop('items', [])
+        
+        if not items_factura:
+            print(f"  ⚠ Saltando factura {fact_data['numero_factura']}: sin items")
+            continue
         
         existing = Factura.query.filter_by(numero_factura=fact_data['numero_factura']).first()
         if not existing:
@@ -625,28 +779,36 @@ def init_facturas(proveedores, items):
             
             # Crear items de la factura
             for item_fact in items_factura:
+                item = item_fact['item']
                 cantidad = Decimal(str(item_fact['cantidad']))
                 precio_unitario = Decimal(str(item_fact['precio_unitario']))
                 subtotal = cantidad * precio_unitario
                 
+                cantidad_aprobada = None
+                if item_fact.get('cantidad_aprobada') is not None:
+                    cantidad_aprobada = Decimal(str(item_fact['cantidad_aprobada']))
+                
                 factura_item = FacturaItem(
                     factura_id=factura.id,
-                    item_id=item_fact['item_id'],
+                    item_id=item.id,
                     cantidad_facturada=cantidad,
-                    cantidad_aprobada=Decimal(str(item_fact['cantidad_aprobada'])),
+                    cantidad_aprobada=cantidad_aprobada,
                     precio_unitario=precio_unitario,
                     subtotal=subtotal,
-                    unidad=items[0].unidad if items else 'unidad'
+                    unidad=item_fact.get('unidad', item.unidad),
+                    descripcion=item_fact.get('descripcion', item.nombre)
                 )
                 db.session.add(factura_item)
             
             facturas_creadas.append(factura)
-            print(f"  ✓ Creada: {fact_data['numero_factura']} - ${fact_data['total']}")
+            estado_str = fact_data['estado'].value if hasattr(fact_data['estado'], 'value') else str(fact_data['estado'])
+            print(f"  ✓ Creada: {fact_data['numero_factura']} - ${fact_data['total']:.2f} ({estado_str}) - {len(items_factura)} items")
         else:
             facturas_creadas.append(existing)
             print(f"  ↻ Ya existe: {fact_data['numero_factura']}")
     
     db.session.commit()
+    print(f"  Total facturas creadas: {len(facturas_creadas)}")
     return facturas_creadas
 
 def init_recetas(items):
