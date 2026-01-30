@@ -137,8 +137,9 @@ class AIConfigService:
             
             # Agregar headers específicos de OpenRouter si es necesario
             if base_url and 'openrouter.ai' in base_url:
-                if Config.OPENROUTER_HTTP_REFERER:
-                    headers["HTTP-Referer"] = Config.OPENROUTER_HTTP_REFERER
+                # HTTP-Referer es requerido por OpenRouter para chat/completions
+                referer = Config.OPENROUTER_HTTP_REFERER or "https://github.com/Mashi007/kohde_demo"
+                headers["HTTP-Referer"] = referer
                 if Config.OPENROUTER_X_TITLE:
                     headers["X-Title"] = Config.OPENROUTER_X_TITLE
             
@@ -200,8 +201,9 @@ class AIConfigService:
             
             # Agregar headers específicos de OpenRouter si es necesario
             if base_url and 'openrouter.ai' in base_url:
-                if Config.OPENROUTER_HTTP_REFERER:
-                    headers["HTTP-Referer"] = Config.OPENROUTER_HTTP_REFERER
+                # HTTP-Referer es requerido por OpenRouter para chat/completions
+                referer = Config.OPENROUTER_HTTP_REFERER or "https://github.com/Mashi007/kohde_demo.git"
+                headers["HTTP-Referer"] = referer
                 if Config.OPENROUTER_X_TITLE:
                     headers["X-Title"] = Config.OPENROUTER_X_TITLE
             
