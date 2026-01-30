@@ -21,15 +21,110 @@ def init_items():
     print("INICIALIZACIÓN DE ITEMS")
     print("=" * 60)
     
-    # Verificar proveedores
+    # Verificar o crear proveedores
     proveedores = Proveedor.query.filter_by(activo=True).all()
     if not proveedores:
-        print("\n⚠ No hay proveedores activos.")
-        print("  Ejecuta primero: python scripts/init_mock_data.py (para crear proveedores)")
-        print("  O crea proveedores manualmente.")
-        return []
-    
-    print(f"\n✓ Encontrados {len(proveedores)} proveedores activos")
+        print("\n⚠ No hay proveedores activos. Creando proveedores...")
+        proveedores_data = [
+            {
+                'nombre': 'Distribuidora Alimentos S.A.',
+                'ruc': '1234567890001',
+                'telefono': '+593 2 234-5678',
+                'email': 'ventas@distribuidora-alimentos.com',
+                'direccion': 'Av. Principal 123, Quito',
+                'nombre_contacto': 'Juan Pérez',
+                'productos_que_provee': 'Verduras, frutas, lácteos, carnes',
+                'activo': True,
+                'dias_credito': 30
+            },
+            {
+                'nombre': 'Carnicería El Buen Corte',
+                'ruc': '9876543210001',
+                'telefono': '+593 2 345-6789',
+                'email': 'pedidos@buencorte.com',
+                'direccion': 'Calle Comercial 456, Quito',
+                'nombre_contacto': 'María González',
+                'productos_que_provee': 'Carnes rojas, pollo, embutidos',
+                'activo': True,
+                'dias_credito': 30
+            },
+            {
+                'nombre': 'Bebidas y Licores del Ecuador',
+                'ruc': '1112223330001',
+                'telefono': '+593 2 456-7890',
+                'email': 'info@bebidas-ec.com',
+                'direccion': 'Av. Industrial 789, Quito',
+                'nombre_contacto': 'Carlos Rodríguez',
+                'productos_que_provee': 'Bebidas gaseosas, alcohólicas, jugos',
+                'activo': True,
+                'dias_credito': 30
+            },
+            {
+                'nombre': 'Suministros de Limpieza Pro',
+                'ruc': '4445556660001',
+                'telefono': '+593 2 567-8901',
+                'email': 'contacto@limpieza-pro.com',
+                'direccion': 'Calle Suministros 321, Quito',
+                'nombre_contacto': 'Ana Martínez',
+                'productos_que_provee': 'Artículos de limpieza, desechables',
+                'activo': True,
+                'dias_credito': 30
+            },
+            {
+                'nombre': 'Panadería Artesanal',
+                'ruc': '7778889990001',
+                'telefono': '+593 2 678-9012',
+                'email': 'pedidos@panaderia-artesanal.com',
+                'direccion': 'Av. Panaderos 654, Quito',
+                'nombre_contacto': 'Luis Fernández',
+                'productos_que_provee': 'Pan, masas, productos de panadería',
+                'activo': True,
+                'dias_credito': 30
+            }
+        ]
+        
+        from sqlalchemy import text
+        
+        proveedores = []
+        for prov_data in proveedores_data:
+            existing = Proveedor.query.filter_by(ruc=prov_data['ruc']).first()
+            if not existing:
+                # Insertar usando SQL directo para incluir todos los campos requeridos
+                dias_credito = prov_data.pop('dias_credito', 30)
+                from datetime import datetime, timezone
+                with db.engine.connect() as conn:
+                    result = conn.execute(
+                        text("""
+                            INSERT INTO proveedores 
+                            (nombre, ruc, telefono, email, direccion, nombre_contacto, productos_que_provee, activo, dias_credito, fecha_registro)
+                            VALUES (:nombre, :ruc, :telefono, :email, :direccion, :nombre_contacto, :productos_que_provee, :activo, :dias_credito, :fecha_registro)
+                            RETURNING id
+                        """),
+                        {
+                            'nombre': prov_data['nombre'],
+                            'ruc': prov_data['ruc'],
+                            'telefono': prov_data.get('telefono'),
+                            'email': prov_data.get('email'),
+                            'direccion': prov_data.get('direccion'),
+                            'nombre_contacto': prov_data.get('nombre_contacto'),
+                            'productos_que_provee': prov_data.get('productos_que_provee'),
+                            'activo': prov_data['activo'],
+                            'dias_credito': dias_credito,
+                            'fecha_registro': datetime.now(timezone.utc)
+                        }
+                    )
+                    prov_id = result.scalar()
+                    conn.commit()
+                    # Recargar el proveedor desde la BD
+                    proveedor = Proveedor.query.get(prov_id)
+                    proveedores.append(proveedor)
+                    print(f"  ✓ Creado proveedor: {prov_data['nombre']}")
+            else:
+                proveedores.append(existing)
+                print(f"  ↻ Ya existe proveedor: {prov_data['nombre']}")
+        print(f"\n✓ {len(proveedores)} proveedores disponibles")
+    else:
+        print(f"\n✓ Encontrados {len(proveedores)} proveedores activos")
     
     # Verificar labels (opcional)
     labels = ItemLabel.query.all()
@@ -440,6 +535,9 @@ def init_items():
         }
     ]
     
+    from sqlalchemy import text
+    from datetime import datetime, timezone
+    
     items_creados = []
     for item_data in items_data:
         # Separar labels del resto de datos
@@ -447,16 +545,61 @@ def init_items():
         
         existing = Item.query.filter_by(codigo=item_data['codigo']).first()
         if not existing:
-            item = Item(**item_data)
-            db.session.add(item)
-            db.session.flush()  # Para obtener el ID
+            # Mapear categoría a valores válidos del enum PostgreSQL
+            # Los valores válidos son: MATERIA_PRIMA, INSUMO, PRODUCTO_TERMINADO, bebida, limpieza, otros
+            categoria_map = {
+                'MATERIA_PRIMA': 'MATERIA_PRIMA',
+                'bebida': 'bebida',
+                'limpieza': 'limpieza',
+                'INSUMO': 'INSUMO',
+                'PRODUCTO_TERMINADO': 'PRODUCTO_TERMINADO',
+                'otros': 'otros'
+            }
+            categoria_db = categoria_map.get(item_data['categoria'], item_data['categoria'])
             
-            # Asignar labels si existen
-            if labels:
-                item.labels = labels
-            
-            items_creados.append(item)
-            print(f"  ✓ Creado: {item_data['nombre']} ({item_data['codigo']})")
+            # Insertar usando SQL directo para hacer cast al tipo ENUM
+            # Construimos el SQL con el valor de categoría ya formateado para evitar problemas con el cast
+            with db.engine.connect() as conn:
+                # Usamos f-string para insertar el valor de categoría directamente en el SQL
+                # ya que el cast necesita estar en el SQL, no como parámetro
+                sql_query = f"""
+                    INSERT INTO items 
+                    (codigo, nombre, descripcion, categoria, unidad, calorias_por_unidad, 
+                     proveedor_autorizado_id, tiempo_entrega_dias, costo_unitario_actual, activo, fecha_creacion)
+                    VALUES (:codigo, :nombre, :descripcion, 
+                            '{categoria_db}'::categoriaitem, 
+                            :unidad, :calorias_por_unidad,
+                            :proveedor_autorizado_id, :tiempo_entrega_dias, :costo_unitario_actual, :activo, :fecha_creacion)
+                    RETURNING id
+                """
+                result = conn.execute(
+                    text(sql_query),
+                    {
+                        'codigo': item_data['codigo'],
+                        'nombre': item_data['nombre'],
+                        'descripcion': item_data.get('descripcion'),
+                        'unidad': item_data['unidad'],
+                        'calorias_por_unidad': item_data.get('calorias_por_unidad'),
+                        'proveedor_autorizado_id': item_data.get('proveedor_autorizado_id'),
+                        'tiempo_entrega_dias': item_data.get('tiempo_entrega_dias', 7),
+                        'costo_unitario_actual': item_data.get('costo_unitario_actual'),
+                        'activo': item_data.get('activo', True),
+                        'fecha_creacion': datetime.now(timezone.utc)
+                    }
+                )
+                item_id = result.scalar()
+                conn.commit()
+                
+                # Recargar el item desde la BD
+                item = Item.query.get(item_id)
+                
+                # Asignar labels si existen
+                if labels and item:
+                    item.labels = labels
+                    db.session.commit()
+                
+                items_creados.append(item)
+                print(f"  ✓ Creado: {item_data['nombre']} ({item_data['codigo']})")
         else:
             items_creados.append(existing)
             print(f"  ↻ Ya existe: {item_data['nombre']} ({item_data['codigo']})")
