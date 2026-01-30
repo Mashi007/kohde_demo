@@ -36,6 +36,7 @@ const menuStructure = [
     icon: Users,
     items: [
       { path: '/proveedores', label: 'Proveedores', icon: Truck },
+      { path: '/contactos', label: 'Contactos', icon: Users },
       { path: '/notificaciones', label: 'Notificaciones', icon: Bell },
       { path: '/tickets', label: 'Tickets', icon: MessageSquare },
     ]

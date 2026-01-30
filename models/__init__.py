@@ -24,6 +24,8 @@ from models.merma import Merma
 from models.merma_receta_programacion import MermaRecetaProgramacion
 from models.chat import Conversacion, Mensaje
 from models.costo_item import CostoItem
+from models.contacto import Contacto, TipoContacto
+from models.conversacion_contacto import ConversacionContacto, TipoMensajeContacto, DireccionMensaje
 
 __all__ = [
     'db',
@@ -53,4 +55,9 @@ __all__ = [
     'Conversacion',
     'Mensaje',
     'CostoItem',
+    'Contacto',
+    'TipoContacto',
+    'ConversacionContacto',
+    'TipoMensajeContacto',
+    'DireccionMensaje',
 ]

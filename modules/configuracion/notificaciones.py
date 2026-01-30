@@ -15,17 +15,38 @@ class NotificacionesConfigService:
         Returns:
             Diccionario con la configuración
         """
-        return {
+        email_provider = Config.EMAIL_PROVIDER.lower()
+        
+        config = {
+            'email_provider': email_provider,
             'email_notificaciones_pedidos': Config.EMAIL_NOTIFICACIONES_PEDIDOS,
             'email_from': Config.EMAIL_FROM,
-            'sendgrid_api_key_configured': bool(Config.SENDGRID_API_KEY),
-            'sendgrid_api_key_preview': (
-                Config.SENDGRID_API_KEY[:10] + '...' + Config.SENDGRID_API_KEY[-4:] 
-                if Config.SENDGRID_API_KEY and len(Config.SENDGRID_API_KEY) > 14 
-                else 'No configurado'
-            ),
-            'estado': 'configurado' if (Config.SENDGRID_API_KEY and Config.EMAIL_NOTIFICACIONES_PEDIDOS) else 'no_configurado'
         }
+        
+        if email_provider == 'sendgrid':
+            config.update({
+                'sendgrid_api_key_configured': bool(Config.SENDGRID_API_KEY),
+                'sendgrid_api_key_preview': (
+                    Config.SENDGRID_API_KEY[:10] + '...' + Config.SENDGRID_API_KEY[-4:] 
+                    if Config.SENDGRID_API_KEY and len(Config.SENDGRID_API_KEY) > 14 
+                    else 'No configurado'
+                ),
+                'estado': 'configurado' if (Config.SENDGRID_API_KEY and Config.EMAIL_NOTIFICACIONES_PEDIDOS) else 'no_configurado'
+            })
+        elif email_provider == 'gmail':
+            config.update({
+                'gmail_user_configured': bool(Config.GMAIL_SMTP_USER),
+                'gmail_user': Config.GMAIL_SMTP_USER,
+                'gmail_password_configured': bool(Config.GMAIL_SMTP_PASSWORD),
+                'gmail_smtp_server': Config.GMAIL_SMTP_SERVER,
+                'gmail_smtp_port': Config.GMAIL_SMTP_PORT,
+                'gmail_use_tls': Config.GMAIL_SMTP_USE_TLS,
+                'estado': 'configurado' if (Config.GMAIL_SMTP_USER and Config.GMAIL_SMTP_PASSWORD and Config.EMAIL_NOTIFICACIONES_PEDIDOS) else 'no_configurado'
+            })
+        else:
+            config['estado'] = 'no_configurado'
+        
+        return config
     
     @staticmethod
     def actualizar_email_notificaciones(email: str) -> Dict:
@@ -69,13 +90,7 @@ class NotificacionesConfigService:
             Diccionario con el resultado de la verificación
         """
         config = NotificacionesConfigService.obtener_configuracion()
-        
-        if not config['sendgrid_api_key_configured']:
-            return {
-                'valido': False,
-                'mensaje': 'API Key de SendGrid no configurado',
-                'detalles': 'Por favor, configura SENDGRID_API_KEY en las variables de entorno'
-            }
+        email_provider = config.get('email_provider', 'sendgrid')
         
         if not config['email_notificaciones_pedidos']:
             return {
@@ -84,22 +99,56 @@ class NotificacionesConfigService:
                 'detalles': 'Por favor, configura EMAIL_NOTIFICACIONES_PEDIDOS en las variables de entorno'
             }
         
+        if email_provider == 'sendgrid':
+            if not config.get('sendgrid_api_key_configured'):
+                return {
+                    'valido': False,
+                    'mensaje': 'API Key de SendGrid no configurado',
+                    'detalles': 'Por favor, configura SENDGRID_API_KEY en las variables de entorno'
+                }
+        elif email_provider == 'gmail':
+            if not config.get('gmail_user_configured'):
+                return {
+                    'valido': False,
+                    'mensaje': 'Usuario de Gmail no configurado',
+                    'detalles': 'Por favor, configura GMAIL_SMTP_USER en las variables de entorno'
+                }
+            if not config.get('gmail_password_configured'):
+                return {
+                    'valido': False,
+                    'mensaje': 'Contraseña de aplicación de Gmail no configurada',
+                    'detalles': 'Por favor, configura GMAIL_SMTP_PASSWORD (contraseña de aplicación) en las variables de entorno'
+                }
+        
         # Verificar que el servicio de email funcione
         try:
             from modules.crm.notificaciones.email import email_service
-            # Solo verificamos que el servicio esté inicializado
-            if email_service.client:
-                return {
-                    'valido': True,
-                    'mensaje': 'Configuración válida',
-                    'detalles': f'Email de notificaciones: {config["email_notificaciones_pedidos"]}'
-                }
-            else:
-                return {
-                    'valido': False,
-                    'mensaje': 'Servicio de email no inicializado',
-                    'detalles': 'Verifica la configuración de SendGrid'
-                }
+            if email_provider == 'sendgrid':
+                if email_service.sendgrid_client:
+                    return {
+                        'valido': True,
+                        'mensaje': 'Configuración de SendGrid válida',
+                        'detalles': f'Email de notificaciones: {config["email_notificaciones_pedidos"]}'
+                    }
+                else:
+                    return {
+                        'valido': False,
+                        'mensaje': 'Servicio de SendGrid no inicializado',
+                        'detalles': 'Verifica la configuración de SendGrid'
+                    }
+            elif email_provider == 'gmail':
+                if email_service.gmail_user and email_service.gmail_password:
+                    return {
+                        'valido': True,
+                        'mensaje': 'Configuración de Gmail SMTP válida',
+                        'detalles': f'Email de notificaciones: {config["email_notificaciones_pedidos"]}, Usuario: {config.get("gmail_user", "N/A")}'
+                    }
+                else:
+                    return {
+                        'valido': False,
+                        'mensaje': 'Servicio de Gmail SMTP no inicializado',
+                        'detalles': 'Verifica la configuración de Gmail (usuario y contraseña de aplicación)'
+                    }
         except Exception as e:
             return {
                 'valido': False,

@@ -31,7 +31,7 @@ def verificar_whatsapp():
 
 @bp.route('/whatsapp/probar', methods=['POST'])
 def probar_whatsapp():
-    """Envía un mensaje de prueba de WhatsApp."""
+    """Envía un mensaje de prueba de WhatsApp respetando las políticas."""
     try:
         datos = request.get_json()
         numero = datos.get('numero', '').strip()
@@ -45,7 +45,18 @@ def probar_whatsapp():
         if resultado.get('exito'):
             return jsonify(resultado), 200
         else:
-            return jsonify(resultado), 400
+            # Retornar código 400 para errores de validación, 500 para errores de servidor
+            codigo = 400 if resultado.get('tipo_error') in ['validacion_numero', 'validacion_mensaje'] else 500
+            return jsonify(resultado), codigo
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/whatsapp/politicas', methods=['GET'])
+def obtener_politicas_whatsapp():
+    """Obtiene las políticas de configuración de WhatsApp."""
+    try:
+        politicas = whatsapp_config_service.obtener_politicas()
+        return jsonify(politicas), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -85,6 +96,27 @@ def probar_ai():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@bp.route('/ai/token', methods=['PUT'])
+def actualizar_token_ai():
+    """Actualiza el token de OpenAI."""
+    try:
+        datos = request.get_json()
+        api_key = datos.get('api_key', '').strip()
+        modelo = datos.get('modelo', '').strip() or None
+        base_url = datos.get('base_url', '').strip() or None
+        
+        if not api_key:
+            return jsonify({'error': 'API key requerida'}), 400
+        
+        resultado = ai_config_service.actualizar_token(api_key, modelo, base_url)
+        
+        if resultado.get('exito'):
+            return jsonify(resultado), 200
+        else:
+            return jsonify(resultado), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 # ========== RUTAS DE NOTIFICACIONES POR EMAIL ==========
 
 @bp.route('/notificaciones', methods=['GET'])
@@ -107,6 +139,34 @@ def actualizar_email_notificaciones():
             return jsonify({'error': 'Email requerido'}), 400
         
         resultado = notificaciones_config_service.actualizar_email_notificaciones(email)
+        
+        if resultado.get('exito'):
+            return jsonify(resultado), 200
+        else:
+            return jsonify(resultado), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@bp.route('/notificaciones/gmail', methods=['PUT'])
+def actualizar_configuracion_gmail():
+    """Actualiza la configuración de Gmail SMTP."""
+    try:
+        datos = request.get_json()
+        usuario = datos.get('usuario', '').strip()
+        contraseña = datos.get('contraseña', '').strip() or datos.get('password', '').strip()
+        servidor = datos.get('servidor', '').strip() or None
+        puerto = datos.get('puerto')
+        usar_tls = datos.get('usar_tls', True)
+        
+        if not usuario:
+            return jsonify({'error': 'Usuario de Gmail requerido'}), 400
+        
+        if not contraseña:
+            return jsonify({'error': 'Contraseña de aplicación requerida'}), 400
+        
+        resultado = notificaciones_config_service.actualizar_configuracion_gmail(
+            usuario, contraseña, servidor, puerto, usar_tls
+        )
         
         if resultado.get('exito'):
             return jsonify(resultado), 200

@@ -8,6 +8,9 @@ from models import db, Item
 from modules.crm.tickets import TicketService
 from modules.crm.tickets_automaticos import TicketsAutomaticosService
 from modules.crm.proveedores import ProveedorService
+from modules.crm.contactos import contacto_service
+from modules.crm.conversaciones import conversacion_service
+from models.conversacion_contacto import TipoMensajeContacto
 from modules.crm.notificaciones.whatsapp import whatsapp_service
 from modules.crm.notificaciones.email import email_service
 from datetime import datetime
@@ -172,17 +175,32 @@ def obtener_pedidos_proveedor(proveedor_id):
 
 @bp.route('/notificaciones', methods=['GET'])
 def listar_notificaciones():
-    """Lista notificaciones enviadas con filtros opcionales."""
+    """Lista notificaciones enviadas con filtros opcionales (usa conversaciones)."""
     try:
         tipo = request.args.get('tipo')  # 'whatsapp' o 'email'
-        destinatario = request.args.get('destinatario')
         skip = validate_positive_int(request.args.get('skip', 0), 'skip')
         limit = validate_positive_int(request.args.get('limit', 50), 'limit')
         
-        # Por ahora retornamos un resumen, en el futuro se puede guardar en BD
-        notificaciones = []
+        conversaciones = conversacion_service.listar_conversaciones(
+            db.session,
+            tipo_mensaje=tipo,
+            skip=skip,
+            limit=limit
+        )
         
-        return paginated_response(notificaciones, total=0, skip=skip, limit=limit)
+        # Formatear como notificaciones para compatibilidad
+        notificaciones = []
+        for conv in conversaciones:
+            notificaciones.append({
+                'tipo': conv.tipo_mensaje.value if conv.tipo_mensaje else None,
+                'destinatario': conv.contacto.email if conv.tipo_mensaje == TipoMensajeContacto.EMAIL else conv.contacto.whatsapp,
+                'mensaje': conv.contenido,
+                'asunto': conv.asunto,
+                'fecha': conv.fecha_envio.isoformat() if conv.fecha_envio else None,
+                'estado': conv.estado
+            })
+        
+        return paginated_response({'notificaciones': notificaciones}, skip=skip, limit=limit)
     except ValueError as e:
         return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
@@ -190,49 +208,109 @@ def listar_notificaciones():
 
 @bp.route('/notificaciones/enviar', methods=['POST'])
 def enviar_notificacion():
-    """Envía una notificación (WhatsApp o Email)."""
+    """Envía una notificación (WhatsApp o Email) a un contacto."""
     try:
         datos = request.get_json()
         if not datos:
             return error_response('Datos JSON requeridos', 400, 'VALIDATION_ERROR')
         
+        contacto_id = datos.get('contacto_id')
         tipo = datos.get('tipo')
-        destinatario = datos.get('destinatario')
         mensaje = datos.get('mensaje')
         asunto = datos.get('asunto', '')
         
-        if not tipo or not destinatario or not mensaje:
-            return error_response('tipo, destinatario y mensaje son requeridos', 400, 'VALIDATION_ERROR')
+        if not contacto_id:
+            return error_response('contacto_id es requerido', 400, 'VALIDATION_ERROR')
         
-        if tipo == 'whatsapp':
-            resultado = whatsapp_service.enviar_mensaje(destinatario, mensaje)
-            # WhatsApp API retorna: {"messages": [{"id": "wamid.xxx"}]}
-            mensaje_id = None
-            if isinstance(resultado, dict):
-                messages = resultado.get('messages', [])
-                if messages and len(messages) > 0:
-                    mensaje_id = messages[0].get('id')
+        if not tipo or not mensaje:
+            return error_response('tipo y mensaje son requeridos', 400, 'VALIDATION_ERROR')
+        
+        # Obtener contacto
+        contacto = contacto_service.obtener_contacto(db.session, contacto_id)
+        if not contacto:
+            return error_response('Contacto no encontrado', 404, 'NOT_FOUND')
+        
+        mensaje_id_externo = None
+        estado = 'enviado'
+        error_msg = None
+        
+        try:
+            if tipo == 'whatsapp':
+                if not contacto.whatsapp:
+                    return error_response('El contacto no tiene WhatsApp configurado', 400, 'VALIDATION_ERROR')
+                
+                # Limpiar número
+                import re
+                numero_limpio = re.sub(r'[^0-9]', '', contacto.whatsapp)
+                resultado = whatsapp_service.enviar_mensaje(numero_limpio, mensaje)
+                
+                # WhatsApp API retorna: {"messages": [{"id": "wamid.xxx"}]}
+                if isinstance(resultado, dict):
+                    messages = resultado.get('messages', [])
+                    if messages and len(messages) > 0:
+                        mensaje_id_externo = messages[0].get('id')
+                        estado = 'enviado'
+            
+            elif tipo == 'email':
+                if not contacto.email:
+                    return error_response('El contacto no tiene email configurado', 400, 'VALIDATION_ERROR')
+                
+                # Convertir mensaje a HTML básico
+                contenido_html = f"<p>{mensaje.replace(chr(10), '<br>')}</p>"
+                resultado = email_service.enviar_email(
+                    contacto.email,
+                    asunto or 'Notificación del Sistema',
+                    contenido_html,
+                    contenido_texto=mensaje
+                )
+                
+                # Email service retorna dict con status_code
+                if isinstance(resultado, dict):
+                    if resultado.get('status_code') == 200:
+                        estado = 'enviado'
+                    else:
+                        estado = 'error'
+                        error_msg = resultado.get('mensaje', 'Error desconocido')
+            
+            else:
+                return error_response('Tipo de notificación no válido. Use "whatsapp" o "email"', 400, 'VALIDATION_ERROR')
+            
+            # Guardar conversación en historial
+            conversacion = conversacion_service.crear_conversacion(
+                db.session,
+                contacto_id=contacto_id,
+                tipo_mensaje=tipo,
+                contenido=mensaje,
+                asunto=asunto if tipo == 'email' else None,
+                mensaje_id_externo=mensaje_id_externo,
+                estado=estado,
+                error=error_msg
+            )
+            db.session.commit()
             
             return success_response({
-                'tipo': 'whatsapp',
-                'mensaje_id': mensaje_id
-            }, message='Notificación WhatsApp enviada correctamente')
-        
-        elif tipo == 'email':
-            # Convertir mensaje a HTML básico
-            contenido_html = f"<p>{mensaje.replace(chr(10), '<br>')}</p>"
-            resultado = email_service.enviar_email(
-                destinatario,
-                asunto or 'Notificación del Sistema',
-                contenido_html,
-                contenido_texto=mensaje
-            )
-            return success_response({
-                'tipo': 'email'
-            }, message='Notificación Email enviada correctamente')
-        
-        else:
-            return error_response('Tipo de notificación no válido. Use "whatsapp" o "email"', 400, 'VALIDATION_ERROR')
+                'conversacion': conversacion.to_dict(),
+                'tipo': tipo,
+                'mensaje_id': mensaje_id_externo
+            }, message=f'Notificación {tipo} enviada correctamente')
+            
+        except Exception as e:
+            # Guardar conversación con error
+            try:
+                conversacion = conversacion_service.crear_conversacion(
+                    db.session,
+                    contacto_id=contacto_id,
+                    tipo_mensaje=tipo,
+                    contenido=mensaje,
+                    asunto=asunto if tipo == 'email' else None,
+                    estado='error',
+                    error=str(e)
+                )
+                db.session.commit()
+            except:
+                pass
+            
+            return error_response(f'Error al enviar notificación: {str(e)}', 500, 'SEND_ERROR')
             
     except Exception as e:
         return error_response(str(e), 500, 'INTERNAL_ERROR')
@@ -241,14 +319,49 @@ def enviar_notificacion():
 def obtener_estadisticas():
     """Obtiene estadísticas de notificaciones."""
     try:
-        # Por ahora retornamos estadísticas básicas
-        # En el futuro se puede consultar desde una tabla de notificaciones
-        return success_response({
-            'total_whatsapp': 0,
-            'total_email': 0,
-            'exitosas': 0,
-            'fallidas': 0
-        })
+        estadisticas = conversacion_service.obtener_resumen_conversaciones(db.session)
+        return success_response(estadisticas)
+    except Exception as e:
+        return error_response(str(e), 500, 'INTERNAL_ERROR')
+
+@bp.route('/notificaciones/conversaciones', methods=['GET'])
+def listar_conversaciones():
+    """Lista conversaciones con filtros opcionales."""
+    try:
+        contacto_id = request.args.get('contacto_id', type=int)
+        tipo_mensaje = request.args.get('tipo_mensaje')
+        skip = validate_positive_int(request.args.get('skip', 0), 'skip')
+        limit = validate_positive_int(request.args.get('limit', 100), 'limit')
+        
+        if contacto_id:
+            validate_positive_int(contacto_id, 'contacto_id')
+        
+        conversaciones = conversacion_service.listar_conversaciones(
+            db.session,
+            contacto_id=contacto_id,
+            tipo_mensaje=tipo_mensaje,
+            skip=skip,
+            limit=limit
+        )
+        
+        return paginated_response([c.to_dict() for c in conversaciones], skip=skip, limit=limit)
+    except ValueError as e:
+        return error_response(str(e), 400, 'VALIDATION_ERROR')
+    except Exception as e:
+        return error_response(str(e), 500, 'INTERNAL_ERROR')
+
+@bp.route('/notificaciones/conversaciones/<int:conversacion_id>', methods=['GET'])
+def obtener_conversacion(conversacion_id):
+    """Obtiene una conversación por ID."""
+    try:
+        validate_positive_int(conversacion_id, 'conversacion_id')
+        conversacion = conversacion_service.obtener_conversacion(db.session, conversacion_id)
+        if not conversacion:
+            return error_response('Conversación no encontrada', 404, 'NOT_FOUND')
+        
+        return success_response(conversacion.to_dict())
+    except ValueError as e:
+        return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
         return error_response(str(e), 500, 'INTERNAL_ERROR')
 
@@ -507,6 +620,181 @@ def verificar_reportes():
             'tickets_generados': len(tickets),
             'tickets': [t.to_dict() for t in tickets]
         })
+    except ValueError as e:
+        return error_response(str(e), 400, 'VALIDATION_ERROR')
+    except Exception as e:
+        return error_response(str(e), 500, 'INTERNAL_ERROR')
+
+# ========== RUTAS DE CONTACTOS ==========
+
+@bp.route('/contactos', methods=['GET'])
+def listar_contactos():
+    """Lista contactos con filtros opcionales."""
+    try:
+        tipo = request.args.get('tipo')
+        proveedor_id = request.args.get('proveedor_id', type=int)
+        proyecto = request.args.get('proyecto')
+        activo = request.args.get('activo')
+        busqueda = request.args.get('busqueda')
+        skip = validate_positive_int(request.args.get('skip', 0), 'skip')
+        limit = validate_positive_int(request.args.get('limit', 100), 'limit')
+        
+        if proveedor_id:
+            validate_positive_int(proveedor_id, 'proveedor_id')
+        
+        activo_bool = None if activo is None else activo.lower() == 'true'
+        
+        contactos = contacto_service.listar_contactos(
+            db.session,
+            tipo=tipo,
+            proveedor_id=proveedor_id,
+            proyecto=proyecto,
+            activo=activo_bool,
+            busqueda=busqueda,
+            skip=skip,
+            limit=limit
+        )
+        
+        return paginated_response([c.to_dict() for c in contactos], skip=skip, limit=limit)
+    except ValueError as e:
+        return error_response(str(e), 400, 'VALIDATION_ERROR')
+    except Exception as e:
+        return error_response(str(e), 500, 'INTERNAL_ERROR')
+
+@bp.route('/contactos', methods=['POST'])
+@handle_db_transaction
+def crear_contacto():
+    """Crea un nuevo contacto."""
+    datos = request.get_json()
+    if not datos:
+        return error_response('Datos JSON requeridos', 400, 'VALIDATION_ERROR')
+    
+    nombre = require_field(datos, 'nombre', 'nombre')
+    
+    contacto = contacto_service.crear_contacto(
+        db.session,
+        nombre=nombre,
+        email=datos.get('email'),
+        whatsapp=datos.get('whatsapp'),
+        telefono=datos.get('telefono'),
+        proyecto=datos.get('proyecto'),
+        cargo=datos.get('cargo'),
+        tipo=datos.get('tipo', 'proveedor'),
+        proveedor_id=datos.get('proveedor_id'),
+        notas=datos.get('notas')
+    )
+    db.session.commit()
+    
+    return success_response(contacto.to_dict(), 201, 'Contacto creado correctamente')
+
+@bp.route('/contactos/<int:contacto_id>', methods=['GET'])
+def obtener_contacto(contacto_id):
+    """Obtiene un contacto por ID."""
+    try:
+        validate_positive_int(contacto_id, 'contacto_id')
+        contacto = contacto_service.obtener_contacto(db.session, contacto_id)
+        if not contacto:
+            return error_response('Contacto no encontrado', 404, 'NOT_FOUND')
+        
+        return success_response(contacto.to_dict())
+    except ValueError as e:
+        return error_response(str(e), 400, 'VALIDATION_ERROR')
+    except Exception as e:
+        return error_response(str(e), 500, 'INTERNAL_ERROR')
+
+@bp.route('/contactos/<int:contacto_id>', methods=['PUT'])
+@handle_db_transaction
+def actualizar_contacto(contacto_id):
+    """Actualiza un contacto existente."""
+    validate_positive_int(contacto_id, 'contacto_id')
+    datos = request.get_json()
+    if not datos:
+        return error_response('Datos JSON requeridos', 400, 'VALIDATION_ERROR')
+    
+    try:
+        contacto = contacto_service.actualizar_contacto(
+            db.session,
+            contacto_id,
+            nombre=datos.get('nombre'),
+            email=datos.get('email'),
+            whatsapp=datos.get('whatsapp'),
+            telefono=datos.get('telefono'),
+            proyecto=datos.get('proyecto'),
+            cargo=datos.get('cargo'),
+            tipo=datos.get('tipo'),
+            proveedor_id=datos.get('proveedor_id'),
+            notas=datos.get('notas'),
+            activo=datos.get('activo')
+        )
+        db.session.commit()
+        
+        return success_response(contacto.to_dict(), message='Contacto actualizado correctamente')
+    except ValueError as e:
+        return error_response(str(e), 400, 'VALIDATION_ERROR')
+    except Exception as e:
+        return error_response(str(e), 500, 'INTERNAL_ERROR')
+
+@bp.route('/contactos/<int:contacto_id>', methods=['DELETE'])
+@handle_db_transaction
+def eliminar_contacto(contacto_id):
+    """Elimina (marca como inactivo) un contacto."""
+    validate_positive_int(contacto_id, 'contacto_id')
+    eliminado = contacto_service.eliminar_contacto(db.session, contacto_id)
+    if not eliminado:
+        return error_response('Contacto no encontrado', 404, 'NOT_FOUND')
+    
+    db.session.commit()
+    return success_response(None, message='Contacto eliminado correctamente')
+
+@bp.route('/contactos/<int:contacto_id>/email', methods=['POST'])
+def enviar_email_contacto(contacto_id):
+    """Envía un email a un contacto."""
+    validate_positive_int(contacto_id, 'contacto_id')
+    datos = request.get_json()
+    if not datos:
+        return error_response('Datos JSON requeridos', 400, 'VALIDATION_ERROR')
+    
+    asunto = require_field(datos, 'asunto', 'asunto')
+    contenido = require_field(datos, 'contenido', 'contenido')
+    
+    try:
+        resultado = contacto_service.enviar_mensaje_email(
+            db.session,
+            contacto_id,
+            asunto,
+            contenido
+        )
+        
+        if resultado.get('exito'):
+            return success_response(resultado, message='Email enviado correctamente')
+        else:
+            return error_response(resultado.get('mensaje', 'Error al enviar email'), 400, 'SEND_ERROR')
+    except ValueError as e:
+        return error_response(str(e), 400, 'VALIDATION_ERROR')
+    except Exception as e:
+        return error_response(str(e), 500, 'INTERNAL_ERROR')
+
+@bp.route('/contactos/<int:contacto_id>/whatsapp', methods=['POST'])
+def enviar_whatsapp_contacto(contacto_id):
+    """Envía un mensaje de WhatsApp a un contacto."""
+    validate_positive_int(contacto_id, 'contacto_id')
+    datos = request.get_json()
+    if not datos:
+        return error_response('Datos JSON requeridos', 400, 'VALIDATION_ERROR')
+    
+    mensaje = require_field(datos, 'mensaje', 'mensaje')
+    
+    try:
+        resultado = contacto_service.enviar_mensaje_whatsapp(
+            db.session,
+            contacto_id,
+            mensaje
+        )
+        
+        if resultado.get('exito'):
+            return success_response(resultado, message='Mensaje de WhatsApp enviado correctamente')
+        else:
+            return error_response(resultado.get('mensaje', 'Error al enviar WhatsApp'), 400, 'SEND_ERROR')
     except ValueError as e:
         return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:

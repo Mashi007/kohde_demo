@@ -8,7 +8,15 @@ export default function Configuracion() {
   const [whatsappNumero, setWhatsappNumero] = useState('')
   const [whatsappMensaje, setWhatsappMensaje] = useState('Mensaje de prueba desde ERP')
   const [aiMensaje, setAiMensaje] = useState('Hola, ¿puedes responder con OK?')
+  const [aiToken, setAiToken] = useState('')
+  const [aiModelo, setAiModelo] = useState('gpt-3.5-turbo')
+  const [aiBaseUrl, setAiBaseUrl] = useState('https://api.openai.com/v1')
   const [emailNotificaciones, setEmailNotificaciones] = useState('')
+  const [gmailUsuario, setGmailUsuario] = useState('')
+  const [gmailPassword, setGmailPassword] = useState('')
+  const [gmailServidor, setGmailServidor] = useState('smtp.gmail.com')
+  const [gmailPuerto, setGmailPuerto] = useState('587')
+  const [gmailUsarTLS, setGmailUsarTLS] = useState(true)
 
   const queryClient = useQueryClient()
 
@@ -22,6 +30,11 @@ export default function Configuracion() {
     queryKey: ['whatsapp-verificacion'],
     queryFn: () => api.get('/configuracion/whatsapp/verificar').then(res => res.data),
     enabled: false, // Solo se ejecuta manualmente
+  })
+
+  const { data: whatsappPoliticas } = useQuery({
+    queryKey: ['whatsapp-politicas'],
+    queryFn: () => api.get('/configuracion/whatsapp/politicas').then(res => res.data),
   })
 
   const probarWhatsappMutation = useMutation({
@@ -56,6 +69,18 @@ export default function Configuracion() {
     },
   })
 
+  const actualizarTokenAiMutation = useMutation({
+    mutationFn: (data) => api.put('/configuracion/ai/token', data),
+    onSuccess: (data) => {
+      toast.success(data.data?.mensaje || 'Token actualizado correctamente')
+      queryClient.invalidateQueries(['ai-config'])
+      setAiToken('') // Limpiar el campo después de guardar
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.error || 'Error al actualizar token')
+    }
+  })
+
   const verificarWhatsapp = () => {
     refetchWhatsapp()
   }
@@ -69,6 +94,25 @@ export default function Configuracion() {
       toast.error('Ingresa un número de teléfono')
       return
     }
+    
+    // Validación básica del número según políticas (solo dígitos, 10-15 caracteres)
+    const numeroLimpio = whatsappNumero.replace(/\D/g, '')
+    if (numeroLimpio.length < 10 || numeroLimpio.length > 15) {
+      toast.error('El número debe tener entre 10 y 15 dígitos')
+      return
+    }
+    
+    // Validación básica del mensaje según políticas
+    if (!whatsappMensaje.trim()) {
+      toast.error('Por favor ingresa un mensaje')
+      return
+    }
+    
+    if (whatsappMensaje.length > 4096) {
+      toast.error('El mensaje no puede exceder 4096 caracteres')
+      return
+    }
+    
     probarWhatsappMutation.mutate({
       numero: whatsappNumero,
       mensaje: whatsappMensaje
@@ -77,6 +121,24 @@ export default function Configuracion() {
 
   const probarAI = () => {
     probarAIMutation.mutate({ mensaje: aiMensaje })
+  }
+
+  const guardarTokenAI = () => {
+    if (!aiToken.trim()) {
+      toast.error('Por favor ingresa un token de OpenAI')
+      return
+    }
+    
+    if (!aiToken.startsWith('sk-')) {
+      toast.error('El token debe empezar con "sk-"')
+      return
+    }
+    
+    actualizarTokenAiMutation.mutate({
+      api_key: aiToken,
+      modelo: aiModelo || undefined,
+      base_url: aiBaseUrl || undefined
+    })
   }
 
   // Notificaciones por Email
@@ -100,6 +162,19 @@ export default function Configuracion() {
     },
     onError: (error) => {
       toast.error(error.response?.data?.error || 'Error al actualizar email')
+    },
+  })
+
+  const actualizarGmailMutation = useMutation({
+    mutationFn: (data) => api.put('/configuracion/notificaciones/gmail', data),
+    onSuccess: (data) => {
+      toast.success(data.data?.mensaje || 'Configuración de Gmail actualizada correctamente')
+      queryClient.invalidateQueries(['notificaciones-config'])
+      setGmailUsuario('')
+      setGmailPassword('')
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.error || 'Error al actualizar configuración de Gmail')
     },
   })
 
@@ -127,6 +202,32 @@ export default function Configuracion() {
 
   const probarNotificaciones = () => {
     probarNotificacionesMutation.mutate({ email: emailNotificaciones || notificacionesConfig?.email_notificaciones_pedidos })
+  }
+
+  const guardarGmail = () => {
+    if (!gmailUsuario.trim()) {
+      toast.error('Por favor ingresa el email de Gmail')
+      return
+    }
+    
+    if (!gmailPassword.trim()) {
+      toast.error('Por favor ingresa la contraseña de aplicación')
+      return
+    }
+    
+    if (!gmailUsuario.includes('@gmail.com')) {
+      toast.error('El email debe ser de Gmail (@gmail.com)')
+      return
+    }
+    
+    actualizarGmailMutation.mutate({
+      usuario: gmailUsuario,
+      contraseña: gmailPassword,
+      password: gmailPassword, // Alias para compatibilidad
+      servidor: gmailServidor || undefined,
+      puerto: gmailPuerto ? parseInt(gmailPuerto) : undefined,
+      usar_tls: gmailUsarTLS
+    })
   }
 
   return (
@@ -237,6 +338,56 @@ export default function Configuracion() {
             </div>
           </div>
 
+          {/* Políticas de Configuración */}
+          {whatsappPoliticas && (
+            <div className="mt-4 p-3 bg-slate-700/50 rounded-lg">
+              <h3 className="text-sm font-medium mb-2">Políticas de Configuración</h3>
+              <div className="space-y-2 text-xs text-slate-400">
+                <div>
+                  <strong>Número de Teléfono:</strong> {whatsappPoliticas.numero_telefono.min_longitud}-{whatsappPoliticas.numero_telefono.max_longitud} dígitos
+                  <br />
+                  <span className="text-slate-500">Ejemplo: {whatsappPoliticas.numero_telefono.ejemplo}</span>
+                </div>
+                <div>
+                  <strong>Mensaje:</strong> Máximo {whatsappPoliticas.mensaje.max_longitud} caracteres
+                </div>
+                <div>
+                  <strong>Access Token:</strong> {whatsappPoliticas.access_token.min_longitud}-{whatsappPoliticas.access_token.max_longitud} caracteres
+                  <br />
+                  <span className="text-slate-500">{whatsappPoliticas.access_token.seguridad}</span>
+                </div>
+                <div>
+                  <strong>API URL:</strong> {whatsappPoliticas.api_url.ejemplo}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Políticas de Configuración */}
+          {whatsappPoliticas && (
+            <div className="mt-4 p-3 bg-slate-700/50 rounded-lg">
+              <h3 className="text-sm font-medium mb-2">Políticas de Configuración</h3>
+              <div className="space-y-2 text-xs text-slate-400">
+                <div>
+                  <strong>Número de Teléfono:</strong> {whatsappPoliticas.numero_telefono.min_longitud}-{whatsappPoliticas.numero_telefono.max_longitud} dígitos
+                  <br />
+                  <span className="text-slate-500">Ejemplo: {whatsappPoliticas.numero_telefono.ejemplo}</span>
+                </div>
+                <div>
+                  <strong>Mensaje:</strong> Máximo {whatsappPoliticas.mensaje.max_longitud} caracteres
+                </div>
+                <div>
+                  <strong>Access Token:</strong> {whatsappPoliticas.access_token.min_longitud}-{whatsappPoliticas.access_token.max_longitud} caracteres
+                  <br />
+                  <span className="text-slate-500">{whatsappPoliticas.access_token.seguridad}</span>
+                </div>
+                <div>
+                  <strong>API URL:</strong> {whatsappPoliticas.api_url.ejemplo}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Nota */}
           <div className="mt-4 p-3 bg-slate-700/50 rounded-lg">
             <p className="text-xs text-slate-400">
@@ -309,6 +460,47 @@ export default function Configuracion() {
               )}
             </div>
           )}
+
+          {/* Ingresar Token */}
+          <div className="mb-4 p-3 bg-slate-700/50 rounded-lg">
+            <h3 className="text-sm font-medium mb-2">Ingresar Token de OpenAI</h3>
+            <input
+              type="password"
+              value={aiToken}
+              onChange={(e) => setAiToken(e.target.value)}
+              placeholder="sk-..."
+              className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg mb-2 text-sm focus:outline-none focus:border-purple-500 font-mono"
+            />
+            <div className="grid grid-cols-2 gap-2 mb-2">
+              <input
+                type="text"
+                value={aiModelo}
+                onChange={(e) => setAiModelo(e.target.value)}
+                placeholder="Modelo (ej: gpt-3.5-turbo)"
+                className="px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-sm focus:outline-none focus:border-purple-500"
+              />
+              <input
+                type="text"
+                value={aiBaseUrl}
+                onChange={(e) => setAiBaseUrl(e.target.value)}
+                placeholder="Base URL"
+                className="px-3 py-2 bg-slate-800 border border-slate-600 rounded-lg text-sm focus:outline-none focus:border-purple-500"
+              />
+            </div>
+            <button
+              onClick={guardarTokenAI}
+              disabled={actualizarTokenAiMutation.isPending}
+              className="w-full bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              <Settings size={18} />
+              {actualizarTokenAiMutation.isPending ? 'Guardando...' : 'Guardar Token'}
+            </button>
+            {aiConfig?.token_en_memoria && (
+              <p className="text-xs text-yellow-400 mt-2">
+                ⚠️ Token guardado en memoria. Se perderá al reiniciar el servidor.
+              </p>
+            )}
+          </div>
 
           {/* Botones de acción */}
           <div className="space-y-3">
@@ -402,6 +594,12 @@ export default function Configuracion() {
             {/* Información de configuración */}
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
+                <span className="text-slate-400">Proveedor:</span>
+                <span className="text-slate-300 capitalize">
+                  {notificacionesConfig?.email_provider || 'sendgrid'}
+                </span>
+              </div>
+              <div className="flex justify-between">
                 <span className="text-slate-400">Email de notificaciones:</span>
                 <span className="text-slate-300 break-all text-right">
                   {notificacionesConfig?.email_notificaciones_pedidos || 'No configurado'}
@@ -413,12 +611,36 @@ export default function Configuracion() {
                   {notificacionesConfig?.email_from || 'N/A'}
                 </span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-slate-400">SendGrid API Key:</span>
-                <span className="text-slate-300 font-mono text-xs">
-                  {notificacionesConfig?.sendgrid_api_key_preview || 'No configurado'}
-                </span>
-              </div>
+              {notificacionesConfig?.email_provider === 'sendgrid' && (
+                <div className="flex justify-between">
+                  <span className="text-slate-400">SendGrid API Key:</span>
+                  <span className="text-slate-300 font-mono text-xs">
+                    {notificacionesConfig?.sendgrid_api_key_preview || 'No configurado'}
+                  </span>
+                </div>
+              )}
+              {notificacionesConfig?.email_provider === 'gmail' && (
+                <>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">Gmail Usuario:</span>
+                    <span className="text-slate-300 text-xs">
+                      {notificacionesConfig?.gmail_user || 'No configurado'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">SMTP Server:</span>
+                    <span className="text-slate-300 text-xs">
+                      {notificacionesConfig?.gmail_smtp_server || 'smtp.gmail.com'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-400">SMTP Port:</span>
+                    <span className="text-slate-300 text-xs">
+                      {notificacionesConfig?.gmail_smtp_port || '587'}
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
@@ -449,6 +671,65 @@ export default function Configuracion() {
               <RefreshCw size={18} />
               Verificar Configuración
             </button>
+
+            {/* Configuración de Gmail IMAP */}
+            {notificacionesConfig?.email_provider === 'gmail' && (
+              <div className="border-t border-slate-700 pt-3 mb-3">
+                <h3 className="text-sm font-medium mb-2">Configurar Gmail SMTP</h3>
+                <input
+                  type="email"
+                  value={gmailUsuario}
+                  onChange={(e) => setGmailUsuario(e.target.value)}
+                  placeholder="usuario@gmail.com"
+                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg mb-2 text-sm focus:outline-none focus:border-purple-500"
+                />
+                <input
+                  type="password"
+                  value={gmailPassword}
+                  onChange={(e) => setGmailPassword(e.target.value)}
+                  placeholder="Contraseña de aplicación"
+                  className="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg mb-2 text-sm focus:outline-none focus:border-purple-500"
+                />
+                <div className="grid grid-cols-2 gap-2 mb-2">
+                  <input
+                    type="text"
+                    value={gmailServidor}
+                    onChange={(e) => setGmailServidor(e.target.value)}
+                    placeholder="Servidor SMTP"
+                    className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm focus:outline-none focus:border-purple-500"
+                  />
+                  <input
+                    type="text"
+                    value={gmailPuerto}
+                    onChange={(e) => setGmailPuerto(e.target.value)}
+                    placeholder="Puerto"
+                    className="px-3 py-2 bg-slate-700 border border-slate-600 rounded-lg text-sm focus:outline-none focus:border-purple-500"
+                  />
+                </div>
+                <label className="flex items-center gap-2 mb-2 text-sm text-slate-300">
+                  <input
+                    type="checkbox"
+                    checked={gmailUsarTLS}
+                    onChange={(e) => setGmailUsarTLS(e.target.checked)}
+                    className="rounded"
+                  />
+                  Usar TLS
+                </label>
+                <button
+                  onClick={guardarGmail}
+                  disabled={actualizarGmailMutation.isPending || !gmailUsuario.trim() || !gmailPassword.trim()}
+                  className="w-full bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  <Settings size={18} />
+                  {actualizarGmailMutation.isPending ? 'Guardando...' : 'Guardar Configuración Gmail'}
+                </button>
+                <p className="text-xs text-slate-400 mt-2">
+                  💡 Necesitas crear una <strong>contraseña de aplicación</strong> en tu cuenta de Google.
+                  <br />
+                  Ve a: Cuenta de Google → Seguridad → Contraseñas de aplicaciones
+                </p>
+              </div>
+            )}
 
             <div className="border-t border-slate-700 pt-3">
               <h3 className="text-sm font-medium mb-2">Actualizar Email de Notificaciones</h3>
@@ -486,11 +767,33 @@ export default function Configuracion() {
             <p className="text-xs text-slate-400">
               <strong>Nota:</strong> Las variables de entorno deben configurarse en Render:
               <br />
-              • SENDGRID_API_KEY
-              <br />
-              • EMAIL_FROM
-              <br />
-              • EMAIL_NOTIFICACIONES_PEDIDOS (se puede actualizar desde aquí)
+              {notificacionesConfig?.email_provider === 'sendgrid' ? (
+                <>
+                  • EMAIL_PROVIDER=sendgrid (o no configurar)
+                  <br />
+                  • SENDGRID_API_KEY
+                  <br />
+                  • EMAIL_FROM
+                  <br />
+                  • EMAIL_NOTIFICACIONES_PEDIDOS (se puede actualizar desde aquí)
+                </>
+              ) : (
+                <>
+                  • EMAIL_PROVIDER=gmail
+                  <br />
+                  • GMAIL_SMTP_USER (email de Gmail)
+                  <br />
+                  • GMAIL_SMTP_PASSWORD (contraseña de aplicación)
+                  <br />
+                  • GMAIL_SMTP_SERVER (opcional, por defecto: smtp.gmail.com)
+                  <br />
+                  • GMAIL_SMTP_PORT (opcional, por defecto: 587)
+                  <br />
+                  • GMAIL_SMTP_USE_TLS (opcional, por defecto: true)
+                  <br />
+                  • EMAIL_NOTIFICACIONES_PEDIDOS (se puede actualizar desde aquí)
+                </>
+              )}
             </p>
           </div>
         </div>

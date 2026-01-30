@@ -175,6 +175,55 @@ class WhatsAppService:
             f"Revisar y enviar al proveedor."
         )
         return self.enviar_mensaje(numero_destino, mensaje)
+    
+    def verificar_conexion(self) -> Dict:
+        """
+        Verifica la conexión con WhatsApp Business API.
+        
+        Returns:
+            Diccionario con el resultado de la verificación
+        """
+        if not self.access_token or not self.phone_number_id:
+            return {
+                'conectado': False,
+                'mensaje': 'Configuración incompleta',
+                'detalles': 'Faltan credenciales de WhatsApp'
+            }
+        
+        try:
+            # Intentar obtener información del número de teléfono
+            url = f"{self.api_url}/{self.phone_number_id}"
+            headers = {
+                "Authorization": f"Bearer {self.access_token}"
+            }
+            
+            response = requests.get(url, headers=headers)
+            response.raise_for_status()
+            
+            return {
+                'conectado': True,
+                'mensaje': 'Conexión exitosa con WhatsApp Business API',
+                'detalles': 'La configuración es válida y funcional'
+            }
+        except requests.exceptions.RequestException as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error al verificar conexión WhatsApp: {e}", exc_info=True)
+            
+            # Intentar obtener más detalles del error
+            detalles = str(e)
+            if hasattr(e, 'response') and e.response is not None:
+                try:
+                    error_data = e.response.json()
+                    detalles = error_data.get('error', {}).get('message', detalles)
+                except:
+                    pass
+            
+            return {
+                'conectado': False,
+                'mensaje': 'Error al conectar con WhatsApp Business API',
+                'detalles': detalles
+            }
 
 # Instancia global
 whatsapp_service = WhatsAppService()

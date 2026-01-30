@@ -9,6 +9,7 @@ import Items from './pages/Items'
 import Recetas from './pages/Recetas'
 import Programacion from './pages/Programacion'
 import Proveedores from './pages/Proveedores'
+import Contactos from './pages/Contactos'
 import Notificaciones from './pages/Notificaciones'
 import Pedidos from './pages/Pedidos'
 import PedidosInternos from './pages/PedidosInternos'
@@ -33,6 +34,7 @@ function App() {
           <Route path="/recetas" element={<Recetas />} />
           <Route path="/programacion" element={<Programacion />} />
         <Route path="/proveedores" element={<Proveedores />} />
+        <Route path="/contactos" element={<Contactos />} />
         <Route path="/notificaciones" element={<Notificaciones />} />
         <Route path="/pedidos" element={<Pedidos />} />
         <Route path="/pedidos-internos" element={<PedidosInternos />} />

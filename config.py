@@ -64,8 +64,17 @@ class Config:
     WHATSAPP_PHONE_NUMBER_ID = os.getenv('WHATSAPP_PHONE_NUMBER_ID', '')
     WHATSAPP_VERIFY_TOKEN = os.getenv('WHATSAPP_VERIFY_TOKEN', 'whatsapp-verify-token')
     
-    # SendGrid (Email)
+    # Email - SendGrid o Gmail SMTP
+    EMAIL_PROVIDER = os.getenv('EMAIL_PROVIDER', 'sendgrid')  # 'sendgrid' o 'gmail'
     SENDGRID_API_KEY = os.getenv('SENDGRID_API_KEY', '')
+    
+    # Gmail SMTP Configuration
+    GMAIL_SMTP_USER = os.getenv('GMAIL_SMTP_USER', '')
+    GMAIL_SMTP_PASSWORD = os.getenv('GMAIL_SMTP_PASSWORD', '')  # Contraseña de aplicación
+    GMAIL_SMTP_SERVER = os.getenv('GMAIL_SMTP_SERVER', 'smtp.gmail.com')
+    GMAIL_SMTP_PORT = int(os.getenv('GMAIL_SMTP_PORT', '587'))
+    GMAIL_SMTP_USE_TLS = os.getenv('GMAIL_SMTP_USE_TLS', 'true').lower() == 'true'
+    
     EMAIL_FROM = os.getenv('EMAIL_FROM', 'noreply@restaurantes.com')
     EMAIL_NOTIFICACIONES_PEDIDOS = os.getenv('EMAIL_NOTIFICACIONES_PEDIDOS', 'a3b7x9q@gmail.com')
     
