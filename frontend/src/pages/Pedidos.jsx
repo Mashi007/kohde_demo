@@ -1,14 +1,17 @@
 import { useQuery } from '@tanstack/react-query'
-import api from '../config/api'
+import api, { extractData } from '../config/api'
 import { ClipboardList, Send } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
 
 export default function Pedidos() {
-  const { data: pedidos } = useQuery({
+  const { data: pedidosResponse } = useQuery({
     queryKey: ['pedidos'],
-    queryFn: () => api.get('/logistica/pedidos').then(res => res.data),
+    queryFn: () => api.get('/logistica/pedidos').then(extractData),
   })
+
+  // Asegurar que pedidos sea un array
+  const pedidos = Array.isArray(pedidosResponse) ? pedidosResponse : []
 
   const getEstadoBadge = (estado) => {
     const badges = {

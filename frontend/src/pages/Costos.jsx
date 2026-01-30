@@ -19,15 +19,18 @@ export default function Costos() {
   const queryClient = useQueryClient()
 
   // Cargar costos de items
-  const { data: costosItems, isLoading: isLoadingItems } = useQuery({
+  const { data: costosItemsResponse, isLoading: isLoadingItems } = useQuery({
     queryKey: ['costos', filtroLabel, filtroCategoria],
     queryFn: () => {
       const params = {}
       if (filtroLabel) params.label_id = filtroLabel
       if (filtroCategoria) params.categoria = filtroCategoria
-      return api.get('/logistica/costos', { params }).then(res => res.data)
+      return api.get('/logistica/costos', { params }).then(extractData)
     },
   })
+
+  // Asegurar que costosItems sea un array
+  const costosItems = Array.isArray(costosItemsResponse) ? costosItemsResponse : []
 
   // Cargar costos de recetas
   const { data: costosRecetasResponse, isLoading: isLoadingRecetas } = useQuery({
@@ -43,10 +46,13 @@ export default function Costos() {
   const costosRecetas = Array.isArray(costosRecetasResponse) ? costosRecetasResponse : []
 
   // Cargar labels para filtro
-  const { data: labels } = useQuery({
+  const { data: labelsResponse } = useQuery({
     queryKey: ['labels'],
-    queryFn: () => api.get('/logistica/labels').then(res => res.data),
+    queryFn: () => api.get('/logistica/labels').then(extractData),
   })
+
+  // Asegurar que labels sea un array
+  const labels = Array.isArray(labelsResponse) ? labelsResponse : []
 
   // Mutación para recalcular todos
   const recalcularTodosMutation = useMutation({

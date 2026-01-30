@@ -5,15 +5,19 @@ import LoadingSpinner from '../components/LoadingSpinner'
 import SkeletonLoader from '../components/SkeletonLoader'
 
 export default function Dashboard() {
-  const { data: stockBajo } = useQuery({
+  const { data: stockBajoResponse } = useQuery({
     queryKey: ['stock-bajo'],
-    queryFn: () => api.get('/logistica/inventario/stock-bajo').then(res => res.data),
+    queryFn: () => api.get('/logistica/inventario/stock-bajo').then(extractData),
   })
 
-  const { data: facturasPendientes } = useQuery({
+  const { data: facturasPendientesResponse } = useQuery({
     queryKey: ['facturas-pendientes'],
-    queryFn: () => api.get('/logistica/facturas?estado=pendiente').then(res => res.data),
+    queryFn: () => api.get('/logistica/facturas?estado=pendiente').then(extractData),
   })
+
+  // Asegurar que sean arrays
+  const stockBajo = Array.isArray(stockBajoResponse) ? stockBajoResponse : []
+  const facturasPendientes = Array.isArray(facturasPendientesResponse) ? facturasPendientesResponse : []
 
   const { data: ticketsAbiertos } = useQuery({
     queryKey: ['tickets-abiertos'],

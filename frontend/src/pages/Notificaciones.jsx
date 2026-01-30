@@ -14,10 +14,20 @@ export default function Notificaciones() {
 
   const queryClient = useQueryClient()
 
-  const { data: notificaciones } = useQuery({
+  const { data: notificacionesResponse } = useQuery({
     queryKey: ['notificaciones'],
     queryFn: () => api.get('/crm/notificaciones').then(res => res.data),
   })
+
+  // Asegurar que notificaciones tenga la estructura correcta
+  const notificaciones = notificacionesResponse && typeof notificacionesResponse === 'object' 
+    ? notificacionesResponse 
+    : { notificaciones: [] }
+  
+  // Asegurar que notificaciones.notificaciones sea un array
+  if (!Array.isArray(notificaciones.notificaciones)) {
+    notificaciones.notificaciones = []
+  }
 
   const enviarMutation = useMutation({
     mutationFn: (data) => api.post('/crm/notificaciones/enviar', data),

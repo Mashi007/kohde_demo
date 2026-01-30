@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
-import api from '../config/api'
+import api, { extractData } from '../config/api'
 import { MessageSquare, AlertCircle, Plus } from 'lucide-react'
 import Modal from '../components/Modal'
 import TicketForm from '../components/TicketForm'
@@ -8,10 +8,13 @@ import TicketForm from '../components/TicketForm'
 export default function Tickets() {
   const [showModal, setShowModal] = useState(false)
   
-  const { data: tickets } = useQuery({
+  const { data: ticketsResponse } = useQuery({
     queryKey: ['tickets'],
-    queryFn: () => api.get('/crm/tickets').then(res => res.data),
+    queryFn: () => api.get('/crm/tickets').then(extractData),
   })
+
+  // Asegurar que tickets sea un array
+  const tickets = Array.isArray(ticketsResponse) ? ticketsResponse : []
 
   return (
     <div>

@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import api from '../config/api'
+import api, { extractData } from '../config/api'
 import { Plus, AlertTriangle, TrendingDown } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -16,7 +16,7 @@ export default function Mermas() {
   const [showModal, setShowModal] = useState(false)
   const queryClient = useQueryClient()
 
-  const { data: mermas, isLoading } = useQuery({
+  const { data: mermasResponse, isLoading } = useQuery({
     queryKey: ['mermas', fechaInicio, fechaFin, tipo, ubicacion],
     queryFn: () => {
       const params = {}
@@ -24,9 +24,12 @@ export default function Mermas() {
       if (fechaFin) params.fecha_fin = fechaFin
       if (tipo) params.tipo = tipo
       if (ubicacion) params.ubicacion = ubicacion
-      return api.get('/reportes/mermas', { params }).then(res => res.data)
+      return api.get('/reportes/mermas', { params }).then(extractData)
     },
   })
+
+  // Asegurar que mermas sea un array
+  const mermas = Array.isArray(mermasResponse) ? mermasResponse : []
 
   const { data: resumen } = useQuery({
     queryKey: ['mermas-resumen', fechaInicio, fechaFin, ubicacion],

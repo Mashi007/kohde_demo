@@ -23,10 +23,13 @@ export default function PedidoInternoForm({ pedido, onClose, onSuccess }) {
   })
 
   // Cargar inventario para verificar stock
-  const { data: inventario } = useQuery({
+  const { data: inventarioResponse } = useQuery({
     queryKey: ['inventario'],
-    queryFn: () => api.get('/logistica/inventario/completo').then(res => res.data),
+    queryFn: () => api.get('/logistica/inventario/completo').then(extractData),
   })
+
+  // Asegurar que inventario sea un array
+  const inventario = Array.isArray(inventarioResponse) ? inventarioResponse : []
 
   const crearPedidoMutation = useMutation({
     mutationFn: (datos) => api.post('/logistica/pedidos-internos', datos),

@@ -11,11 +11,24 @@ export default function NecesidadesProgramacion({ programacionId, onClose }) {
   const [mostrarPedidosInteligentes, setMostrarPedidosInteligentes] = useState(false)
   
   // Cargar necesidades
-  const { data: necesidades, isLoading, refetch } = useQuery({
+  const { data: necesidadesResponse, isLoading, refetch } = useQuery({
     queryKey: ['necesidades', programacionId],
     queryFn: () => api.get(`/planificacion/programacion/${programacionId}/necesidades`).then(res => res.data),
     enabled: !!programacionId,
   })
+
+  // Asegurar que necesidades tenga la estructura correcta
+  const necesidades = necesidadesResponse && typeof necesidadesResponse === 'object'
+    ? necesidadesResponse
+    : { items_faltantes: [], items_suficientes: [] }
+  
+  // Asegurar que los arrays existan
+  if (!Array.isArray(necesidades.items_faltantes)) {
+    necesidades.items_faltantes = []
+  }
+  if (!Array.isArray(necesidades.items_suficientes)) {
+    necesidades.items_suficientes = []
+  }
   
   // Generar pedidos inteligentes
   const generarPedidosMutation = useMutation({
@@ -49,8 +62,9 @@ export default function NecesidadesProgramacion({ programacionId, onClose }) {
     return null
   }
   
-  const itemsFaltantes = necesidades.items_faltantes || []
-  const itemsSuficientes = necesidades.items_suficientes || []
+  // Asegurar que sean arrays
+  const itemsFaltantes = Array.isArray(necesidades.items_faltantes) ? necesidades.items_faltantes : []
+  const itemsSuficientes = Array.isArray(necesidades.items_suficientes) ? necesidades.items_suficientes : []
   
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">

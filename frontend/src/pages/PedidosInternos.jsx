@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import api from '../config/api'
+import api, { extractData } from '../config/api'
 import { Package, Plus, Check, X, Search, Filter, User, Calendar } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -21,7 +21,7 @@ export default function PedidosInternos() {
     queryFn: () => {
       const params = {}
       if (filtroEstado) params.estado = filtroEstado
-      return api.get('/logistica/pedidos-internos', { params }).then(res => res.data)
+      return api.get('/logistica/pedidos-internos', { params }).then(extractData)
     },
   })
 

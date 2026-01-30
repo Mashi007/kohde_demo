@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import api from '../config/api'
+import api, { extractData } from '../config/api'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { Truck, Plus, Edit, Trash2, Power, X, Search, Filter } from 'lucide-react'
 import Modal from '../components/Modal'
@@ -17,10 +17,13 @@ export default function Proveedores() {
   const queryClient = useQueryClient()
 
   // Cargar labels para filtros
-  const { data: labels } = useQuery({
+  const { data: labelsResponse } = useQuery({
     queryKey: ['labels'],
-    queryFn: () => api.get('/logistica/labels').then(res => res.data),
+    queryFn: () => api.get('/logistica/labels').then(extractData),
   })
+
+  // Asegurar que labels sea un array
+  const labels = Array.isArray(labelsResponse) ? labelsResponse : []
 
   // Agrupar labels por categoría
   const labelsPorCategoria = labels?.reduce((acc, label) => {
@@ -31,22 +34,38 @@ export default function Proveedores() {
   }, {}) || {}
 
   // Cargar proveedores con filtros
-  const { data: proveedores } = useQuery({
+  const { data: proveedoresResponse } = useQuery({
     queryKey: ['proveedores', busqueda, labelFiltro],
     queryFn: () => {
       const params = new URLSearchParams()
       if (busqueda) params.append('busqueda', busqueda)
       if (labelFiltro) params.append('label_id', labelFiltro)
-      return api.get(`/crm/proveedores?${params}`).then(res => res.data)
+      return api.get(`/crm/proveedores?${params}`).then(extractData)
     },
   })
 
   // Cargar detalle del proveedor seleccionado
-  const { data: detalleProveedor } = useQuery({
+  const { data: detalleProveedorResponse } = useQuery({
     queryKey: ['proveedor-detalle', proveedorSeleccionado],
     queryFn: () => api.get(`/crm/proveedores/${proveedorSeleccionado}`).then(res => res.data),
     enabled: !!proveedorSeleccionado,
   })
+
+  // Asegurar que proveedores sea un array
+  const proveedores = Array.isArray(proveedoresResponse) ? proveedoresResponse : []
+  
+  // Asegurar que detalleProveedor tenga la estructura correcta
+  const detalleProveedor = detalleProveedorResponse && typeof detalleProveedorResponse === 'object'
+    ? detalleProveedorResponse
+    : { labels_por_categoria: {}, items: [] }
+  
+  // Asegurar que los arrays existan
+  if (!Array.isArray(detalleProveedor.items)) {
+    detalleProveedor.items = []
+  }
+  if (!detalleProveedor.labels_por_categoria || typeof detalleProveedor.labels_por_categoria !== 'object') {
+    detalleProveedor.labels_por_categoria = {}
+  }
 
   // Mutaciones
   const eliminarMutation = useMutation({

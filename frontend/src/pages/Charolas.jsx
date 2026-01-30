@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import api from '../config/api'
+import api, { extractData } from '../config/api'
 import { Plus, FileText, TrendingUp, Users } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -17,7 +17,7 @@ export default function Charolas() {
   const [showModal, setShowModal] = useState(false)
   const queryClient = useQueryClient()
 
-  const { data: charolas, isLoading } = useQuery({
+  const { data: charolasResponse, isLoading } = useQuery({
     queryKey: ['charolas', fechaInicio, fechaFin, ubicacion, tiempoComida],
     queryFn: () => {
       const params = {}
@@ -25,9 +25,12 @@ export default function Charolas() {
       if (fechaFin) params.fecha_fin = fechaFin
       if (ubicacion) params.ubicacion = ubicacion
       if (tiempoComida) params.tiempo_comida = tiempoComida
-      return api.get('/reportes/charolas', { params }).then(res => res.data)
+      return api.get('/reportes/charolas', { params }).then(extractData)
     },
   })
+
+  // Asegurar que charolas sea un array
+  const charolas = Array.isArray(charolasResponse) ? charolasResponse : []
 
   const { data: resumen } = useQuery({
     queryKey: ['charolas-resumen', fechaInicio, fechaFin, ubicacion],

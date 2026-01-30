@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
-import api from '../config/api'
+import api, { extractData } from '../config/api'
 import { ShoppingCart, Package, Truck, TrendingUp, AlertTriangle, Calendar } from 'lucide-react'
 
 export default function ComprasDashboard() {
@@ -20,16 +20,20 @@ export default function ComprasDashboard() {
   })
 
   // Compras por item
-  const { data: comprasPorItem } = useQuery({
+  const { data: comprasPorItemResponse } = useQuery({
     queryKey: ['compras-por-item', fechaDesde, fechaHasta],
-    queryFn: () => api.get(`/logistica/compras/por-item?fecha_desde=${fechaDesde}&fecha_hasta=${fechaHasta}&limite=10`).then(res => res.data),
+    queryFn: () => api.get(`/logistica/compras/por-item?fecha_desde=${fechaDesde}&fecha_hasta=${fechaHasta}&limite=10`).then(extractData),
   })
 
   // Compras por proveedor
-  const { data: comprasPorProveedor } = useQuery({
+  const { data: comprasPorProveedorResponse } = useQuery({
     queryKey: ['compras-por-proveedor', fechaDesde, fechaHasta],
-    queryFn: () => api.get(`/logistica/compras/por-proveedor?fecha_desde=${fechaDesde}&fecha_hasta=${fechaHasta}&limite=10`).then(res => res.data),
+    queryFn: () => api.get(`/logistica/compras/por-proveedor?fecha_desde=${fechaDesde}&fecha_hasta=${fechaHasta}&limite=10`).then(extractData),
   })
+
+  // Asegurar que sean arrays
+  const comprasPorItem = Array.isArray(comprasPorItemResponse) ? comprasPorItemResponse : []
+  const comprasPorProveedor = Array.isArray(comprasPorProveedorResponse) ? comprasPorProveedorResponse : []
 
   // Compras por proceso
   const { data: comprasPorProceso } = useQuery({

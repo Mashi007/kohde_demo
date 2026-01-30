@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import api from '../config/api'
+import api, { extractData } from '../config/api'
 import { Send, Bot, User, Plus, Trash2, MessageSquare } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { format } from 'date-fns'
@@ -15,17 +15,21 @@ export default function Chat() {
   const messagesEndRef = useRef(null)
   const queryClient = useQueryClient()
 
-  const { data: conversaciones } = useQuery({
+  const { data: conversacionesResponse } = useQuery({
     queryKey: ['conversaciones'],
-    queryFn: () => api.get('/chat/conversaciones?activa=true').then(res => res.data),
+    queryFn: () => api.get('/chat/conversaciones?activa=true').then(extractData),
   })
 
-  const { data: mensajes, isLoading: cargandoMensajes } = useQuery({
+  const { data: mensajesResponse, isLoading: cargandoMensajes } = useQuery({
     queryKey: ['mensajes', conversacionActual],
     queryFn: () => 
-      api.get(`/chat/conversaciones/${conversacionActual}/mensajes`).then(res => res.data),
+      api.get(`/chat/conversaciones/${conversacionActual}/mensajes`).then(extractData),
     enabled: !!conversacionActual,
   })
+
+  // Asegurar que sean arrays
+  const conversaciones = Array.isArray(conversacionesResponse) ? conversacionesResponse : []
+  const mensajes = Array.isArray(mensajesResponse) ? mensajesResponse : []
 
   const crearConversacionMutation = useMutation({
     mutationFn: (data) => api.post('/chat/conversaciones', data),

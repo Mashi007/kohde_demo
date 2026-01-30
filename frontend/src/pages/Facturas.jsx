@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
-import api from '../config/api'
+import api, { extractData } from '../config/api'
 import { Upload, FileText, CheckCircle, XCircle, Eye, Image as ImageIcon } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -25,18 +25,22 @@ export default function Facturas() {
   })
 
   // Facturas pendientes de confirmación
-  const { data: facturasPendientes, isLoading: isLoadingPendientes } = useQuery({
+  const { data: facturasPendientesResponse, isLoading: isLoadingPendientes } = useQuery({
     queryKey: ['facturas-pendientes'],
-    queryFn: () => api.get('/logistica/facturas?pendiente_confirmacion=true&estado=pendiente').then(res => res.data),
+    queryFn: () => api.get('/logistica/facturas?pendiente_confirmacion=true&estado=pendiente').then(extractData),
   })
 
   // Todas las facturas
-  const { data: facturas, isLoading } = useQuery({
+  const { data: facturasResponse, isLoading } = useQuery({
     queryKey: ['facturas', tipoFiltro],
     queryFn: () => 
       api.get('/logistica/facturas', { params: tipoFiltro ? { estado: tipoFiltro } : {} })
-        .then(res => res.data),
+        .then(extractData),
   })
+
+  // Asegurar que sean arrays
+  const facturasPendientes = Array.isArray(facturasPendientesResponse) ? facturasPendientesResponse : []
+  const facturas = Array.isArray(facturasResponse) ? facturasResponse : []
 
   const getEstadoBadge = (estado) => {
     const badges = {

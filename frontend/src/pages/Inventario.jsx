@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import api from '../config/api'
+import api, { extractData } from '../config/api'
 import { Package, AlertTriangle, TrendingUp, TrendingDown, DollarSign, Box } from 'lucide-react'
 import { format } from 'date-fns'
 import { es } from 'date-fns/locale'
@@ -10,15 +10,19 @@ export default function Inventario() {
     queryFn: () => api.get('/logistica/inventario/dashboard').then(res => res.data),
   })
 
-  const { data: silos } = useQuery({
+  const { data: silosResponse } = useQuery({
     queryKey: ['inventario-silos'],
-    queryFn: () => api.get('/logistica/inventario/silos').then(res => res.data),
+    queryFn: () => api.get('/logistica/inventario/silos').then(extractData),
   })
 
-  const { data: inventario, isLoading } = useQuery({
+  const { data: inventarioResponse, isLoading } = useQuery({
     queryKey: ['inventario-completo'],
-    queryFn: () => api.get('/logistica/inventario/completo').then(res => res.data),
+    queryFn: () => api.get('/logistica/inventario/completo').then(extractData),
   })
+
+  // Asegurar que silos e inventario sean arrays
+  const silos = Array.isArray(silosResponse) ? silosResponse : []
+  const inventario = Array.isArray(inventarioResponse) ? inventarioResponse : []
 
   return (
     <div>
