@@ -21,8 +21,8 @@ class TipoRecetaEnum(TypeDecorator):
     
     def __init__(self):
         # Usar native_enum=False para que SQLAlchemy use los valores del enum directamente
-        # PostgreSQL espera valores en MAYÚSCULAS (DESAYUNO, ALMUERZO, CENA)
-        # pero nuestro enum Python usa minúsculas ('desayuno', 'almuerzo', 'cena')
+        # PostgreSQL espera valores en MINÚSCULAS: 'desayuno', 'almuerzo', 'cena'
+        # Nuestro enum Python también usa minúsculas ('desayuno', 'almuerzo', 'cena')
         # La conversión se hace en process_bind_param y process_result_value
         super().__init__(
             TipoReceta, 
@@ -32,78 +32,65 @@ class TipoRecetaEnum(TypeDecorator):
         )
     
     def process_bind_param(self, value, dialect):
-        """Convierte el enum a su nombre (MAYÚSCULAS) antes de insertar en PostgreSQL."""
+        """Convierte el enum a su VALOR (minúsculas) antes de insertar en PostgreSQL."""
         if value is None:
             return None
-        # Si es un objeto Enum, retornar su NOMBRE en mayúsculas (no el valor)
-        # PostgreSQL espera: DESAYUNO, ALMUERZO, CENA (nombres del enum)
+        # PostgreSQL espera valores en MINÚSCULAS: 'desayuno', 'almuerzo', 'cena'
+        # Si es un objeto Enum, retornar su VALOR (minúsculas)
         if isinstance(value, TipoReceta):
-            return value.name  # Usar el nombre del enum (DESAYUNO, ALMUERZO, CENA)
-        # Si es un string, convertir a objeto Enum y luego obtener su nombre
+            return value.value  # Usar el valor del enum ('desayuno', 'almuerzo', 'cena')
+        # Si es un string, convertir a objeto Enum y luego obtener su valor
         if isinstance(value, str):
             valor_lower = value.lower().strip()
             # Buscar el enum por su valor (minúsculas)
             valores_validos = [e.value for e in TipoReceta]
             if valor_lower in valores_validos:
-                # Encontrar el enum correspondiente y retornar su nombre
-                for tipo in TipoReceta:
-                    if tipo.value == valor_lower:
-                        return tipo.name  # Retornar nombre del enum (DESAYUNO, ALMUERZO, CENA)
+                return valor_lower  # Retornar valor en minúsculas directamente
             # Si no está en valores, intentar buscar por nombre del enum (fallback)
             try:
                 tipo_enum = TipoReceta[value.upper()]
-                return tipo_enum.name  # Retornar nombre del enum
+                return tipo_enum.value  # Retornar valor del enum (minúsculas)
             except KeyError:
                 raise ValueError(f"'{value}' no es un valor válido para TipoReceta. Valores válidos: {valores_validos}")
         return value
     
     def process_result_value(self, value, dialect):
-        """Convierte el nombre del enum (MAYÚSCULAS) de PostgreSQL a objeto Enum."""
+        """Convierte el VALOR del enum (minúsculas) de PostgreSQL a objeto Enum."""
         if value is None:
             return None
         # Si ya es un objeto Enum, retornarlo directamente
         if isinstance(value, TipoReceta):
             return value
-        # Si es un string, PostgreSQL puede devolver:
-        # 1. El nombre del enum en mayúsculas (DESAYUNO, ALMUERZO, CENA) - si usa native_enum
-        # 2. El valor del enum en minúsculas ('desayuno', 'almuerzo', 'cena') - si usa valores
+        # PostgreSQL devuelve valores en MINÚSCULAS: 'desayuno', 'almuerzo', 'cena'
         if isinstance(value, str):
-            valor_upper = value.upper().strip()
             valor_lower = value.lower().strip()
+            valor_upper = value.upper().strip()
             
-            # Primero intentar buscar por nombre del enum (mayúsculas)
+            # Primero intentar buscar por valor (minúsculas) - caso normal
+            for tipo in TipoReceta:
+                if tipo.value == valor_lower:
+                    return tipo
+            
+            # Si no se encuentra por valor, intentar buscar por nombre del enum (mayúsculas) - fallback
             try:
                 return TipoReceta[valor_upper]  # Buscar por nombre del enum (DESAYUNO, ALMUERZO, CENA)
             except KeyError:
                 pass
             
-            # Si no se encuentra por nombre, buscar por valor (minúsculas)
-            for tipo in TipoReceta:
-                if tipo.value == valor_lower:
-                    return tipo
-            
-            # Si no se encuentra, intentar buscar por nombre alternativo
-            # Mapeo de valores comunes a nombres de enum
-            valor_to_name = {
-                'desayuno': 'DESAYUNO',
-                'almuerzo': 'ALMUERZO',
-                'cena': 'CENA',
-            }
-            if valor_lower in valor_to_name:
-                try:
-                    return TipoReceta[valor_to_name[valor_lower]]
-                except KeyError:
-                    pass
-            
             # Si no se encuentra, retornar un valor por defecto seguro
             import logging
-            logging.warning(f"Valor de enum no encontrado: '{value}' (upper: '{valor_upper}', lower: '{valor_lower}'), valores válidos: {[t.value for t in TipoReceta]}, nombres: {[t.name for t in TipoReceta]}, usando ALMUERZO como valor por defecto")
+            logging.warning(f"Valor de enum no encontrado: '{value}' (lower: '{valor_lower}', upper: '{valor_upper}'), valores válidos: {[t.value for t in TipoReceta]}, nombres: {[t.name for t in TipoReceta]}, usando ALMUERZO como valor por defecto")
             return TipoReceta.ALMUERZO  # Valor por defecto seguro
         # Para cualquier otro tipo, intentar convertirlo a string
         try:
-            str_value = str(value).upper().strip()
+            str_value = str(value).lower().strip()
+            # Buscar por valor primero
+            for tipo in TipoReceta:
+                if tipo.value == str_value:
+                    return tipo
+            # Si no se encuentra, buscar por nombre
             try:
-                return TipoReceta[str_value]
+                return TipoReceta[str(value).upper().strip()]
             except KeyError:
                 return TipoReceta.ALMUERZO  # Valor por defecto
         except:
