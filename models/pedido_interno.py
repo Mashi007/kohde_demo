@@ -23,11 +23,9 @@ class EstadoPedidoInternoEnum(TypeDecorator):
     cache_ok = True
     
     def load_dialect_impl(self, dialect):
-        if dialect.name == 'postgresql':
-            # PostgreSQL tiene valores en minúsculas: 'pendiente', 'entregado', 'cancelado'
-            return dialect.type_descriptor(
-                PG_ENUM('estadopedidointerno', name='estadopedidointerno', create_type=False)
-            )
+        """Cargar la implementación del dialecto - usar String para evitar validación automática."""
+        # Usar String en lugar de PG_ENUM directamente para evitar problemas de validación
+        # El cast se hace en bind_expression para escritura
         return dialect.type_descriptor(SQLString(20))
     
     def bind_expression(self, bindvalue):
@@ -53,15 +51,21 @@ class EstadoPedidoInternoEnum(TypeDecorator):
         return value
     
     def process_result_value(self, value, dialect):
+        """Convierte el valor (minúsculas) de PostgreSQL a objeto Enum."""
         if value is None:
             return None
         if isinstance(value, EstadoPedidoInterno):
             return value
         if isinstance(value, str):
             valor_lower = value.lower().strip()
+            # Buscar por valor del enum
             for estado in EstadoPedidoInterno:
                 if estado.value.lower() == valor_lower:
                     return estado
+                if estado.name.lower() == valor_lower:
+                    return estado
+            # Si no encuentra, retornar por defecto
+            print(f"⚠️ Advertencia: Valor '{value}' no encontrado en EstadoPedidoInterno, usando PENDIENTE por defecto")
             return EstadoPedidoInterno.PENDIENTE
         return EstadoPedidoInterno.PENDIENTE
 

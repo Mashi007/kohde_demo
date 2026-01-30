@@ -22,11 +22,7 @@ class EstadoRequerimientoEnum(TypeDecorator):
     cache_ok = True
     
     def load_dialect_impl(self, dialect):
-        if dialect.name == 'postgresql':
-            # PostgreSQL tiene valores en MAYÚSCULAS: 'PENDIENTE', 'ENTREGADO', 'CANCELADO'
-            return dialect.type_descriptor(
-                PG_ENUM('estadorequerimiento', name='estadorequerimiento', create_type=False)
-            )
+        """Cargar la implementación del dialecto - usar String para evitar validación automática."""
         return dialect.type_descriptor(SQLString(20))
     
     def bind_expression(self, bindvalue):
@@ -52,14 +48,20 @@ class EstadoRequerimientoEnum(TypeDecorator):
         return value
     
     def process_result_value(self, value, dialect):
+        """Convierte el NOMBRE (mayúsculas) de PostgreSQL a objeto Enum."""
         if value is None:
             return None
         if isinstance(value, EstadoRequerimiento):
             return value
         if isinstance(value, str):
+            valor_upper = value.upper().strip()
             try:
-                return EstadoRequerimiento[value.upper().strip()]
+                return EstadoRequerimiento[valor_upper]
             except KeyError:
+                # Buscar por valor si no encuentra por nombre
+                for estado in EstadoRequerimiento:
+                    if estado.name.upper() == valor_upper or estado.value.upper() == valor_upper:
+                        return estado
                 return EstadoRequerimiento.PENDIENTE
         return EstadoRequerimiento.PENDIENTE
 

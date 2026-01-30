@@ -37,10 +37,7 @@ class TipoTicketEnum(TypeDecorator):
     cache_ok = True
     
     def load_dialect_impl(self, dialect):
-        if dialect.name == 'postgresql':
-            return dialect.type_descriptor(
-                PG_ENUM('tipoticket', name='tipoticket', create_type=False)
-            )
+        """Cargar la implementación del dialecto - usar String para evitar validación automática."""
         return dialect.type_descriptor(SQLString(20))
     
     def bind_expression(self, bindvalue):
@@ -66,14 +63,20 @@ class TipoTicketEnum(TypeDecorator):
         return value
     
     def process_result_value(self, value, dialect):
+        """Convierte el NOMBRE (mayúsculas) de PostgreSQL a objeto Enum."""
         if value is None:
             return None
         if isinstance(value, TipoTicket):
             return value
         if isinstance(value, str):
+            valor_upper = value.upper().strip()
             try:
-                return TipoTicket[value.upper().strip()]
+                return TipoTicket[valor_upper]
             except KeyError:
+                # Buscar por valor si no encuentra por nombre
+                for tipo in TipoTicket:
+                    if tipo.name.upper() == valor_upper or tipo.value.upper() == valor_upper:
+                        return tipo
                 return TipoTicket.CONSULTA
         return TipoTicket.CONSULTA
 
@@ -83,10 +86,7 @@ class EstadoTicketEnum(TypeDecorator):
     cache_ok = True
     
     def load_dialect_impl(self, dialect):
-        if dialect.name == 'postgresql':
-            return dialect.type_descriptor(
-                PG_ENUM('estadoticket', name='estadoticket', create_type=False)
-            )
+        """Cargar la implementación del dialecto - usar String para evitar validación automática."""
         return dialect.type_descriptor(SQLString(20))
     
     def bind_expression(self, bindvalue):
@@ -112,14 +112,20 @@ class EstadoTicketEnum(TypeDecorator):
         return value
     
     def process_result_value(self, value, dialect):
+        """Convierte el NOMBRE (mayúsculas) de PostgreSQL a objeto Enum."""
         if value is None:
             return None
         if isinstance(value, EstadoTicket):
             return value
         if isinstance(value, str):
+            valor_upper = value.upper().strip()
             try:
-                return EstadoTicket[value.upper().strip()]
+                return EstadoTicket[valor_upper]
             except KeyError:
+                # Buscar por valor si no encuentra por nombre
+                for estado in EstadoTicket:
+                    if estado.name.upper() == valor_upper or estado.value.upper() == valor_upper:
+                        return estado
                 return EstadoTicket.ABIERTO
         return EstadoTicket.ABIERTO
 
@@ -129,10 +135,7 @@ class PrioridadTicketEnum(TypeDecorator):
     cache_ok = True
     
     def load_dialect_impl(self, dialect):
-        if dialect.name == 'postgresql':
-            return dialect.type_descriptor(
-                PG_ENUM('prioridadticket', name='prioridadticket', create_type=False)
-            )
+        """Cargar la implementación del dialecto - usar String para evitar validación automática."""
         return dialect.type_descriptor(SQLString(20))
     
     def bind_expression(self, bindvalue):
@@ -158,14 +161,20 @@ class PrioridadTicketEnum(TypeDecorator):
         return value
     
     def process_result_value(self, value, dialect):
+        """Convierte el NOMBRE (mayúsculas) de PostgreSQL a objeto Enum."""
         if value is None:
             return None
         if isinstance(value, PrioridadTicket):
             return value
         if isinstance(value, str):
+            valor_upper = value.upper().strip()
             try:
-                return PrioridadTicket[value.upper().strip()]
+                return PrioridadTicket[valor_upper]
             except KeyError:
+                # Buscar por valor si no encuentra por nombre
+                for prioridad in PrioridadTicket:
+                    if prioridad.name.upper() == valor_upper or prioridad.value.upper() == valor_upper:
+                        return prioridad
                 return PrioridadTicket.MEDIA
         return PrioridadTicket.MEDIA
 

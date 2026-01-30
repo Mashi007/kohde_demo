@@ -23,12 +23,9 @@ class EstadoPedidoEnum(TypeDecorator):
     cache_ok = True
     
     def load_dialect_impl(self, dialect):
-        """Cargar la implementación del dialecto - usar PG_ENUM para PostgreSQL."""
-        if dialect.name == 'postgresql':
-            # PostgreSQL tiene valores en MAYÚSCULAS: 'BORRADOR', 'ENVIADO', 'RECIBIDO', 'CANCELADO'
-            return dialect.type_descriptor(
-                PG_ENUM('estadopedido', name='estadopedido', create_type=False)
-            )
+        """Cargar la implementación del dialecto - usar String para evitar validación automática."""
+        # Usar String en lugar de PG_ENUM directamente para evitar problemas de validación
+        # El cast se hace en bind_expression para escritura
         return dialect.type_descriptor(SQLString(20))
     
     def bind_expression(self, bindvalue):
@@ -62,10 +59,20 @@ class EstadoPedidoEnum(TypeDecorator):
         if isinstance(value, EstadoPedido):
             return value
         if isinstance(value, str):
+            valor_upper = value.upper().strip()
+            # Intentar buscar por nombre del enum
             try:
-                return EstadoPedido[value.upper().strip()]
+                return EstadoPedido[valor_upper]
             except KeyError:
-                return EstadoPedido.BORRADOR  # Valor por defecto
+                # Si no encuentra por nombre, buscar por valor
+                for estado in EstadoPedido:
+                    if estado.name.upper() == valor_upper:
+                        return estado
+                    if estado.value.upper() == valor_upper:
+                        return estado
+                # Si aún no encuentra, retornar por defecto
+                print(f"⚠️ Advertencia: Valor '{value}' no encontrado en EstadoPedido, usando BORRADOR por defecto")
+                return EstadoPedido.BORRADOR
         return EstadoPedido.BORRADOR
 
 class PedidoCompra(db.Model):

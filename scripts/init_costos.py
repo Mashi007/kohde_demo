@@ -82,10 +82,19 @@ def init_costos():
         ).first()
         
         if not existing:
-            costo = CostoItem(**costo_data)
-            db.session.add(costo)
-            costos_creados.append(costo)
-            print(f"  ✓ Creado costo #{costo.id} - {costo.item.nombre} - ${costo.costo_unitario_promedio:.4f}/{costo.unidad_estandar}")
+            try:
+                costo = CostoItem(**costo_data)
+                db.session.add(costo)
+                db.session.flush()
+                costos_creados.append(costo)
+                
+                # Obtener el item para mostrar su nombre
+                item = Item.query.get(costo_data['item_id'])
+                item_nombre = item.nombre if item else f"Item #{costo_data['item_id']}"
+                print(f"  ✓ Creado costo #{costo.id} - {item_nombre} - ${costo.costo_unitario_promedio:.4f}/{costo.unidad_estandar}")
+            except Exception as e:
+                print(f"  ❌ Error al crear costo: {e}")
+                db.session.rollback()
         else:
             costos_creados.append(existing)
             print(f"  ↻ Ya existe costo para item {costo_data['item_id']}")

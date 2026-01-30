@@ -28,12 +28,7 @@ class TipoFacturaEnum(TypeDecorator):
     cache_ok = True
     
     def load_dialect_impl(self, dialect):
-        """Cargar la implementación del dialecto - usar PG_ENUM para PostgreSQL."""
-        if dialect.name == 'postgresql':
-            # PostgreSQL tiene valores en MAYÚSCULAS: 'CLIENTE', 'PROVEEDOR'
-            return dialect.type_descriptor(
-                PG_ENUM('tipofactura', name='tipofactura', create_type=False)
-            )
+        """Cargar la implementación del dialecto - usar String para evitar validación automática."""
         return dialect.type_descriptor(SQLString(20))
     
     def bind_expression(self, bindvalue):
@@ -67,10 +62,15 @@ class TipoFacturaEnum(TypeDecorator):
         if isinstance(value, TipoFactura):
             return value
         if isinstance(value, str):
+            valor_upper = value.upper().strip()
             try:
-                return TipoFactura[value.upper().strip()]
+                return TipoFactura[valor_upper]
             except KeyError:
-                return TipoFactura.CLIENTE  # Valor por defecto
+                # Buscar por valor si no encuentra por nombre
+                for tipo in TipoFactura:
+                    if tipo.name.upper() == valor_upper or tipo.value.upper() == valor_upper:
+                        return tipo
+                return TipoFactura.CLIENTE
         return TipoFactura.CLIENTE
 
 class EstadoFacturaEnum(TypeDecorator):
@@ -79,12 +79,7 @@ class EstadoFacturaEnum(TypeDecorator):
     cache_ok = True
     
     def load_dialect_impl(self, dialect):
-        """Cargar la implementación del dialecto - usar PG_ENUM para PostgreSQL."""
-        if dialect.name == 'postgresql':
-            # PostgreSQL tiene valores en MAYÚSCULAS: 'PENDIENTE', 'PARCIAL', 'APROBADA', 'RECHAZADA'
-            return dialect.type_descriptor(
-                PG_ENUM('estadofactura', name='estadofactura', create_type=False)
-            )
+        """Cargar la implementación del dialecto - usar String para evitar validación automática."""
         return dialect.type_descriptor(SQLString(20))
     
     def bind_expression(self, bindvalue):
@@ -118,10 +113,15 @@ class EstadoFacturaEnum(TypeDecorator):
         if isinstance(value, EstadoFactura):
             return value
         if isinstance(value, str):
+            valor_upper = value.upper().strip()
             try:
-                return EstadoFactura[value.upper().strip()]
+                return EstadoFactura[valor_upper]
             except KeyError:
-                return EstadoFactura.PENDIENTE  # Valor por defecto
+                # Buscar por valor si no encuentra por nombre
+                for estado in EstadoFactura:
+                    if estado.name.upper() == valor_upper or estado.value.upper() == valor_upper:
+                        return estado
+                return EstadoFactura.PENDIENTE
         return EstadoFactura.PENDIENTE
 
 class Factura(db.Model):

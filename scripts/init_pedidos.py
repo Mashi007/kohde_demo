@@ -15,6 +15,7 @@ from models import db
 from models.proveedor import Proveedor
 from models.item import Item
 from models.pedido import PedidoCompra, PedidoCompraItem, EstadoPedido
+from sqlalchemy import text
 
 def init_pedidos():
     """Inicializa 10 pedidos de compra variados."""
@@ -94,13 +95,22 @@ def init_pedidos():
     for pedido_data in pedidos_data:
         items_data = pedido_data.pop('items')
         
-        # Verificar si ya existe un pedido similar
-        existing = PedidoCompra.query.filter_by(
-            proveedor_id=pedido_data['proveedor_id'],
-            fecha_pedido=pedido_data['fecha_pedido']
-        ).first()
+        # Verificar si ya existe un pedido similar (usando solo proveedor_id para evitar problemas con enum)
+        try:
+            existing = PedidoCompra.query.filter_by(
+                proveedor_id=pedido_data['proveedor_id']
+            ).order_by(PedidoCompra.fecha_pedido.desc()).first()
+            
+            # Verificar si es muy reciente (mismo día)
+            if existing and existing.fecha_pedido.date() == pedido_data['fecha_pedido'].date():
+                pedidos_creados.append(existing)
+                print(f"  ↻ Ya existe pedido para proveedor {pedido_data['proveedor_id']} del {pedido_data['fecha_pedido'].date()}")
+                continue
+        except Exception as e:
+            # Si hay error con el enum, continuar de todas formas
+            print(f"  ⚠ Advertencia al verificar existencia: {e}")
         
-        if not existing:
+        try:
             pedido = PedidoCompra(**pedido_data)
             db.session.add(pedido)
             db.session.flush()  # Para obtener el ID
@@ -114,10 +124,11 @@ def init_pedidos():
                 db.session.add(pedido_item)
             
             pedidos_creados.append(pedido)
-            print(f"  ✓ Creado pedido #{pedido.id} - {pedido.proveedor.nombre} - {pedido.estado.value} - ${pedido.total:.2f}")
-        else:
-            pedidos_creados.append(existing)
-            print(f"  ↻ Ya existe pedido para {pedido_data['proveedor_id']} del {pedido_data['fecha_pedido'].date()}")
+            estado_str = pedido.estado.value if hasattr(pedido.estado, 'value') else str(pedido.estado)
+            print(f"  ✓ Creado pedido #{pedido.id} - {pedido.proveedor.nombre} - {estado_str} - ${pedido.total:.2f}")
+        except Exception as e:
+            print(f"  ❌ Error al crear pedido: {e}")
+            db.session.rollback()
     
     db.session.commit()
     print(f"\n✓ Total pedidos creados/actualizados: {len(pedidos_creados)}")

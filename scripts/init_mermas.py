@@ -90,8 +90,13 @@ def init_mermas():
         if not existing:
             merma = Merma(**merma_data)
             db.session.add(merma)
+            db.session.flush()
             mermas_creadas.append(merma)
-            print(f"  ✓ Creada merma #{merma.id} - {merma.item.nombre} - {merma.tipo.value} - ${merma.costo_total:.2f}")
+            
+            # Obtener el item para mostrar su nombre
+            item = Item.query.get(merma_data['item_id'])
+            item_nombre = item.nombre if item else f"Item #{merma_data['item_id']}"
+            print(f"  ✓ Creada merma #{merma.id} - {item_nombre} - {merma.tipo.value} - ${merma.costo_total:.2f}")
         else:
             mermas_creadas.append(existing)
             print(f"  ↻ Ya existe merma para item {merma_data['item_id']} del {merma_data['fecha_merma'].date()}")

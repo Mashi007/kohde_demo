@@ -27,10 +27,7 @@ class TipoMensajeContactoEnum(TypeDecorator):
     cache_ok = True
     
     def load_dialect_impl(self, dialect):
-        if dialect.name == 'postgresql':
-            return dialect.type_descriptor(
-                PG_ENUM('tipomensajecontacto', name='tipomensajecontacto', create_type=False)
-            )
+        """Cargar la implementación del dialecto - usar String para evitar validación automática."""
         return dialect.type_descriptor(SQLString(20))
     
     def bind_expression(self, bindvalue):
@@ -73,10 +70,7 @@ class DireccionMensajeEnum(TypeDecorator):
     cache_ok = True
     
     def load_dialect_impl(self, dialect):
-        if dialect.name == 'postgresql':
-            return dialect.type_descriptor(
-                PG_ENUM('direccionmensaje', name='direccionmensaje', create_type=False)
-            )
+        """Cargar la implementación del dialecto - usar String para evitar validación automática."""
         return dialect.type_descriptor(SQLString(20))
     
     def bind_expression(self, bindvalue):

@@ -115,7 +115,7 @@ def init_pedidos_internos():
                 db.session.add(pedido_item)
             
             pedidos_creados.append(pedido)
-            print(f"  ✓ Creado pedido interno #{pedido.id} - {pedido_data['estado'].value} - {len(items_data)} items")
+            print(f"  ✓ Creado pedido interno #{pedido.id} - {pedido.estado.value} - {len(items_data)} items")
         else:
             pedidos_creados.append(existing)
             print(f"  ↻ Ya existe pedido interno del {pedido_data['fecha_pedido'].date()}")

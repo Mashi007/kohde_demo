@@ -24,10 +24,9 @@ class TipoMermaEnum(TypeDecorator):
     cache_ok = True
     
     def load_dialect_impl(self, dialect):
-        if dialect.name == 'postgresql':
-            return dialect.type_descriptor(
-                PG_ENUM('tipomerma', name='tipomerma', create_type=False)
-            )
+        """Cargar la implementación del dialecto - usar String para evitar validación automática."""
+        # Usar String en lugar de PG_ENUM directamente para evitar problemas de validación
+        # El cast se hace en bind_expression para escritura
         return dialect.type_descriptor(SQLString(20))
     
     def bind_expression(self, bindvalue):
@@ -53,14 +52,25 @@ class TipoMermaEnum(TypeDecorator):
         return value
     
     def process_result_value(self, value, dialect):
+        """Convierte el NOMBRE (mayúsculas) de PostgreSQL a objeto Enum."""
         if value is None:
             return None
         if isinstance(value, TipoMerma):
             return value
         if isinstance(value, str):
+            valor_upper = value.upper().strip()
+            # Intentar buscar por nombre del enum
             try:
-                return TipoMerma[value.upper().strip()]
+                return TipoMerma[valor_upper]
             except KeyError:
+                # Si no encuentra por nombre, buscar por valor
+                for tipo in TipoMerma:
+                    if tipo.name.upper() == valor_upper:
+                        return tipo
+                    if tipo.value.upper() == valor_upper:
+                        return tipo
+                # Si aún no encuentra, retornar por defecto
+                print(f"⚠️ Advertencia: Valor '{value}' no encontrado en TipoMerma, usando OTRO por defecto")
                 return TipoMerma.OTRO
         return TipoMerma.OTRO
 
