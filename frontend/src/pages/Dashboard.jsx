@@ -424,6 +424,131 @@ export default function Dashboard() {
         </div>
       </div>
 
+      {/* Gráfico Comparativo de Charolas - Destacado */}
+      <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-6 rounded-xl border border-slate-700 shadow-xl">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-2xl font-bold flex items-center gap-3 mb-2">
+              <Calendar size={28} className="text-cyan-400" />
+              Charolas Programadas vs Servidas
+            </h2>
+            {charolasEstadisticas.eficiencia_promedio && (
+              <p className="text-slate-400 text-sm">
+                Eficiencia promedio: <span className="font-bold text-cyan-400">{charolasEstadisticas.eficiencia_promedio}%</span>
+                {' | '}
+                Total Programadas: <span className="font-semibold">{charolasEstadisticas.total_programadas || 0}</span>
+                {' | '}
+                Total Servidas: <span className="font-semibold">{charolasEstadisticas.total_servidas || 0}</span>
+              </p>
+            )}
+          </div>
+        </div>
+        {charolasComparacionLoading ? (
+          <div className="h-96 flex items-center justify-center">
+            <LoadingSpinner />
+          </div>
+        ) : charolasComparacionSeries.length > 0 ? (
+          <ResponsiveContainer width="100%" height={400}>
+            <AreaChart data={charolasComparacionSeries}>
+              <defs>
+                <linearGradient id="colorProgramadas" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={COLORS.blue} stopOpacity={0.8} />
+                  <stop offset="95%" stopColor={COLORS.blue} stopOpacity={0.1} />
+                </linearGradient>
+                <linearGradient id="colorServidas" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={COLORS.green} stopOpacity={0.8} />
+                  <stop offset="95%" stopColor={COLORS.green} stopOpacity={0.1} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
+              <XAxis
+                dataKey="fecha"
+                stroke="#9ca3af"
+                tickFormatter={(value) => format(new Date(value), 'dd/MM', { locale: es })}
+                style={{ fontSize: '12px' }}
+              />
+              <YAxis stroke="#9ca3af" />
+              <Tooltip
+                content={({ active, payload, label }) => {
+                  if (active && payload && payload.length) {
+                    const programadas = payload.find(p => p.dataKey === 'programadas')?.value || 0
+                    const servidas = payload.find(p => p.dataKey === 'servidas')?.value || 0
+                    const diferencia = programadas - servidas
+                    const eficiencia = programadas > 0 ? ((servidas / programadas) * 100).toFixed(1) : 0
+                    
+                    return (
+                      <div className="bg-slate-800 border border-slate-700 rounded-lg p-4 shadow-xl">
+                        <p className="text-slate-300 font-semibold mb-3 text-sm">
+                          {label ? format(new Date(label), 'EEEE, dd MMM yyyy', { locale: es }) : ''}
+                        </p>
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between gap-4">
+                            <span className="text-sm" style={{ color: COLORS.blue }}>Programadas:</span>
+                            <span className="font-bold">{programadas}</span>
+                          </div>
+                          <div className="flex items-center justify-between gap-4">
+                            <span className="text-sm" style={{ color: COLORS.green }}>Servidas:</span>
+                            <span className="font-bold">{servidas}</span>
+                          </div>
+                          <div className="border-t border-slate-700 pt-2 mt-2">
+                            <div className="flex items-center justify-between gap-4">
+                              <span className="text-xs text-slate-400">Diferencia:</span>
+                              <span className={`font-semibold text-xs ${diferencia >= 0 ? 'text-yellow-400' : 'text-red-400'}`}>
+                                {diferencia >= 0 ? '+' : ''}{diferencia}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between gap-4 mt-1">
+                              <span className="text-xs text-slate-400">Eficiencia:</span>
+                              <span className="font-semibold text-xs text-cyan-400">{eficiencia}%</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  }
+                  return null
+                }}
+              />
+              <Legend
+                wrapperStyle={{ paddingTop: '20px' }}
+                iconType="circle"
+                formatter={(value) => (
+                  <span className="text-slate-300 text-sm">
+                    {value === 'programadas' ? 'Programadas' : 'Servidas'}
+                  </span>
+                )}
+              />
+              <Area
+                type="monotone"
+                dataKey="programadas"
+                stroke={COLORS.blue}
+                strokeWidth={3}
+                fillOpacity={1}
+                fill="url(#colorProgramadas)"
+                name="programadas"
+                dot={{ fill: COLORS.blue, r: 4 }}
+                activeDot={{ r: 6 }}
+              />
+              <Area
+                type="monotone"
+                dataKey="servidas"
+                stroke={COLORS.green}
+                strokeWidth={3}
+                fillOpacity={1}
+                fill="url(#colorServidas)"
+                name="servidas"
+                dot={{ fill: COLORS.green, r: 4 }}
+                activeDot={{ r: 6 }}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="h-96 flex items-center justify-center text-slate-400">
+            No hay datos disponibles
+          </div>
+        )}
+      </div>
+
       {/* Gráficos de distribución (Donut/Pie) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Facturas por Estado */}
