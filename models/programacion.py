@@ -4,6 +4,7 @@ Modelos de ProgramacionMenu y ProgramacionMenuItem.
 from datetime import datetime, date
 from sqlalchemy import Column, Integer, String, DateTime, Date, Numeric, ForeignKey, Enum
 from sqlalchemy.orm import relationship
+from sqlalchemy.event import listens_for
 import enum
 
 from models import db
@@ -21,9 +22,9 @@ class ProgramacionMenu(db.Model):
     id = Column(Integer, primary_key=True)
     # Compatibilidad: mantener fecha para bases de datos antiguas
     fecha = Column(Date, nullable=True)  # Mantener para compatibilidad hacia atrás
-    # Nuevas columnas para rango de fechas (pueden ser NULL si la migración no se ha ejecutado)
-    fecha_desde = Column(Date, nullable=True)  # Fecha de inicio del rango
-    fecha_hasta = Column(Date, nullable=True)  # Fecha de fin del rango
+    # Columnas para rango de fechas (ya migradas en la BD)
+    fecha_desde = Column(Date, nullable=False)  # Fecha de inicio del rango
+    fecha_hasta = Column(Date, nullable=False)  # Fecha de fin del rango
     tiempo_comida = Column(Enum(TiempoComida), nullable=False)
     ubicacion = Column(String(100), nullable=False)  # restaurante_A, restaurante_B, etc.
     personas_estimadas = Column(Integer, nullable=False, default=0)
@@ -34,12 +35,16 @@ class ProgramacionMenu(db.Model):
     @property
     def fecha_desde_effective(self):
         """Retorna fecha_desde si existe, sino fecha como fallback."""
-        return self.fecha_desde if self.fecha_desde is not None else self.fecha
+        if self.fecha_desde is not None:
+            return self.fecha_desde
+        return self.fecha if self.fecha is not None else None
     
     @property
     def fecha_hasta_effective(self):
         """Retorna fecha_hasta si existe, sino fecha como fallback."""
-        return self.fecha_hasta if self.fecha_hasta is not None else self.fecha
+        if self.fecha_hasta is not None:
+            return self.fecha_hasta
+        return self.fecha if self.fecha is not None else None
     
     # Relaciones
     items = relationship('ProgramacionMenuItem', back_populates='programacion', cascade='all, delete-orphan')
@@ -48,9 +53,28 @@ class ProgramacionMenu(db.Model):
     
     def to_dict(self):
         """Convierte el modelo a diccionario."""
-        totales = self.calcular_totales_servicio()
+        try:
+            totales = self.calcular_totales_servicio()
+        except Exception as e:
+            import logging
+            logging.warning(f"Error al calcular totales para programación {self.id}: {str(e)}")
+            totales = {
+                'calorias_totales': 0,
+                'costo_total': 0,
+                'total_recetas': 0,
+                'total_porciones': 0,
+            }
+        
         fecha_desde_eff = self.fecha_desde_effective
         fecha_hasta_eff = self.fecha_hasta_effective
+        
+        try:
+            items_dict = [item.to_dict() for item in self.items] if self.items else []
+        except Exception as e:
+            import logging
+            logging.warning(f"Error al convertir items de programación {self.id}: {str(e)}")
+            items_dict = []
+        
         return {
             'id': self.id,
             'fecha_desde': fecha_desde_eff.isoformat() if fecha_desde_eff else None,
@@ -62,7 +86,7 @@ class ProgramacionMenu(db.Model):
             'charolas_planificadas': self.charolas_planificadas,
             'charolas_producidas': self.charolas_producidas,
             'fecha_creacion': self.fecha_creacion.isoformat() if self.fecha_creacion else None,
-            'items': [item.to_dict() for item in self.items] if self.items else [],
+            'items': items_dict,
             'calorias_totales': totales['calorias_totales'],
             'costo_total': totales['costo_total'],
             'total_recetas': totales['total_recetas'],
@@ -126,7 +150,8 @@ class ProgramacionMenu(db.Model):
         }
     
     def __repr__(self):
-        return f'<ProgramacionMenu {self.fecha_desde} a {self.fecha_hasta} - {self.tiempo_comida.value}>'
+        fecha_repr = self.fecha_desde_effective if self.fecha_desde_effective else (self.fecha if self.fecha else 'N/A')
+        return f'<ProgramacionMenu {fecha_repr} - {self.tiempo_comida.value if self.tiempo_comida else "N/A"}>'
 
 class ProgramacionMenuItem(db.Model):
     """Modelo de receta dentro de una programación de menú."""

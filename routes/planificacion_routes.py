@@ -156,7 +156,31 @@ def listar_programaciones():
             limit=limit
         )
         
-        return paginated_response([p.to_dict() for p in programaciones], skip=skip, limit=limit)
+        # Convertir programaciones a diccionarios con manejo de errores robusto
+        programaciones_dict = []
+        for p in programaciones:
+            try:
+                programaciones_dict.append(p.to_dict())
+            except Exception as e:
+                import logging
+                logging.error(f"Error al convertir programación {p.id if hasattr(p, 'id') else 'N/A'} a dict: {str(e)}", exc_info=True)
+                # Agregar programación básica si falla la conversión completa
+                try:
+                    programaciones_dict.append({
+                        'id': p.id if hasattr(p, 'id') else None,
+                        'fecha': p.fecha.isoformat() if hasattr(p, 'fecha') and p.fecha else None,
+                        'fecha_desde': p.fecha.isoformat() if hasattr(p, 'fecha') and p.fecha else None,
+                        'fecha_hasta': p.fecha.isoformat() if hasattr(p, 'fecha') and p.fecha else None,
+                        'tiempo_comida': p.tiempo_comida.value if hasattr(p, 'tiempo_comida') and p.tiempo_comida else None,
+                        'ubicacion': p.ubicacion if hasattr(p, 'ubicacion') else None,
+                        'items': [],
+                        'error': f'Error al cargar: {str(e)}'
+                    })
+                except:
+                    # Si incluso esto falla, continuar sin agregar esta programación
+                    continue
+        
+        return paginated_response(programaciones_dict, skip=skip, limit=limit)
     except ValueError as e:
         return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
@@ -175,24 +199,28 @@ def crear_programacion():
         return error_response('Datos JSON requeridos', 400, 'VALIDATION_ERROR')
     
     # Convertir fechas string a date
-    # Compatibilidad: si viene 'fecha', usar para ambas fechas
-    if 'fecha' in datos and isinstance(datos['fecha'], str):
-        fecha = parse_date(datos['fecha'])
-        datos['fecha_desde'] = fecha
-        datos['fecha_hasta'] = fecha
-        datos.pop('fecha', None)  # Eliminar 'fecha' si existe
+    # Compatibilidad: usar solo fecha hasta que se ejecute la migración
+    # Si vienen fecha_desde y fecha_hasta, usar fecha_desde como fecha
+    fecha_para_insertar = None
     
-    # Convertir fecha_desde y fecha_hasta si vienen como strings
-    if 'fecha_desde' in datos and isinstance(datos['fecha_desde'], str):
-        datos['fecha_desde'] = parse_date(datos['fecha_desde'])
+    if 'fecha_desde' in datos and datos['fecha_desde']:
+        if isinstance(datos['fecha_desde'], str):
+            fecha_para_insertar = parse_date(datos['fecha_desde'])
+        else:
+            fecha_para_insertar = datos['fecha_desde']
+    elif 'fecha' in datos and datos['fecha']:
+        if isinstance(datos['fecha'], str):
+            fecha_para_insertar = parse_date(datos['fecha'])
+        else:
+            fecha_para_insertar = datos['fecha']
     
-    if 'fecha_hasta' in datos and isinstance(datos['fecha_hasta'], str):
-        datos['fecha_hasta'] = parse_date(datos['fecha_hasta'])
+    # Usar solo fecha (remover fecha_desde y fecha_hasta hasta que se ejecute la migración)
+    if fecha_para_insertar:
+        datos['fecha'] = fecha_para_insertar
     
-    # Validar que fecha_hasta >= fecha_desde
-    if datos.get('fecha_desde') and datos.get('fecha_hasta'):
-        if datos['fecha_hasta'] < datos['fecha_desde']:
-            return error_response('fecha_hasta debe ser mayor o igual a fecha_desde', 400, 'VALIDATION_ERROR')
+    # Remover fecha_desde y fecha_hasta para evitar el error de columnas inexistentes
+    datos.pop('fecha_desde', None)
+    datos.pop('fecha_hasta', None)
     
     programacion = ProgramacionMenuService.crear_programacion(db.session, datos)
     
@@ -211,7 +239,7 @@ def crear_programacion():
         usuario_id = datos.get('usuario_id', 1)
         pedidos_generados = PedidosAutomaticosService.generar_pedidos_desde_programacion(
             db.session,
-            fecha_inicio=programacion.fecha_desde,  # Usar fecha_desde
+            fecha_inicio=programacion.fecha_desde,
             usuario_id=usuario_id
         )
     except Exception as e:
@@ -235,12 +263,13 @@ def actualizar_programacion(programacion_id):
         return error_response('Datos JSON requeridos', 400, 'VALIDATION_ERROR')
     
     # Convertir fechas string a date
-    # Compatibilidad: si viene 'fecha', usar para ambas fechas
+    # Si viene 'fecha', usar para ambas fechas
     if 'fecha' in datos and isinstance(datos['fecha'], str):
         fecha = parse_date(datos['fecha'])
-        datos['fecha_desde'] = fecha
-        datos['fecha_hasta'] = fecha
-        datos.pop('fecha', None)  # Eliminar 'fecha' si existe
+        if 'fecha_desde' not in datos or not datos['fecha_desde']:
+            datos['fecha_desde'] = fecha
+        if 'fecha_hasta' not in datos or not datos['fecha_hasta']:
+            datos['fecha_hasta'] = fecha
     
     # Convertir fecha_desde y fecha_hasta si vienen como strings
     if 'fecha_desde' in datos and isinstance(datos['fecha_desde'], str):

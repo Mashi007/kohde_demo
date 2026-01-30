@@ -26,7 +26,23 @@ class ProgramacionMenuService:
         """
         recetas_data = datos.pop('recetas', [])
         
-        programacion = ProgramacionMenu(**datos)
+        # Asegurar que fecha_desde y fecha_hasta estén presentes
+        datos_programacion = datos.copy()
+        
+        # Si viene solo 'fecha', usar para ambas fechas
+        if 'fecha' in datos_programacion and datos_programacion['fecha']:
+            if 'fecha_desde' not in datos_programacion or not datos_programacion['fecha_desde']:
+                datos_programacion['fecha_desde'] = datos_programacion['fecha']
+            if 'fecha_hasta' not in datos_programacion or not datos_programacion['fecha_hasta']:
+                datos_programacion['fecha_hasta'] = datos_programacion['fecha']
+        
+        # Validar que fecha_hasta >= fecha_desde
+        if datos_programacion.get('fecha_desde') and datos_programacion.get('fecha_hasta'):
+            if datos_programacion['fecha_hasta'] < datos_programacion['fecha_desde']:
+                raise ValueError('fecha_hasta debe ser mayor o igual a fecha_desde')
+        
+        programacion = ProgramacionMenu(**datos_programacion)
+        
         db.add(programacion)
         db.flush()  # Para obtener el ID
         
@@ -68,6 +84,18 @@ class ProgramacionMenuService:
             raise ValueError("Programación no encontrada")
         
         recetas_data = datos.pop('recetas', None)
+        
+        # Si viene solo 'fecha', usar para ambas fechas
+        if 'fecha' in datos and datos['fecha']:
+            if 'fecha_desde' not in datos or not datos['fecha_desde']:
+                datos['fecha_desde'] = datos['fecha']
+            if 'fecha_hasta' not in datos or not datos['fecha_hasta']:
+                datos['fecha_hasta'] = datos['fecha']
+        
+        # Validar que fecha_hasta >= fecha_desde
+        if datos.get('fecha_desde') and datos.get('fecha_hasta'):
+            if datos['fecha_hasta'] < datos['fecha_desde']:
+                raise ValueError('fecha_hasta debe ser mayor o igual a fecha_desde')
         
         # Actualizar campos básicos
         for key, value in datos.items():
@@ -231,15 +259,11 @@ class ProgramacionMenuService:
         query = db.query(ProgramacionMenu)
         
         # Filtrar por rango de fechas: programaciones que se solapen con el rango solicitado
-        # Compatibilidad: usar fecha si fecha_desde/fecha_hasta no existen en la base de datos
         # Una programación se solapa si: fecha_desde <= fecha_hasta_solicitada AND fecha_hasta >= fecha_desde_solicitada
-        
-        # Por ahora, usar solo fecha hasta que se ejecute la migración
-        # TODO: Cambiar a usar fecha_desde/fecha_hasta después de ejecutar la migración
         if fecha_desde:
-            query = query.filter(ProgramacionMenu.fecha >= fecha_desde)
+            query = query.filter(ProgramacionMenu.fecha_desde <= fecha_hasta)
         if fecha_hasta:
-            query = query.filter(ProgramacionMenu.fecha <= fecha_hasta)
+            query = query.filter(ProgramacionMenu.fecha_hasta >= fecha_desde)
         
         if ubicacion:
             query = query.filter(ProgramacionMenu.ubicacion == ubicacion)
@@ -251,8 +275,8 @@ class ProgramacionMenuService:
             except KeyError:
                 pass  # Ignorar si el valor no es válido
         
-        # Ordenar por fecha (usar fecha_desde después de la migración)
-        return query.order_by(ProgramacionMenu.fecha.desc(), ProgramacionMenu.tiempo_comida).offset(skip).limit(limit).all()
+        # Ordenar por fecha_desde (rango de fechas)
+        return query.order_by(ProgramacionMenu.fecha_desde.desc(), ProgramacionMenu.tiempo_comida).offset(skip).limit(limit).all()
     
     @staticmethod
     def generar_pedidos_inteligentes(
