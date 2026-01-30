@@ -61,3 +61,9 @@ Thumbs.db
 
 # Carpeta duplicada (archivos están en raíz)
 kohde_demo/
+
+# Archivos con información sensible (documentación que puede contener tokens)
+# Estos archivos pueden tener tokens expuestos y deben ser revisados antes de commit
+*.md.backup
+*_BACKUP.md
+*_OLD.md
