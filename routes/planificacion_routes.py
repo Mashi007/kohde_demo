@@ -130,6 +130,41 @@ def duplicar_receta(receta_id):
     db.session.commit()
     return success_response(receta.to_dict(), 201, 'Receta duplicada correctamente')
 
+@bp.route('/recetas/<int:receta_id>', methods=['DELETE'])
+@handle_db_transaction
+def eliminar_receta(receta_id):
+    """Elimina una receta."""
+    try:
+        validate_positive_int(receta_id, 'receta_id')
+        RecetaService.eliminar_receta(db.session, receta_id)
+        db.session.commit()
+        return success_response(None, message='Receta eliminada correctamente')
+    except ValueError as e:
+        return error_response(str(e), 404, 'NOT_FOUND')
+    except Exception as e:
+        import logging
+        logging.error(f"Error al eliminar receta {receta_id}: {str(e)}", exc_info=True)
+        return error_response(f"Error al eliminar receta: {str(e)}", 500, 'INTERNAL_ERROR')
+
+@bp.route('/recetas/<int:receta_id>/activar', methods=['PATCH'])
+@handle_db_transaction
+def activar_desactivar_receta(receta_id):
+    """Activa o desactiva una receta."""
+    try:
+        validate_positive_int(receta_id, 'receta_id')
+        datos = request.get_json() or {}
+        activa = datos.get('activa', True)
+        
+        receta = RecetaService.activar_desactivar_receta(db.session, receta_id, activa)
+        db.session.commit()
+        return success_response(receta.to_dict(), message=f'Receta {"activada" if activa else "desactivada"} correctamente')
+    except ValueError as e:
+        return error_response(str(e), 404, 'NOT_FOUND')
+    except Exception as e:
+        import logging
+        logging.error(f"Error al activar/desactivar receta {receta_id}: {str(e)}", exc_info=True)
+        return error_response(f"Error al activar/desactivar receta: {str(e)}", 500, 'INTERNAL_ERROR')
+
 # ========== RUTAS DE PROGRAMACIÓN ==========
 
 @bp.route('/programacion', methods=['GET'])

@@ -212,8 +212,35 @@ class ItemService:
         query = db.query(Item)
         
         if categoria:
-            from models.item import CategoriaItem
-            query = query.filter(Item.categoria == CategoriaItem[categoria.upper()])
+            # Convertir categoria a formato PostgreSQL (valores mixtos)
+            categoria_str = categoria.lower().strip()
+            categoria_upper = categoria.upper().strip()
+            
+            # Mapeo de valores Python a valores PostgreSQL
+            categoria_pg_map = {
+                'materia_prima': 'MATERIA_PRIMA',
+                'insumo': 'INSUMO',
+                'producto_terminado': 'PRODUCTO_TERMINADO',
+                'bebida': 'bebida',
+                'limpieza': 'limpieza',
+                'otros': 'otros',
+                'MATERIA_PRIMA': 'MATERIA_PRIMA',
+                'INSUMO': 'INSUMO',
+                'PRODUCTO_TERMINADO': 'PRODUCTO_TERMINADO',
+                'BEBIDA': 'bebida',
+                'LIMPIEZA': 'limpieza',
+                'OTROS': 'otros',
+            }
+            
+            # Obtener el valor PostgreSQL esperado
+            categoria_pg_value = categoria_pg_map.get(categoria_str) or categoria_pg_map.get(categoria_upper)
+            
+            if categoria_pg_value:
+                # Comparar directamente con el string (PG_ENUM devuelve strings)
+                query = query.filter(Item.categoria == categoria_pg_value)
+            else:
+                # Si no se encuentra en el mapa, intentar comparar directamente
+                query = query.filter(Item.categoria == categoria_str)
         
         if activo is not None:
             query = query.filter(Item.activo == activo)

@@ -94,12 +94,22 @@ def listar_items():
                     # Crear un nuevo contexto de sesión para evitar problemas con transacciones abortadas
                     from sqlalchemy.orm import Session
                     # Intentar serializar sin labels si hay problema
+                    # Manejar categoria que puede ser string (PG_ENUM) o enum
+                    categoria_value = None
+                    if item.categoria:
+                        if isinstance(item.categoria, str):
+                            categoria_value = item.categoria.lower()
+                        elif hasattr(item.categoria, 'value'):
+                            categoria_value = item.categoria.value
+                        else:
+                            categoria_value = str(item.categoria).lower()
+                    
                     item_dict = {
                         'id': item.id,
                         'codigo': item.codigo,
                         'nombre': item.nombre,
                         'descripcion': item.descripcion,
-                        'categoria': item.categoria.value if item.categoria else None,
+                        'categoria': categoria_value,
                         'unidad': item.unidad,
                         'calorias_por_unidad': float(item.calorias_por_unidad) if item.calorias_por_unidad else None,
                         'costo_unitario_actual': float(item.costo_unitario_actual) if item.costo_unitario_actual else None,

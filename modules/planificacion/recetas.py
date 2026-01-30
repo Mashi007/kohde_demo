@@ -144,12 +144,9 @@ class RecetaService:
                         tipo_enum = None
                 
                 if tipo_enum:
-                    # Usar el valor del enum (string minúsculas) directamente para la comparación
-                    # Esto funciona porque el TypeDecorator usa String como base y compara strings
-                    # El process_bind_param convertirá el enum a string si es necesario
-                    from sqlalchemy import cast, String
-                    # Comparar usando el valor del enum directamente
-                    query = query.filter(cast(Receta.tipo, String) == tipo_enum.value)
+                    # Comparar directamente con el valor string (PG_ENUM devuelve strings)
+                    # El valor del enum es minúsculas ('almuerzo', 'desayuno', 'cena')
+                    query = query.filter(Receta.tipo == tipo_enum.value)
             except (KeyError, AttributeError, Exception) as e:
                 import logging
                 logging.warning(f"Error al filtrar por tipo '{tipo}': {str(e)}", exc_info=True)
@@ -250,6 +247,48 @@ class RecetaService:
         # Recalcular totales
         receta.calcular_totales()
         
+        db.commit()
+        db.refresh(receta)
+        return receta
+    
+    @staticmethod
+    def eliminar_receta(db: Session, receta_id: int) -> bool:
+        """
+        Elimina una receta por ID.
+        
+        Args:
+            db: Sesión de base de datos
+            receta_id: ID de la receta a eliminar
+            
+        Returns:
+            True si se eliminó correctamente
+        """
+        receta = db.query(Receta).filter(Receta.id == receta_id).first()
+        if not receta:
+            raise ValueError("Receta no encontrada")
+        
+        db.delete(receta)
+        db.commit()
+        return True
+    
+    @staticmethod
+    def activar_desactivar_receta(db: Session, receta_id: int, activa: bool) -> Receta:
+        """
+        Activa o desactiva una receta.
+        
+        Args:
+            db: Sesión de base de datos
+            receta_id: ID de la receta
+            activa: True para activar, False para desactivar
+            
+        Returns:
+            Receta actualizada
+        """
+        receta = db.query(Receta).filter(Receta.id == receta_id).first()
+        if not receta:
+            raise ValueError("Receta no encontrada")
+        
+        receta.activa = activa
         db.commit()
         db.refresh(receta)
         return receta

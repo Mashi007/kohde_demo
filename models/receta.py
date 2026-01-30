@@ -17,14 +17,24 @@ class TipoReceta(enum.Enum):
 
 class TipoRecetaEnum(TypeDecorator):
     """TypeDecorator para manejar el enum tiporeceta de PostgreSQL."""
-    impl = String  # Usar String como base, no Enum, para evitar validación automática
+    # Usar String como base para evitar validación automática incorrecta
+    # PostgreSQL tiene valores en MINÚSCULAS: 'desayuno', 'almuerzo', 'cena'
+    impl = String(20)
     cache_ok = True
     
     def __init__(self):
-        # Usar String como base para evitar que SQLAlchemy valide automáticamente
-        # PostgreSQL tiene valores en MINÚSCULAS: 'desayuno', 'almuerzo', 'cena'
-        # Hacemos la validación y conversión manualmente en process_bind_param y process_result_value
-        super().__init__(length=20)  # Longitud suficiente para los valores del enum
+        super().__init__(length=20)
+    
+    def load_dialect_impl(self, dialect):
+        """Cargar la implementación del dialecto - usar String para PostgreSQL también."""
+        # Siempre usar String, nunca PG_ENUM, para evitar validación incorrecta
+        # El process_result_value manejará la conversión de strings a enums
+        # IMPORTANTE: No usar PG_ENUM aquí porque intenta validar por nombre, no por valor
+        return dialect.type_descriptor(String(20))
+    
+    def coerce_compared_value(self, op, value):
+        """Permitir comparaciones con strings directamente."""
+        return self
     
     def process_bind_param(self, value, dialect):
         """Convierte el enum a su VALOR (minúsculas) antes de insertar en PostgreSQL."""
@@ -48,6 +58,7 @@ class TipoRecetaEnum(TypeDecorator):
             except KeyError:
                 raise ValueError(f"'{value}' no es un valor válido para TipoReceta. Valores válidos: {valores_validos}")
         return value
+    
     
     def literal_processor(self, dialect):
         """Procesador literal para evitar el cast a VARCHAR."""
@@ -111,11 +122,10 @@ class Receta(db.Model):
     id = Column(Integer, primary_key=True)
     nombre = Column(String(200), nullable=False)
     descripcion = Column(Text, nullable=True)
-    # Usar PG_ENUM directamente para evitar el cast a VARCHAR
-    # PostgreSQL tiene valores en MINÚSCULAS, así que usamos values_callable para convertir
+    # Usar TypeDecorator para manejar correctamente los valores en minúsculas de PostgreSQL
+    # El TypeDecorator convierte entre strings (DB) y enums (Python) automáticamente
     tipo = Column(
-        PG_ENUM('tiporeceta', name='tiporeceta', create_type=False, 
-                values_callable=lambda x: [e.value for e in TipoReceta]),
+        TipoRecetaEnum(),
         nullable=False, 
         default='almuerzo'  # Usar el valor string directamente para el default
     )

@@ -1,12 +1,14 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api, { extractData } from '../config/api'
-import { ChefHat, Plus, Filter } from 'lucide-react'
+import { ChefHat, Plus, Filter, Edit, Trash2, Power, PowerOff } from 'lucide-react'
 import RecetaForm from '../components/RecetaForm'
 import Modal from '../components/Modal'
+import toast from 'react-hot-toast'
 import { TIEMPO_COMIDA_OPTIONS, getTiempoComidaColor, getTiempoComidaLabel } from '../constants/tiempoComida'
 
 export default function Recetas() {
+  const queryClient = useQueryClient()
   const [tipoFiltro, setTipoFiltro] = useState('')
   const [mostrarFormulario, setMostrarFormulario] = useState(false)
   const [recetaEditando, setRecetaEditando] = useState(null)
@@ -21,6 +23,52 @@ export default function Recetas() {
 
   // Asegurar que recetas sea un array
   const recetas = Array.isArray(recetasResponse) ? recetasResponse : []
+
+  // Mutación para eliminar receta
+  const deleteMutation = useMutation({
+    mutationFn: (recetaId) => api.delete(`/planificacion/recetas/${recetaId}`),
+    onSuccess: () => {
+      toast.success('Receta eliminada correctamente')
+      queryClient.invalidateQueries(['recetas'])
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.error || 'Error al eliminar receta')
+    },
+  })
+
+  // Mutación para activar/desactivar receta
+  const toggleActivaMutation = useMutation({
+    mutationFn: ({ recetaId, activa }) => 
+      api.patch(`/planificacion/recetas/${recetaId}/activar`, { activa }),
+    onSuccess: (_, variables) => {
+      toast.success(`Receta ${variables.activa ? 'activada' : 'desactivada'} correctamente`)
+      queryClient.invalidateQueries(['recetas'])
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.error || 'Error al cambiar estado de la receta')
+    },
+  })
+
+  const handleEliminar = (e, receta) => {
+    e.stopPropagation()
+    if (window.confirm(`¿Estás seguro de eliminar la receta "${receta.nombre}"?`)) {
+      deleteMutation.mutate(receta.id)
+    }
+  }
+
+  const handleEditar = (e, receta) => {
+    e.stopPropagation()
+    setRecetaEditando(receta)
+    setMostrarFormulario(true)
+  }
+
+  const handleToggleActiva = (e, receta) => {
+    e.stopPropagation()
+    toggleActivaMutation.mutate({ 
+      recetaId: receta.id, 
+      activa: !receta.activa 
+    })
+  }
 
   const tiposReceta = [
     { value: '', label: 'Todas' },
@@ -95,18 +143,58 @@ export default function Recetas() {
           {recetas.map((receta) => (
             <div
               key={receta.id}
-              className="bg-slate-800 p-6 rounded-lg border border-slate-700 hover:border-purple-500/50 transition-all cursor-pointer"
-              onClick={() => {
-                setRecetaEditando(receta)
-                setMostrarFormulario(true)
-              }}
+              className="bg-slate-800 p-6 rounded-lg border border-slate-700 hover:border-purple-500/50 transition-all relative"
             >
-              <div className="flex items-start justify-between mb-3">
-                <ChefHat className="text-purple-500" size={28} />
-                <span className={`px-2 py-1 rounded text-xs font-medium border ${getTipoBadge(receta.tipo)}`}>
-                  {getTipoLabel(receta.tipo)}
-                </span>
+              {/* Botones de acción */}
+              <div className="absolute top-4 right-4 flex gap-2 z-10">
+                <button
+                  onClick={(e) => handleToggleActiva(e, receta)}
+                  className={`p-2 rounded transition-colors ${
+                    receta.activa
+                      ? 'bg-green-600/20 text-green-400 hover:bg-green-600/30'
+                      : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                  }`}
+                  title={receta.activa ? 'Desactivar receta' : 'Activar receta'}
+                >
+                  {receta.activa ? <Power size={16} /> : <PowerOff size={16} />}
+                </button>
+                <button
+                  onClick={(e) => handleEditar(e, receta)}
+                  className="p-2 rounded bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 transition-colors"
+                  title="Editar receta"
+                >
+                  <Edit size={16} />
+                </button>
+                <button
+                  onClick={(e) => handleEliminar(e, receta)}
+                  className="p-2 rounded bg-red-600/20 text-red-400 hover:bg-red-600/30 transition-colors"
+                  title="Eliminar receta"
+                  disabled={deleteMutation.isPending}
+                >
+                  <Trash2 size={16} />
+                </button>
               </div>
+
+              <div 
+                className="cursor-pointer"
+                onClick={() => {
+                  setRecetaEditando(receta)
+                  setMostrarFormulario(true)
+                }}
+              >
+                <div className="flex items-start justify-between mb-3">
+                  <ChefHat className="text-purple-500" size={28} />
+                  <div className="flex items-center gap-2">
+                    <span className={`px-2 py-1 rounded text-xs font-medium border ${getTipoBadge(receta.tipo)}`}>
+                      {getTipoLabel(receta.tipo)}
+                    </span>
+                    {!receta.activa && (
+                      <span className="px-2 py-1 rounded text-xs font-medium bg-slate-700 text-slate-400 border border-slate-600">
+                        Inactiva
+                      </span>
+                    )}
+                  </div>
+                </div>
               
               <h3 className="text-xl font-bold mb-2">{receta.nombre}</h3>
               {receta.descripcion && (
@@ -151,6 +239,7 @@ export default function Recetas() {
                   </p>
                 </div>
               )}
+              </div>
             </div>
           ))}
         </div>
