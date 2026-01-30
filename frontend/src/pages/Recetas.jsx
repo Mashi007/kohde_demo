@@ -145,45 +145,13 @@ export default function Recetas() {
               key={receta.id}
               className="bg-slate-800 p-6 rounded-lg border border-slate-700 hover:border-purple-500/50 transition-all relative"
             >
-              {/* Botones de acción */}
-              <div className="absolute top-4 right-4 flex gap-2 z-10">
-                <button
-                  onClick={(e) => handleToggleActiva(e, receta)}
-                  className={`p-2 rounded transition-colors ${
-                    receta.activa
-                      ? 'bg-green-600/20 text-green-400 hover:bg-green-600/30'
-                      : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
-                  }`}
-                  title={receta.activa ? 'Desactivar receta' : 'Activar receta'}
-                >
-                  {receta.activa ? <Power size={16} /> : <PowerOff size={16} />}
-                </button>
-                <button
-                  onClick={(e) => handleEditar(e, receta)}
-                  className="p-2 rounded bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 transition-colors"
-                  title="Editar receta"
-                >
-                  <Edit size={16} />
-                </button>
-                <button
-                  onClick={(e) => handleEliminar(e, receta)}
-                  className="p-2 rounded bg-red-600/20 text-red-400 hover:bg-red-600/30 transition-colors"
-                  title="Eliminar receta"
-                  disabled={deleteMutation.isPending}
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
-
-              <div 
-                className="cursor-pointer"
-                onClick={() => {
-                  setRecetaEditando(receta)
-                  setMostrarFormulario(true)
-                }}
-              >
-                <div className="flex items-start justify-between mb-3">
-                  <ChefHat className="text-purple-500" size={28} />
+              {/* Header con icono, etiquetas y botones de acción */}
+              <div className="flex items-start justify-between mb-3">
+                <ChefHat className="text-purple-500" size={28} />
+                
+                {/* Contenedor para etiquetas y botones - organizados verticalmente */}
+                <div className="flex flex-col items-end gap-2">
+                  {/* Etiquetas de tipo y estado */}
                   <div className="flex items-center gap-2">
                     <span className={`px-2 py-1 rounded text-xs font-medium border ${getTipoBadge(receta.tipo)}`}>
                       {getTipoLabel(receta.tipo)}
@@ -194,7 +162,46 @@ export default function Recetas() {
                       </span>
                     )}
                   </div>
+                  
+                  {/* Botones de acción */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={(e) => handleToggleActiva(e, receta)}
+                      className={`p-2 rounded transition-colors ${
+                        receta.activa
+                          ? 'bg-green-600/20 text-green-400 hover:bg-green-600/30'
+                          : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
+                      }`}
+                      title={receta.activa ? 'Desactivar receta' : 'Activar receta'}
+                    >
+                      {receta.activa ? <Power size={16} /> : <PowerOff size={16} />}
+                    </button>
+                    <button
+                      onClick={(e) => handleEditar(e, receta)}
+                      className="p-2 rounded bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 transition-colors"
+                      title="Editar receta"
+                    >
+                      <Edit size={16} />
+                    </button>
+                    <button
+                      onClick={(e) => handleEliminar(e, receta)}
+                      className="p-2 rounded bg-red-600/20 text-red-400 hover:bg-red-600/30 transition-colors"
+                      title="Eliminar receta"
+                      disabled={deleteMutation.isPending}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 </div>
+              </div>
+
+              <div 
+                className="cursor-pointer"
+                onClick={() => {
+                  setRecetaEditando(receta)
+                  setMostrarFormulario(true)
+                }}
+              >
               
               <h3 className="text-xl font-bold mb-2">{receta.nombre}</h3>
               {receta.descripcion && (
