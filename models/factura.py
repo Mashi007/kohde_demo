@@ -160,29 +160,55 @@ class Factura(db.Model):
     
     def to_dict(self):
         """Convierte el modelo a diccionario."""
-        return {
-            'id': self.id,
-            'numero_factura': self.numero_factura,
-            'tipo': self.tipo.value if self.tipo else None,
-            'cliente_id': self.cliente_id,
-            'proveedor_id': self.proveedor_id,
-            'fecha_emision': self.fecha_emision.isoformat() if self.fecha_emision else None,
-            'fecha_recepcion': self.fecha_recepcion.isoformat() if self.fecha_recepcion else None,
-            'subtotal': float(self.subtotal) if self.subtotal else None,
-            'iva': float(self.iva) if self.iva else None,
-            'total': float(self.total) if self.total else None,
-            'estado': self.estado.value if self.estado else None,
-            'imagen_url': self.imagen_url,
-            'items_json': self.items_json,
-            'aprobado_por': self.aprobado_por,
-            'fecha_aprobacion': self.fecha_aprobacion.isoformat() if self.fecha_aprobacion else None,
-            'observaciones': self.observaciones,
-            'remitente_nombre': self.remitente_nombre,
-            'remitente_telefono': self.remitente_telefono,
-            'recibida_por_whatsapp': self.recibida_por_whatsapp,
-            'whatsapp_message_id': self.whatsapp_message_id,
-            'items': [item.to_dict() for item in self.items] if self.items else [],
-        }
+        try:
+            # Serializar items con manejo de errores
+            items_list = []
+            if self.items:
+                for item in self.items:
+                    try:
+                        items_list.append(item.to_dict())
+                    except Exception as e:
+                        # Si hay error serializando un item, continuar con los demás
+                        import logging
+                        logging.warning(f"Error serializando item {item.id} de factura {self.id}: {str(e)}")
+                        continue
+            
+            return {
+                'id': self.id,
+                'numero_factura': self.numero_factura,
+                'tipo': self.tipo.value if self.tipo else None,
+                'cliente_id': self.cliente_id,
+                'proveedor_id': self.proveedor_id,
+                'fecha_emision': self.fecha_emision.isoformat() if self.fecha_emision else None,
+                'fecha_recepcion': self.fecha_recepcion.isoformat() if self.fecha_recepcion else None,
+                'subtotal': float(self.subtotal) if self.subtotal else None,
+                'iva': float(self.iva) if self.iva else None,
+                'total': float(self.total) if self.total else None,
+                'estado': self.estado.value if self.estado else None,
+                'imagen_url': self.imagen_url,
+                'items_json': self.items_json,
+                'aprobado_por': self.aprobado_por,
+                'fecha_aprobacion': self.fecha_aprobacion.isoformat() if self.fecha_aprobacion else None,
+                'observaciones': self.observaciones,
+                'remitente_nombre': self.remitente_nombre,
+                'remitente_telefono': self.remitente_telefono,
+                'recibida_por_whatsapp': self.recibida_por_whatsapp,
+                'whatsapp_message_id': self.whatsapp_message_id,
+                'items': items_list,
+            }
+        except Exception as e:
+            import logging
+            import traceback
+            logging.error(f"Error en to_dict de factura {self.id}: {str(e)}")
+            logging.error(traceback.format_exc())
+            # Retornar datos básicos en caso de error
+            return {
+                'id': self.id,
+                'numero_factura': self.numero_factura,
+                'estado': self.estado.value if self.estado else None,
+                'total': float(self.total) if self.total else None,
+                'error': 'Error al serializar factura completa'
+            }
     
     def __repr__(self):
         return f'<Factura {self.numero_factura}>'

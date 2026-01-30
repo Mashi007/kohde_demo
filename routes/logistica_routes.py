@@ -622,6 +622,7 @@ def listar_facturas():
             }
             if estado_normalizado in estado_map:
                 estado_enum = estado_map[estado_normalizado]
+                # El TypeDecorator maneja la comparación automáticamente
                 query = query.filter(Factura.estado == estado_enum)
             else:
                 # Intentar con el valor directamente en mayúsculas

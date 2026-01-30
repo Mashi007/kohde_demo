@@ -232,16 +232,44 @@ class ChatService:
                 from sqlalchemy import event
                 import time
                 
+                # Optimización: Validar consulta antes de ejecutar
+                query_upper = query.upper().strip()
+                
+                # Detectar consultas potencialmente costosas sin LIMIT
+                if 'SELECT' in query_upper and 'LIMIT' not in query_upper:
+                    # Agregar LIMIT automático si no existe (máximo 100 filas por defecto)
+                    if not any(keyword in query_upper for keyword in ['COUNT(', 'SUM(', 'AVG(', 'MAX(', 'MIN(', 'GROUP BY']):
+                        # Solo agregar LIMIT si no es una agregación
+                        query = query.rstrip(';').strip() + ' LIMIT 100'
+                        import logging
+                        logger = logging.getLogger(__name__)
+                        logger.info(f"Se agregó LIMIT 100 automáticamente a la consulta")
+                
                 inicio = time.time()
                 resultado = db.execute(text(query))
                 filas = resultado.fetchall()
                 tiempo_ejecucion = time.time() - inicio
                 
-                # Log de consultas lentas (> 5 segundos)
-                if tiempo_ejecucion > 5:
+                # Log de consultas lentas (> 3 segundos ahora, más estricto)
+                if tiempo_ejecucion > 3:
                     import logging
                     logger = logging.getLogger(__name__)
-                    logger.warning(f"Consulta lenta detectada: {tiempo_ejecucion:.2f}s - Query: {query[:100]}...")
+                    logger.warning(f"⚠️ Consulta lenta detectada: {tiempo_ejecucion:.2f}s - Query: {query[:150]}...")
+                    
+                    # Sugerir optimización si no usa índices conocidos
+                    sugerencias_optimizacion = []
+                    if 'WHERE' in query_upper:
+                        # Verificar si usa campos indexados
+                        campos_indexados = ['id', 'activo', 'estado', 'fecha_', 'proveedor_id', 'item_id', 'codigo', 'nombre']
+                        usa_indices = any(campo in query_upper for campo in campos_indexados)
+                        if not usa_indices:
+                            sugerencias_optimizacion.append("Considera usar campos indexados en WHERE (id, activo, estado, fecha_*, proveedor_id, item_id)")
+                    
+                    if 'JOIN' in query_upper and 'ON' not in query_upper:
+                        sugerencias_optimizacion.append("Asegúrate de usar JOINs con foreign keys indexadas")
+                    
+                    if sugerencias_optimizacion:
+                        logger.info(f"💡 Sugerencias de optimización: {'; '.join(sugerencias_optimizacion)}")
                 
                 # Convertir a lista de diccionarios de forma más eficiente
                 columnas = list(resultado.keys())
@@ -270,10 +298,18 @@ class ChatService:
                 # Confirmar el savepoint (commit de la subtransacción)
                 savepoint.commit()
                 
+                # Información adicional para optimización
+                info_optimizacion = {
+                    'tiempo_ejecucion_ms': round(tiempo_ejecucion * 1000, 2),
+                    'total_filas': len(resultados),
+                    'usa_indices': any(campo in query_upper for campo in ['id', 'activo', 'estado', 'fecha_', 'proveedor_id', 'item_id'])
+                }
+                
                 return {
                     'error': None,
                     'resultados': resultados,
-                    'total_filas': len(resultados)
+                    'total_filas': len(resultados),
+                    'info_optimizacion': info_optimizacion
                 }
             except SQLAlchemyError as e:
                 # Si hay un error SQL, hacer rollback solo del savepoint
@@ -364,19 +400,37 @@ class ChatService:
                     else:
                         resultados = resultado_db['resultados']
                         total = resultado_db['total_filas']
+                        info_opt = resultado_db.get('info_optimizacion', {})
+                        tiempo_ms = info_opt.get('tiempo_ejecucion_ms', 0)
+                        consulta_upper = consulta_sql.upper()
                         
                         # Formatear resultados de manera más legible
                         if resultados:
                             columnas = list(resultados[0].keys())
                             
-                            # Crear mensaje estructurado
-                            mensaje_db = f"✅ Consulta ejecutada exitosamente. Total de filas: {total}\n\n"
+                            # Crear mensaje estructurado con información de rendimiento
+                            mensaje_db = f"✅ Consulta ejecutada exitosamente. Total de filas: {total}"
+                            if tiempo_ms > 0:
+                                if tiempo_ms < 100:
+                                    mensaje_db += f" ⚡ ({tiempo_ms}ms - rápida)"
+                                elif tiempo_ms < 1000:
+                                    mensaje_db += f" ⏱️ ({tiempo_ms}ms)"
+                                else:
+                                    mensaje_db += f" 🐌 ({tiempo_ms}ms - lenta, considera optimizar)"
+                            mensaje_db += "\n\n"
                             
                             # Mostrar columnas
                             mensaje_db += f"📋 Columnas ({len(columnas)}): {', '.join(columnas)}\n\n"
                             
                             # Mostrar resultados en formato tabla (máximo 15 filas para legibilidad)
-                            max_filas_mostrar = min(15, total)
+                            # Optimización: ajustar según el tipo de consulta
+                            if total <= 20:
+                                max_filas_mostrar = total  # Mostrar todas si son pocas
+                            elif any(keyword in consulta_upper for keyword in ['COUNT', 'SUM', 'AVG', 'MAX', 'MIN']):
+                                max_filas_mostrar = min(30, total)  # Más filas para agregaciones
+                            else:
+                                max_filas_mostrar = min(15, total)  # Menos para listas
+                            
                             mensaje_db += f"📊 Resultados (mostrando {max_filas_mostrar} de {total}):\n\n"
                             
                             # Crear tabla formateada
@@ -802,7 +856,7 @@ FORMATO OBLIGATORIO:
 [QUERY_DB]
 SELECT campo1, campo2 FROM tabla WHERE condicion LIMIT 10
 
-REGLAS DE ORO PARA CONSULTAS RÁPIDAS:
+REGLAS DE ORO PARA CONSULTAS RÁPIDAS Y OPTIMIZADAS:
 ✅ SIEMPRE usa LIMIT (máximo 50-100 filas para respuestas rápidas)
 ✅ Usa WHERE para filtrar (activo=true, estados específicos, rangos de fechas)
 ✅ Usa ORDER BY con campos indexados (fecha_creacion DESC, nombre ASC)
@@ -811,6 +865,42 @@ REGLAS DE ORO PARA CONSULTAS RÁPIDAS:
 ✅ Usa índices disponibles: activo, estado, fecha_*, proveedor_id, item_id
 ✅ Para fechas, usa rangos: fecha >= '2024-01-01' AND fecha <= '2024-12-31'
 ✅ Para búsquedas de texto, usa ILIKE: nombre ILIKE '%arroz%'
+
+🚀 OPTIMIZACIONES AVANZADAS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+1. CONSULTAS AGRUPADAS (GROUP BY):
+   → Usa GROUP BY con campos indexados cuando sea posible
+   → Ejemplo: GROUP BY estado, fecha (ambos indexados)
+   → Evita GROUP BY en campos calculados o no indexados
+
+2. SUBCONSULTAS VS JOINs:
+   → Prefiere JOINs sobre subconsultas cuando sea posible (más eficiente)
+   → Usa EXISTS() en lugar de IN() para subconsultas grandes
+   → Ejemplo: WHERE EXISTS (SELECT 1 FROM tabla WHERE condicion)
+
+3. ÍNDICES COMPUESTOS:
+   → Usa múltiples campos indexados en WHERE cuando sea posible
+   → Ejemplo: WHERE estado = 'pendiente' AND fecha >= '2026-01-01' (ambos indexados)
+
+4. CONSULTAS DE AGRUPACIÓN:
+   → Para COUNT, SUM, AVG: usa índices en campos de agrupación
+   → Ejemplo: SELECT estado, COUNT(*) FROM facturas WHERE fecha >= X GROUP BY estado
+
+5. EVITAR OPERACIONES COSTOSAS:
+   → Evita funciones en WHERE: WHERE DATE(fecha) = X → WHERE fecha >= X AND fecha < X+1
+   → Usa índices: WHERE fecha_servicio >= '2026-01-29' AND fecha_servicio < '2026-01-30'
+   → Para comparar solo fecha: DATE(fecha_servicio) = '2026-01-29' (aceptable si hay índice en fecha)
+
+6. LÍMITES INTELIGENTES:
+   → Para listas: LIMIT 20-50
+   → Para agregaciones: sin LIMIT (ya agrupa)
+   → Para búsquedas: LIMIT 10-20 (resultados más relevantes primero)
+
+7. ORDENAMIENTO EFICIENTE:
+   → Usa ORDER BY con campos indexados
+   → Evita ORDER BY en campos calculados
+   → Para fechas recientes: ORDER BY fecha DESC (usa índice)
 
 🚨 MANEJO DE FECHAS ESPECÍFICAS - MUY IMPORTANTE:
 Cuando el usuario pregunte sobre una fecha específica (ej: "29 de enero", "29 de enero de 2026", "el 29"):
