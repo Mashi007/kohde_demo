@@ -111,9 +111,8 @@ class ProgramacionMenu(db.Model):
     # Columnas para rango de fechas (ya migradas en la BD)
     fecha_desde = Column(Date, nullable=False)  # Fecha de inicio del rango
     fecha_hasta = Column(Date, nullable=False)  # Fecha de fin del rango
-    # PostgreSQL tiene valores en MAYÚSCULAS: 'DESAYUNO', 'ALMUERZO', 'CENA'
-    # Usar values_callable para convertir nombres (mayúsculas) en lugar de valores (minúsculas)
-    tiempo_comida = Column(PG_ENUM('tiempocomida', name='tiempocomida', create_type=False, values_callable=lambda x: [e.name for e in TiempoComida]), nullable=False)
+    # Usar TypeDecorator para manejar correctamente el enum tiempocomida
+    tiempo_comida = Column(TiempoComidaEnum(), nullable=False)
     ubicacion = Column(String(100), nullable=False)  # restaurante_A, restaurante_B, etc.
     personas_estimadas = Column(Integer, nullable=False, default=0)
     charolas_planificadas = Column(Integer, nullable=False, default=0)  # Charolas planificadas para este servicio
