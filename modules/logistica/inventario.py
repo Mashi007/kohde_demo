@@ -220,6 +220,9 @@ class InventarioService:
                         })
                     
                     return resultado
+                else:
+                    # Si no hay items, retornar lista vacía
+                    return []
             
             for inv in inventarios:
                 try:
