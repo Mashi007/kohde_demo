@@ -98,6 +98,7 @@ class TicketsAutomaticosService:
                     )
                     
                     ticket = Ticket(
+                        cliente_id=0,  # Tickets automáticos no tienen cliente asociado
                         tipo=tipo_ticket,
                         asunto=asunto,
                         descripcion=descripcion,
@@ -212,6 +213,7 @@ class TicketsAutomaticosService:
                 descripcion += f"\nMerma ID principal: {mermas_item[0].id}"
                 
                 ticket = Ticket(
+                    cliente_id=0,  # Tickets automáticos no tienen cliente asociado
                     tipo=TipoTicket.QUEJA,
                     asunto=asunto,
                     descripcion=descripcion,
@@ -277,6 +279,7 @@ class TicketsAutomaticosService:
                 descripcion += f"\nProveedor autorizado: {item.proveedor_autorizado.nombre}"
             
             ticket = Ticket(
+                cliente_id=0,  # Tickets automáticos no tienen cliente asociado
                 tipo=TipoTicket.CONSULTA,
                 asunto=asunto,
                 descripcion=descripcion,
@@ -360,6 +363,7 @@ class TicketsAutomaticosService:
                     )
                     
                     ticket = Ticket(
+                        cliente_id=0,  # Tickets automáticos no tienen cliente asociado
                         tipo=TipoTicket.CONSULTA,
                         asunto=asunto,
                         descripcion=descripcion,
@@ -453,6 +457,7 @@ class TicketsAutomaticosService:
                     )
                     
                     ticket = Ticket(
+                        cliente_id=0,  # Tickets automáticos no tienen cliente asociado
                         tipo=TipoTicket.CONSULTA,
                         asunto=asunto,
                         descripcion=descripcion,
@@ -542,6 +547,7 @@ class TicketsAutomaticosService:
                     descripcion += f"\nPedido relacionado ID: {pedido.id}"
                 
                 ticket = Ticket(
+                    cliente_id=0,  # Tickets automáticos no tienen cliente asociado
                     tipo=TipoTicket.CONSULTA,
                     asunto=asunto,
                     descripcion=descripcion,

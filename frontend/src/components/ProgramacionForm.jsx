@@ -110,28 +110,21 @@ export default function ProgramacionForm({ programacion, fecha, tiempoComida, on
     }
     
     if (!recetasDisponibles || recetasDisponibles.length === 0) {
-      toast.error('No hay recetas disponibles para este tipo de servicio')
+      toast.error('No hay recetas disponibles')
       return
     }
     
-    const primeraReceta = recetasDisponibles[0]
-    // Verificar que no esté ya agregada
-    if (formData.recetas.some(r => r.receta_id === primeraReceta.id)) {
-      toast(`La receta "${primeraReceta.nombre}" ya está agregada`, { icon: 'ℹ️' })
-      return
-    }
-    
+    // Agregar una receta vacía que el usuario puede seleccionar
     setFormData({
       ...formData,
       recetas: [
         ...formData.recetas,
         {
-          receta_id: primeraReceta.id,
+          receta_id: null, // Se seleccionará después
           // cantidad_porciones se calculará automáticamente desde charolas_planificadas
         },
       ],
     })
-    toast.success(`Receta "${primeraReceta.nombre}" agregada`)
   }
   
   const eliminarReceta = (index) => {
@@ -378,13 +371,20 @@ export default function ProgramacionForm({ programacion, fecha, tiempoComida, on
                           value={recetaProg.receta_id || ''}
                           onChange={(e) => actualizarReceta(index, 'receta_id', parseInt(e.target.value))}
                           className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded focus:outline-none focus:border-purple-500"
+                          required
                         >
                           <option value="">Selecciona una receta</option>
-                          {recetasDisponibles?.map(r => (
-                            <option key={r.id} value={r.id}>
-                              {r.nombre} {r.calorias_por_porcion && `(${Math.round(r.calorias_por_porcion)} kcal/porción)`}
-                            </option>
-                          ))}
+                          {recetasDisponibles
+                            ?.filter(r => {
+                              // Filtrar recetas ya agregadas en otras posiciones
+                              const yaAgregada = formData.recetas.some((rec, i) => i !== index && rec.receta_id === r.id)
+                              return !yaAgregada
+                            })
+                            .map(r => (
+                              <option key={r.id} value={r.id}>
+                                {r.nombre} {r.calorias_por_porcion && `(${Math.round(r.calorias_por_porcion)} kcal/porción)`}
+                              </option>
+                            ))}
                         </select>
                       </div>
                       

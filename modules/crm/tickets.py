@@ -35,6 +35,11 @@ class TicketService:
         if isinstance(ticket_data.get('estado'), str):
             ticket_data['estado'] = EstadoTicket[ticket_data['estado'].upper()]
         
+        # Asegurar que cliente_id tenga un valor por defecto si no se proporciona
+        # (la BD requiere NOT NULL pero el modelo permite nullable)
+        if 'cliente_id' not in ticket_data or ticket_data['cliente_id'] is None:
+            ticket_data['cliente_id'] = 0
+        
         ticket = Ticket(**ticket_data)
         db.add(ticket)
         db.commit()

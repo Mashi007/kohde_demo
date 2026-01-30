@@ -174,7 +174,7 @@ class Ticket(db.Model):
     __tablename__ = 'tickets'
     
     id = Column(Integer, primary_key=True)
-    cliente_id = Column(Integer, nullable=True)  # Removida FK, ahora opcional
+    cliente_id = Column(Integer, nullable=True, default=0)  # Removida FK, ahora opcional. Default 0 para tickets automáticos
     tipo = Column(TipoTicketEnum(), nullable=False)
     asunto = Column(String(200), nullable=False)
     descripcion = Column(Text, nullable=False)
