@@ -39,10 +39,23 @@ def listar_recetas():
             limit=limit
         )
         
-        return paginated_response([r.to_dict() for r in recetas], skip=skip, limit=limit)
+        # Convertir recetas a diccionarios con manejo de errores
+        recetas_dict = []
+        for receta in recetas:
+            try:
+                recetas_dict.append(receta.to_dict())
+            except Exception as e:
+                import logging
+                logging.error(f"Error al convertir receta {receta.id} a dict: {str(e)}", exc_info=True)
+                # Continuar con las demás recetas aunque una falle
+                continue
+        
+        return paginated_response(recetas_dict, skip=skip, limit=limit)
     except ValueError as e:
         return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
+        import logging
+        logging.error(f"Error en listar_recetas: {str(e)}", exc_info=True)
         return error_response(str(e), 500, 'INTERNAL_ERROR')
 
 @bp.route('/recetas', methods=['POST'])

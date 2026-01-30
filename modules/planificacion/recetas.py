@@ -99,9 +99,15 @@ class RecetaService:
             Lista de recetas
         """
         from sqlalchemy import or_
+        from sqlalchemy.orm import selectinload, joinedload
         from models.receta import TipoReceta
         
-        query = db.query(Receta)
+        # Usar selectinload para cargar ingredientes y joinedload para items
+        # Esto evita problemas de lazy loading cuando la sesión está cerrada
+        # Nota: selectinload para ingredientes (uno a muchos) y joinedload para item (muchos a uno)
+        query = db.query(Receta).options(
+            selectinload(Receta.ingredientes).joinedload('item')
+        )
         
         if activa is not None:
             query = query.filter(Receta.activa == activa)

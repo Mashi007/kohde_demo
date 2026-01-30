@@ -93,6 +93,11 @@ class ProveedorService:
                          .filter(item_labels.c.label_id == label_id)\
                          .filter(Item.activo == True)
         
+        # Agregar eager loading para items y labels cuando se necesiten
+        from sqlalchemy.orm import selectinload
+        # No podemos usar eager loading aquí porque las relaciones son lazy='dynamic'
+        # En su lugar, cargaremos los items manualmente en el endpoint
+        
         return query.offset(skip).limit(limit).all()
     
     @staticmethod

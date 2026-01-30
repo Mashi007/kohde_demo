@@ -36,10 +36,13 @@ export default function ComprasDashboard() {
   const comprasPorProveedor = Array.isArray(comprasPorProveedorResponse) ? comprasPorProveedorResponse : []
 
   // Compras por proceso
-  const { data: comprasPorProceso } = useQuery({
+  const { data: comprasPorProcesoResponse } = useQuery({
     queryKey: ['compras-por-proceso', fechaDesde, fechaHasta],
-    queryFn: () => api.get(`/logistica/compras/por-proceso?fecha_desde=${fechaDesde}&fecha_hasta=${fechaHasta}`).then(res => res.data),
+    queryFn: () => api.get(`/logistica/compras/por-proceso?fecha_desde=${fechaDesde}&fecha_hasta=${fechaHasta}`).then(extractData),
   })
+
+  // Asegurar que comprasPorProceso tenga la estructura correcta
+  const comprasPorProceso = comprasPorProcesoResponse || {}
 
   const formatearMoneda = (valor) => {
     return new Intl.NumberFormat('es-ES', {
@@ -125,7 +128,7 @@ export default function ComprasDashboard() {
       )}
 
       {/* Compras por Proceso */}
-      {comprasPorProceso && (
+      {comprasPorProceso && Object.keys(comprasPorProceso).length > 0 && (
         <div className="bg-slate-800 p-6 rounded-lg border border-slate-700">
           <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
             <TrendingUp size={24} />
@@ -134,21 +137,29 @@ export default function ComprasDashboard() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-slate-700/50 p-4 rounded-lg">
               <h3 className="text-sm text-slate-400 mb-1">Pedidos Automáticos</h3>
-              <p className="text-xl font-bold">{comprasPorProceso.pedidos_automaticos.cantidad}</p>
+              <p className="text-xl font-bold">
+                {comprasPorProceso.pedidos_automaticos?.cantidad || 0}
+              </p>
               <p className="text-xs text-slate-500 mt-1">
-                {formatearMoneda(comprasPorProceso.pedidos_automaticos.total_gastado)}
+                {formatearMoneda(comprasPorProceso.pedidos_automaticos?.total_gastado || 0)}
               </p>
             </div>
             <div className="bg-slate-700/50 p-4 rounded-lg">
               <h3 className="text-sm text-slate-400 mb-1">Programaciones</h3>
-              <p className="text-xl font-bold">{comprasPorProceso.programaciones.cantidad}</p>
+              <p className="text-xl font-bold">
+                {comprasPorProceso.programaciones?.cantidad || 0}
+              </p>
               <p className="text-xs text-slate-500 mt-1">Menús programados</p>
             </div>
             <div className="bg-slate-700/50 p-4 rounded-lg">
               <h3 className="text-sm text-slate-400 mb-1">Items Bajo Stock</h3>
-              <p className="text-xl font-bold">{comprasPorProceso.inventario.items_bajo_stock}</p>
+              <p className="text-xl font-bold">
+                {comprasPorProceso.inventario?.items_bajo_stock || 0}
+              </p>
               <p className="text-xs text-slate-500 mt-1">
-                {comprasPorProceso.inventario.porcentaje_bajo_stock.toFixed(1)}% del inventario
+                {comprasPorProceso.inventario?.porcentaje_bajo_stock 
+                  ? `${comprasPorProceso.inventario.porcentaje_bajo_stock.toFixed(1)}% del inventario`
+                  : '0% del inventario'}
               </p>
             </div>
           </div>

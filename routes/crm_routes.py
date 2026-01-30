@@ -48,8 +48,38 @@ def listar_proveedores():
         # Incluir información de items y labels para cada proveedor
         resultado = []
         for p in proveedores:
-            prov_dict = p.to_dict(include_items=True)
-            resultado.append(prov_dict)
+            try:
+                # Obtener items del proveedor con eager loading de labels
+                from sqlalchemy.orm import selectinload
+                from models import Item
+                
+                items = db.session.query(Item).options(
+                    selectinload(Item.labels)
+                ).filter(
+                    Item.proveedor_autorizado_id == p.id,
+                    Item.activo == True
+                ).all()
+                
+                # Contar labels únicos
+                labels_set = set()
+                for item in items:
+                    for label in item.labels:
+                        if label.activo:
+                            labels_set.add(label.id)
+                
+                prov_dict = p.to_dict(include_items=False)
+                prov_dict['total_items'] = len(items)
+                prov_dict['total_labels'] = len(labels_set)
+                
+                resultado.append(prov_dict)
+            except Exception as e:
+                import logging
+                logging.error(f"Error procesando proveedor {p.id}: {str(e)}", exc_info=True)
+                # Si falla, agregar sin items
+                prov_dict = p.to_dict(include_items=False)
+                prov_dict['total_items'] = 0
+                prov_dict['total_labels'] = 0
+                resultado.append(prov_dict)
         
         return paginated_response(resultado, skip=skip, limit=limit)
     except ValueError as e:

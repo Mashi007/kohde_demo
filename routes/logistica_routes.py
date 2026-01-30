@@ -958,37 +958,53 @@ def listar_costos_recetas():
         if busqueda:
             query = query.filter(Receta.nombre.ilike(f'%{busqueda}%'))
         
+        # Agregar eager loading para ingredientes e items relacionados
+        from sqlalchemy.orm import selectinload, joinedload
+        query = query.options(
+            selectinload(Receta.ingredientes).joinedload('item')
+        )
+        
         recetas = query.order_by(Receta.nombre).offset(skip).limit(limit).all()
         
         # Recalcular costos antes de retornar (por si acaso)
         for receta in recetas:
-            receta.calcular_totales()
+            try:
+                receta.calcular_totales()
+            except Exception as e:
+                import logging
+                logging.warning(f"Error calculando totales de receta {receta.id}: {str(e)}")
         
         db.session.commit()
         
         resultado = []
         for receta in recetas:
-            receta_dict = receta.to_dict()
-            
-            # Contar ingredientes con costo
-            ingredientes_con_costo = 0
-            total_ingredientes = 0
-            if receta.ingredientes:
-                for ing in receta.ingredientes:
-                    total_ingredientes += 1
-                    if ing.item and ing.item.costo_unitario_actual:
-                        ingredientes_con_costo += 1
-            
-            # Agregar información adicional de costos
-            receta_dict['costo_info'] = {
-                'costo_total': float(receta.costo_total) if receta.costo_total else None,
-                'costo_por_porcion': float(receta.costo_por_porcion) if receta.costo_por_porcion else None,
-                'porciones': receta.porciones,
-                'porcion_gramos': float(receta.porcion_gramos) if receta.porcion_gramos else None,
-                'ingredientes_con_costo': ingredientes_con_costo,
-                'total_ingredientes': total_ingredientes
-            }
-            resultado.append(receta_dict)
+            try:
+                receta_dict = receta.to_dict()
+                
+                # Contar ingredientes con costo
+                ingredientes_con_costo = 0
+                total_ingredientes = 0
+                if receta.ingredientes:
+                    for ing in receta.ingredientes:
+                        total_ingredientes += 1
+                        if ing.item and ing.item.costo_unitario_actual:
+                            ingredientes_con_costo += 1
+                
+                # Agregar información adicional de costos
+                receta_dict['costo_info'] = {
+                    'costo_total': float(receta.costo_total) if receta.costo_total else None,
+                    'costo_por_porcion': float(receta.costo_por_porcion) if receta.costo_por_porcion else None,
+                    'porciones': receta.porciones,
+                    'porcion_gramos': float(receta.porcion_gramos) if receta.porcion_gramos else None,
+                    'ingredientes_con_costo': ingredientes_con_costo,
+                    'total_ingredientes': total_ingredientes
+                }
+                resultado.append(receta_dict)
+            except Exception as e:
+                import logging
+                logging.error(f"Error procesando receta {receta.id} en costos/recetas: {str(e)}", exc_info=True)
+                # Continuar con las demás recetas aunque una falle
+                continue
         
         return paginated_response(resultado, skip=skip, limit=limit)
     except ValueError as e:

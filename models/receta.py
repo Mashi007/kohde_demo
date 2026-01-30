@@ -55,11 +55,25 @@ class TipoRecetaEnum(TypeDecorator):
         """Convierte el valor string del enum a objeto Enum."""
         if value is None:
             return None
+        # Si ya es un objeto Enum, retornarlo directamente
+        if isinstance(value, TipoReceta):
+            return value
+        # Si es un string, buscar el enum correspondiente
         if isinstance(value, str):
+            valor_lower = value.lower().strip()
             for tipo in TipoReceta:
-                if tipo.value == value.lower():
+                if tipo.value == valor_lower:
                     return tipo
-        return value
+            # Si no se encuentra, retornar el string (será manejado en to_dict)
+            # Esto puede pasar si hay valores en la BD que no coinciden exactamente
+            import logging
+            logging.warning(f"Valor de enum no encontrado: '{valor_lower}', valores válidos: {[t.value for t in TipoReceta]}")
+            return valor_lower
+        # Para cualquier otro tipo, intentar convertirlo a string
+        try:
+            return str(value).lower().strip()
+        except:
+            return value
 
 class Receta(db.Model):
     """Modelo de receta."""
@@ -141,11 +155,43 @@ class Receta(db.Model):
     
     def to_dict(self):
         """Convierte el modelo a diccionario."""
+        # Manejar el tipo de manera segura
+        tipo_value = None
+        try:
+            if self.tipo:
+                if isinstance(self.tipo, TipoReceta):
+                    # Si es un objeto Enum, obtener su valor
+                    tipo_value = self.tipo.value
+                elif isinstance(self.tipo, str):
+                    # Si es un string, usarlo directamente (normalizar a minúsculas)
+                    tipo_value = self.tipo.lower().strip()
+                else:
+                    # Intentar obtener el valor si tiene el atributo value
+                    try:
+                        tipo_value = self.tipo.value
+                    except (AttributeError, TypeError):
+                        tipo_value = str(self.tipo).lower().strip() if self.tipo else None
+        except Exception as e:
+            # Si hay algún error, usar None y continuar
+            import logging
+            logging.warning(f"Error procesando tipo de receta {self.id}: {str(e)}")
+            tipo_value = None
+        
+        # Manejar ingredientes de manera segura
+        ingredientes_list = []
+        try:
+            if hasattr(self, 'ingredientes') and self.ingredientes:
+                ingredientes_list = [ing.to_dict() for ing in self.ingredientes]
+        except Exception as e:
+            import logging
+            logging.warning(f"Error procesando ingredientes de receta {self.id}: {str(e)}")
+            ingredientes_list = []
+        
         return {
             'id': self.id,
             'nombre': self.nombre,
             'descripcion': self.descripcion,
-            'tipo': self.tipo.value if self.tipo else None,
+            'tipo': tipo_value,
             'porciones': self.porciones,
             'porcion_gramos': float(self.porcion_gramos) if self.porcion_gramos else None,
             'calorias_totales': float(self.calorias_totales) if self.calorias_totales else None,
@@ -155,7 +201,7 @@ class Receta(db.Model):
             'tiempo_preparacion': self.tiempo_preparacion,
             'activa': self.activa,
             'fecha_creacion': self.fecha_creacion.isoformat() if self.fecha_creacion else None,
-            'ingredientes': [ing.to_dict() for ing in self.ingredientes] if self.ingredientes else [],
+            'ingredientes': ingredientes_list,
         }
     
     def __repr__(self):
@@ -177,13 +223,23 @@ class RecetaIngrediente(db.Model):
     
     def to_dict(self):
         """Convierte el modelo a diccionario."""
+        # Manejar item de manera segura
+        item_dict = None
+        try:
+            if self.item:
+                item_dict = self.item.to_dict()
+        except Exception as e:
+            import logging
+            logging.warning(f"Error procesando item de ingrediente {self.id}: {str(e)}")
+            item_dict = None
+        
         return {
             'id': self.id,
             'receta_id': self.receta_id,
             'item_id': self.item_id,
             'cantidad': float(self.cantidad) if self.cantidad else None,
             'unidad': self.unidad,
-            'item': self.item.to_dict() if self.item else None,
+            'item': item_dict,
         }
     
     def __repr__(self):
