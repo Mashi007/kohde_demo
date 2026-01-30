@@ -92,20 +92,12 @@ def create_app():
         return response
     
     # Inicializar extensiones
-    db.init_app(app)
-    
-    # Aplicar configuración del pool de conexiones después de init_app
-    # Flask-SQLAlchemy crea el engine en init_app, así que lo reconfiguramos aquí
+    # Configurar opciones del engine antes de init_app
+    # Flask-SQLAlchemy lee SQLALCHEMY_ENGINE_OPTIONS de la configuración
     if hasattr(Config, 'SQLALCHEMY_ENGINE_OPTIONS'):
-        from sqlalchemy import create_engine
-        # Obtener la URI actual
-        database_uri = app.config['SQLALCHEMY_DATABASE_URI']
-        # Crear nuevo engine con las opciones del pool
-        new_engine = create_engine(database_uri, **Config.SQLALCHEMY_ENGINE_OPTIONS)
-        # Reemplazar el engine de Flask-SQLAlchemy
-        db.engine = new_engine
-        # Actualizar el método get_engine para que devuelva nuestro engine
-        db.get_engine = lambda bind=None: new_engine
+        app.config['SQLALCHEMY_ENGINE_OPTIONS'] = Config.SQLALCHEMY_ENGINE_OPTIONS
+    
+    db.init_app(app)
     
     jwt = JWTManager(app)
     
