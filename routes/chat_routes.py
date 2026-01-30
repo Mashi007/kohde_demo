@@ -162,3 +162,74 @@ def listar_mensajes(conversacion_id):
         return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
         return error_response(str(e), 500, 'INTERNAL_ERROR')
+
+@bp.route('/health', methods=['GET'])
+def chat_health_check():
+    """Verifica la conectividad del sistema AI-BD."""
+    try:
+        from utils.db_helpers import verify_db_connection, get_pool_stats
+        from modules.configuracion.ai import AIConfigService
+        
+        # Verificar conexión BD
+        db_info = verify_db_connection()
+        
+        # Verificar configuración AI
+        ai_config = {
+            'api_key_configured': bool(AIConfigService.obtener_api_key()),
+            'model_configured': bool(AIConfigService.obtener_modelo()),
+            'base_url_configured': bool(AIConfigService.obtener_base_url())
+        }
+        
+        # Intentar ejecutar una consulta de prueba
+        prueba_consulta = None
+        if db_info['connected']:
+            try:
+                from sqlalchemy import text
+                import time
+                inicio = time.time()
+                resultado = db.session.execute(text("SELECT COUNT(*) FROM charolas LIMIT 1"))
+                tiempo = (time.time() - inicio) * 1000
+                prueba_consulta = {
+                    'ejecutada': True,
+                    'tiempo_ms': round(tiempo, 2),
+                    'status': 'ok'
+                }
+            except Exception as e:
+                prueba_consulta = {
+                    'ejecutada': False,
+                    'error': str(e),
+                    'status': 'error'
+                }
+        
+        # Verificar que el AI puede acceder a BD (simulación)
+        ai_bd_integracion = {
+            'status': 'ok' if (db_info['connected'] and ai_config['api_key_configured']) else 'error',
+            'bd_conectada': db_info['connected'],
+            'ai_configurado': ai_config['api_key_configured'],
+            'mensaje': 'Sistema AI-BD operativo' if (db_info['connected'] and ai_config['api_key_configured']) else 'Problemas de conectividad detectados'
+        }
+        
+        response_data = {
+            'status': 'ok' if (db_info['connected'] and ai_config['api_key_configured']) else 'error',
+            'database': {
+                'connected': db_info['connected'],
+                'status': db_info['status'],
+                'response_time_ms': db_info.get('response_time_ms', 0),
+                'pool': db_info.get('pool', {})
+            },
+            'ai': {
+                'configured': ai_config['api_key_configured'],
+                'model': AIConfigService.obtener_modelo() if ai_config['model_configured'] else None,
+                'base_url': 'configured' if ai_config['base_url_configured'] else 'not_configured'
+            },
+            'integration': ai_bd_integracion,
+            'test_query': prueba_consulta
+        }
+        
+        if response_data['status'] == 'ok':
+            return success_response(response_data)
+        else:
+            return error_response('Problemas de conectividad detectados', 503, 'CONNECTIVITY_ERROR')
+    except Exception as e:
+        logging.error(f"Error en chat health check: {str(e)}", exc_info=True)
+        return error_response(f'Error al verificar conectividad: {str(e)}', 500, 'INTERNAL_ERROR')
