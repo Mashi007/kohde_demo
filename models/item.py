@@ -4,7 +4,6 @@ Modelo de Item (Producto/Insumo).
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Numeric, ForeignKey
 from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
 import enum
 
 from models import db
@@ -30,12 +29,10 @@ class Item(db.Model):
     # PostgreSQL tiene valores mixtos: algunos en MAYÚSCULAS (nombres) y otros en minúsculas (valores)
     # Mapeo: MATERIA_PRIMA, INSUMO, PRODUCTO_TERMINADO -> nombres (MAYÚSCULAS)
     #        BEBIDA, LIMPIEZA, OTROS -> valores (minúsculas)
-    def _categoria_values():
-        return ['MATERIA_PRIMA', 'INSUMO', 'PRODUCTO_TERMINADO', 'bebida', 'limpieza', 'otros']
-    
+    # Usar String en lugar de PG_ENUM para evitar problemas de validación cuando los valores no coinciden
+    # El enum de PostgreSQL puede tener valores diferentes a los definidos en Python
     categoria = Column(
-        PG_ENUM('categoriaitem', name='categoriaitem', create_type=False,
-                values_callable=lambda x: _categoria_values()),
+        String(50),
         nullable=False,
         default='INSUMO'  # Usar el valor que PostgreSQL espera
     )

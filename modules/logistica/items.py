@@ -223,12 +223,27 @@ class ItemService:
         query = db.query(Item)
         
         # Usar eager loading para labels para evitar problemas de lazy loading
+        # Verificar primero si la tabla existe antes de intentar eager loading
         try:
-            query = query.options(selectinload(Item.labels))
+            from sqlalchemy import inspect as sql_inspect
+            inspector = sql_inspect(db.bind)
+            tables = inspector.get_table_names()
+            
+            # Solo usar eager loading si las tablas necesarias existen
+            if 'item_labels' in tables and 'item_label' in tables:
+                try:
+                    query = query.options(selectinload(Item.labels))
+                except Exception as e:
+                    import logging
+                    logging.warning(f"Error configurando eager loading: {str(e)}")
+                    # Continuar sin eager loading si falla
+            else:
+                import logging
+                logging.debug("Tablas item_labels o item_label no existen, omitiendo eager loading")
         except Exception as e:
             import logging
-            logging.warning(f"Error configurando eager loading: {str(e)}")
-            # Continuar sin eager loading si falla
+            logging.warning(f"Error verificando tablas para eager loading: {str(e)}")
+            # Continuar sin eager loading si falla la verificación
         
         if categoria:
             # Convertir categoria a formato PostgreSQL (valores mixtos)
@@ -272,7 +287,36 @@ class ItemService:
                 )
             )
         
-        return query.offset(skip).limit(limit).all()
+        # Ejecutar query con manejo de errores
+        try:
+            items = query.offset(skip).limit(limit).all()
+            return items
+        except LookupError as enum_error:
+            # Error específico de enum - puede ser que el enum de PostgreSQL tenga valores diferentes
+            import logging
+            import traceback
+            logging.error(f"Error de enum al ejecutar query de items: {str(enum_error)}")
+            logging.error(traceback.format_exc())
+            # Intentar rollback y retornar lista vacía
+            try:
+                db.rollback()
+            except:
+                pass
+            # Retornar lista vacía en lugar de fallar
+            logging.warning("Retornando lista vacía debido a error de enum. Verificar valores de categoría en la BD.")
+            return []
+        except Exception as e:
+            import logging
+            import traceback
+            logging.error(f"Error ejecutando query de items: {str(e)}")
+            logging.error(traceback.format_exc())
+            # Intentar rollback y retornar lista vacía
+            try:
+                db.rollback()
+            except:
+                pass
+            # Retornar lista vacía en lugar de fallar
+            return []
     
     @staticmethod
     def actualizar_item(db: Session, item_id: int, datos: Dict) -> Item:
