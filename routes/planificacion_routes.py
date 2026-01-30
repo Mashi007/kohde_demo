@@ -219,19 +219,23 @@ def crear_programacion():
         if datos['fecha_hasta'] < datos['fecha_desde']:
             return error_response('fecha_hasta debe ser mayor o igual a fecha_desde', 400, 'VALIDATION_ERROR')
     
-    # Convertir tiempo_comida string a enum si viene como string
+    # Convertir tiempo_comida string a nombre del enum (mayúsculas) si viene como string
     if 'tiempo_comida' in datos and isinstance(datos['tiempo_comida'], str):
         from models.programacion import TiempoComida
         try:
             tiempo_lower = datos['tiempo_comida'].lower().strip()
-            # Buscar por valor (minúsculas)
+            tiempo_upper = datos['tiempo_comida'].upper().strip()
+            # Buscar por valor (minúsculas) y convertir a nombre (mayúsculas)
+            tiempo_encontrado = None
             for tiempo in TiempoComida:
                 if tiempo.value == tiempo_lower:
-                    datos['tiempo_comida'] = tiempo
+                    tiempo_encontrado = tiempo
                     break
-            else:
+            if not tiempo_encontrado:
                 # Si no se encuentra por valor, intentar por nombre
-                datos['tiempo_comida'] = TiempoComida[datos['tiempo_comida'].upper()]
+                tiempo_encontrado = TiempoComida[tiempo_upper]
+            # Usar el nombre del enum (mayúsculas) para PostgreSQL
+            datos['tiempo_comida'] = tiempo_encontrado.name
         except (KeyError, AttributeError):
             return error_response(f"tiempo_comida inválido: {datos['tiempo_comida']}", 400, 'VALIDATION_ERROR')
     

@@ -2,10 +2,11 @@
 Modelos de ProgramacionMenu y ProgramacionMenuItem.
 """
 from datetime import datetime, date
-from sqlalchemy import Column, Integer, String, DateTime, Date, Numeric, ForeignKey, Enum
+from sqlalchemy import Column, Integer, String, DateTime, Date, Numeric, ForeignKey, Enum, cast, literal
 from sqlalchemy.orm import relationship
 from sqlalchemy.event import listens_for
 from sqlalchemy.types import TypeDecorator, String as SQLString
+from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
 import enum
 
 from models import db
@@ -28,6 +29,11 @@ class TiempoComidaEnum(TypeDecorator):
     
     def __init__(self):
         super().__init__(length=20)
+    
+    def bind_expression(self, bindvalue):
+        """Agregar cast explícito al tipo enum de PostgreSQL."""
+        # Cast explícito al tipo enum de PostgreSQL usando el tipo correcto
+        return cast(bindvalue, PG_ENUM('tiempocomida', name='tiempocomida', create_type=False))
     
     def process_bind_param(self, value, dialect):
         """Convierte el enum a MAYÚSCULAS antes de insertar en PostgreSQL."""
@@ -102,7 +108,7 @@ class ProgramacionMenu(db.Model):
     # Columnas para rango de fechas (ya migradas en la BD)
     fecha_desde = Column(Date, nullable=False)  # Fecha de inicio del rango
     fecha_hasta = Column(Date, nullable=False)  # Fecha de fin del rango
-    tiempo_comida = Column(TiempoComidaEnum(), nullable=False)
+    tiempo_comida = Column(PG_ENUM('tiempocomida', name='tiempocomida', create_type=False, values_callable=lambda x: [e.name for e in TiempoComida]), nullable=False)
     ubicacion = Column(String(100), nullable=False)  # restaurante_A, restaurante_B, etc.
     personas_estimadas = Column(Integer, nullable=False, default=0)
     charolas_planificadas = Column(Integer, nullable=False, default=0)  # Charolas planificadas para este servicio

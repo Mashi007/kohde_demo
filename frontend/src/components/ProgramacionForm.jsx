@@ -14,9 +14,10 @@ export default function ProgramacionForm({ programacion, fecha, tiempoComida, on
     tiempo_comida: tiempoComida || TIEMPO_COMIDA_VALUES.ALMUERZO, // Cambiar a ALMUERZO porque es el tipo más común
     ubicacion: programacion?.ubicacion || 'restaurante_A',
     charolas_planificadas: programacion?.charolas_planificadas || 0,
+    // Al cargar una programación existente, solo guardamos el receta_id
+    // La cantidad se tomará de charolas_planificadas automáticamente
     recetas: programacion?.items?.map(item => ({
       receta_id: item.receta_id,
-      cantidad_porciones: item.cantidad_porciones,
     })) || [],
   })
   
@@ -54,24 +55,24 @@ export default function ProgramacionForm({ programacion, fecha, tiempoComida, on
     console.log('Error recetas:', errorRecetas)
   }, [recetasDisponibles, formData.tiempo_comida, cargandoRecetas, errorRecetas])
   
-  // Calcular totales del servicio
+  // Calcular totales del servicio usando charolas_planificadas para todas las recetas
   const calcularTotales = () => {
     let caloriasTotales = 0
     let costoTotal = 0
     let totalRecetas = formData.recetas.length
-    let totalPorciones = 0
+    const cantidadPorReceta = formData.charolas_planificadas || 0
+    let totalPorciones = cantidadPorReceta * totalRecetas
     
     formData.recetas.forEach(recetaProg => {
       const receta = recetasDisponibles?.find(r => r.id === recetaProg.receta_id)
       if (receta) {
-        const cantidad = recetaProg.cantidad_porciones || 0
+        // Usar charolas_planificadas como cantidad para cada receta
         if (receta.calorias_por_porcion) {
-          caloriasTotales += receta.calorias_por_porcion * cantidad
+          caloriasTotales += receta.calorias_por_porcion * cantidadPorReceta
         }
         if (receta.costo_por_porcion) {
-          costoTotal += receta.costo_por_porcion * cantidad
+          costoTotal += receta.costo_por_porcion * cantidadPorReceta
         }
-        totalPorciones += cantidad
       }
     })
     
@@ -102,13 +103,19 @@ export default function ProgramacionForm({ programacion, fecha, tiempoComida, on
     }
     
     const primeraReceta = recetasDisponibles[0]
+    // Verificar que no esté ya agregada
+    if (formData.recetas.some(r => r.receta_id === primeraReceta.id)) {
+      toast.info(`La receta "${primeraReceta.nombre}" ya está agregada`)
+      return
+    }
+    
     setFormData({
       ...formData,
       recetas: [
         ...formData.recetas,
         {
           receta_id: primeraReceta.id,
-          cantidad_porciones: 1,
+          // cantidad_porciones se calculará automáticamente desde charolas_planificadas
         },
       ],
     })
@@ -124,6 +131,14 @@ export default function ProgramacionForm({ programacion, fecha, tiempoComida, on
   
   const actualizarReceta = (index, campo, valor) => {
     const nuevasRecetas = [...formData.recetas]
+    // Si se cambia la receta, verificar que no esté duplicada
+    if (campo === 'receta_id') {
+      const recetaId = parseInt(valor)
+      if (formData.recetas.some((r, i) => i !== index && r.receta_id === recetaId)) {
+        toast.error('Esta receta ya está agregada al menú')
+        return
+      }
+    }
     nuevasRecetas[index] = {
       ...nuevasRecetas[index],
       [campo]: valor,
@@ -168,11 +183,25 @@ export default function ProgramacionForm({ programacion, fecha, tiempoComida, on
       return
     }
     
+    // Validar que todas las recetas tengan receta_id seleccionado
+    const recetasInvalidas = formData.recetas.filter(r => !r.receta_id)
+    if (recetasInvalidas.length > 0) {
+      toast.error('Todas las recetas deben estar seleccionadas')
+      return
+    }
+    
+    // Validar que haya charolas programadas
+    if (!formData.charolas_planificadas || formData.charolas_planificadas <= 0) {
+      toast.error('Debes especificar la cantidad de charolas programadas')
+      return
+    }
+    
     const datos = {
       ...formData,
       recetas: formData.recetas.map(r => ({
         receta_id: r.receta_id,
-        cantidad_porciones: parseInt(r.cantidad_porciones) || 1,
+        // Usar charolas_planificadas como cantidad_porciones para todas las recetas
+        cantidad_porciones: parseInt(formData.charolas_planificadas) || 0,
       })),
     }
     
@@ -271,9 +300,16 @@ export default function ProgramacionForm({ programacion, fecha, tiempoComida, on
                 type="number"
                 min="0"
                 value={formData.charolas_planificadas}
-                onChange={(e) => setFormData({ ...formData, charolas_planificadas: parseInt(e.target.value) || 0 })}
+                onChange={(e) => {
+                  const nuevasCharolas = parseInt(e.target.value) || 0
+                  setFormData({ ...formData, charolas_planificadas: nuevasCharolas })
+                }}
                 className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:border-purple-500"
+                placeholder="Cantidad de porciones por receta"
               />
+              <p className="text-xs text-slate-400 mt-1">
+                Esta cantidad se aplicará a todas las recetas del menú
+              </p>
             </div>
           </div>
           
@@ -327,7 +363,7 @@ export default function ProgramacionForm({ programacion, fecha, tiempoComida, on
                     >
                       <div className="flex-1">
                         <select
-                          value={recetaProg.receta_id}
+                          value={recetaProg.receta_id || ''}
                           onChange={(e) => actualizarReceta(index, 'receta_id', parseInt(e.target.value))}
                           className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded focus:outline-none focus:border-purple-500"
                         >
@@ -340,21 +376,20 @@ export default function ProgramacionForm({ programacion, fecha, tiempoComida, on
                         </select>
                       </div>
                       
-                      <div className="w-32">
-                        <label className="text-xs text-slate-400 mb-1 block">Cantidad</label>
-                        <input
-                          type="number"
-                          min="1"
-                          value={recetaProg.cantidad_porciones}
-                          onChange={(e) => actualizarReceta(index, 'cantidad_porciones', parseInt(e.target.value) || 1)}
-                          className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded focus:outline-none focus:border-purple-500"
-                        />
-                      </div>
-                      
                       {receta && (
-                        <div className="text-xs text-slate-400 min-w-[120px]">
-                          <div>Calorías: {Math.round((receta.calorias_por_porcion || 0) * (recetaProg.cantidad_porciones || 1))}</div>
-                          <div>Costo: ${((receta.costo_por_porcion || 0) * (recetaProg.cantidad_porciones || 1)).toFixed(2)}</div>
+                        <div className="text-xs text-slate-400 min-w-[150px] text-right">
+                          <div className="mb-1">
+                            <span className="text-slate-500">Porciones: </span>
+                            <span className="font-semibold">{formData.charolas_planificadas || 0}</span>
+                          </div>
+                          <div className="mb-1">
+                            <span className="text-slate-500">Calorías: </span>
+                            <span className="font-semibold">{Math.round((receta.calorias_por_porcion || 0) * (formData.charolas_planificadas || 0))}</span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500">Costo: </span>
+                            <span className="font-semibold">${((receta.costo_por_porcion || 0) * (formData.charolas_planificadas || 0)).toFixed(2)}</span>
+                          </div>
                         </div>
                       )}
                       
