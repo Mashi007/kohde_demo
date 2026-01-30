@@ -26,8 +26,7 @@ class EstadoPedidoInternoEnum(TypeDecorator):
         if dialect.name == 'postgresql':
             # PostgreSQL tiene valores en minúsculas: 'pendiente', 'entregado', 'cancelado'
             return dialect.type_descriptor(
-                PG_ENUM('estadopedidointerno', values=['pendiente', 'entregado', 'cancelado'],
-                       name='estadopedidointerno', create_type=False)
+                PG_ENUM('estadopedidointerno', name='estadopedidointerno', create_type=False)
             )
         return dialect.type_descriptor(SQLString(20))
     

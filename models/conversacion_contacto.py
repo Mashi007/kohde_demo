@@ -29,8 +29,7 @@ class TipoMensajeContactoEnum(TypeDecorator):
     def load_dialect_impl(self, dialect):
         if dialect.name == 'postgresql':
             return dialect.type_descriptor(
-                PG_ENUM('tipomensajecontacto', values=['EMAIL', 'WHATSAPP'],
-                       name='tipomensajecontacto', create_type=False)
+                PG_ENUM('tipomensajecontacto', name='tipomensajecontacto', create_type=False)
             )
         return dialect.type_descriptor(SQLString(20))
     
@@ -71,8 +70,7 @@ class DireccionMensajeEnum(TypeDecorator):
     def load_dialect_impl(self, dialect):
         if dialect.name == 'postgresql':
             return dialect.type_descriptor(
-                PG_ENUM('direccionmensaje', values=['ENVIADO', 'RECIBIDO'],
-                       name='direccionmensaje', create_type=False)
+                PG_ENUM('direccionmensaje', name='direccionmensaje', create_type=False)
             )
         return dialect.type_descriptor(SQLString(20))
     

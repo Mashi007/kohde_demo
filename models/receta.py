@@ -26,20 +26,21 @@ class TipoRecetaEnum(TypeDecorator):
         super().__init__(length=20)
     
     def load_dialect_impl(self, dialect):
-        """Cargar la implementación del dialecto - usar PG_ENUM para PostgreSQL."""
-        # Para PostgreSQL, usar PG_ENUM para que SQLAlchemy haga el cast correcto
-        if dialect.name == 'postgresql':
-            # Crear el tipo ENUM de PostgreSQL con los valores correctos (minúsculas)
-            return dialect.type_descriptor(
-                PG_ENUM('tiporeceta', values=['desayuno', 'almuerzo', 'cena'], 
-                       name='tiporeceta', create_type=False)
-            )
-        # Para otros dialectos, usar String
+        """Cargar la implementación del dialecto - usar String para evitar problemas de validación."""
+        # Usar String en lugar de PG_ENUM para evitar problemas de validación
+        # El cast al tipo ENUM se hace en process_bind_param usando SQL explícito
         return dialect.type_descriptor(String(20))
     
     def coerce_compared_value(self, op, value):
         """Permitir comparaciones con strings directamente."""
         return self
+    
+    def bind_expression(self, bindvalue):
+        """Agregar cast explícito al tipo enum de PostgreSQL."""
+        from sqlalchemy import cast
+        # Hacer cast explícito al tipo ENUM de PostgreSQL solo para PostgreSQL
+        # Esto genera SQL como: CAST(:tipo AS tiporeceta)
+        return cast(bindvalue, PG_ENUM('tiporeceta', name='tiporeceta', create_type=False))
     
     def process_bind_param(self, value, dialect):
         """Convierte el enum a su VALOR (minúsculas) antes de insertar en PostgreSQL."""

@@ -24,8 +24,7 @@ class TipoCuentaEnum(TypeDecorator):
     def load_dialect_impl(self, dialect):
         if dialect.name == 'postgresql':
             return dialect.type_descriptor(
-                PG_ENUM('tipocuenta', values=['ACTIVO', 'PASIVO', 'INGRESO', 'GASTO'],
-                       name='tipocuenta', create_type=False)
+                PG_ENUM('tipocuenta', name='tipocuenta', create_type=False)
             )
         return dialect.type_descriptor(SQLString(20))
     

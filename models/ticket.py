@@ -39,8 +39,7 @@ class TipoTicketEnum(TypeDecorator):
     def load_dialect_impl(self, dialect):
         if dialect.name == 'postgresql':
             return dialect.type_descriptor(
-                PG_ENUM('tipoticket', values=['QUEJA', 'CONSULTA', 'SUGERENCIA', 'RECLAMO'],
-                       name='tipoticket', create_type=False)
+                PG_ENUM('tipoticket', name='tipoticket', create_type=False)
             )
         return dialect.type_descriptor(SQLString(20))
     
@@ -81,8 +80,7 @@ class EstadoTicketEnum(TypeDecorator):
     def load_dialect_impl(self, dialect):
         if dialect.name == 'postgresql':
             return dialect.type_descriptor(
-                PG_ENUM('estadoticket', values=['ABIERTO', 'EN_PROCESO', 'RESUELTO', 'CERRADO'],
-                       name='estadoticket', create_type=False)
+                PG_ENUM('estadoticket', name='estadoticket', create_type=False)
             )
         return dialect.type_descriptor(SQLString(20))
     
@@ -123,8 +121,7 @@ class PrioridadTicketEnum(TypeDecorator):
     def load_dialect_impl(self, dialect):
         if dialect.name == 'postgresql':
             return dialect.type_descriptor(
-                PG_ENUM('prioridadticket', values=['BAJA', 'MEDIA', 'ALTA', 'URGENTE'],
-                       name='prioridadticket', create_type=False)
+                PG_ENUM('prioridadticket', name='prioridadticket', create_type=False)
             )
         return dialect.type_descriptor(SQLString(20))
     

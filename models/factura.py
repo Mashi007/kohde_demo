@@ -32,8 +32,7 @@ class TipoFacturaEnum(TypeDecorator):
         if dialect.name == 'postgresql':
             # PostgreSQL tiene valores en MAYÚSCULAS: 'CLIENTE', 'PROVEEDOR'
             return dialect.type_descriptor(
-                PG_ENUM('tipofactura', values=['CLIENTE', 'PROVEEDOR'],
-                       name='tipofactura', create_type=False)
+                PG_ENUM('tipofactura', name='tipofactura', create_type=False)
             )
         return dialect.type_descriptor(SQLString(20))
     
@@ -79,8 +78,7 @@ class EstadoFacturaEnum(TypeDecorator):
         if dialect.name == 'postgresql':
             # PostgreSQL tiene valores en MAYÚSCULAS: 'PENDIENTE', 'PARCIAL', 'APROBADA', 'RECHAZADA'
             return dialect.type_descriptor(
-                PG_ENUM('estadofactura', values=['PENDIENTE', 'PARCIAL', 'APROBADA', 'RECHAZADA'],
-                       name='estadofactura', create_type=False)
+                PG_ENUM('estadofactura', name='estadofactura', create_type=False)
             )
         return dialect.type_descriptor(SQLString(20))
     

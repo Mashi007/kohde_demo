@@ -27,8 +27,7 @@ class EstadoPedidoEnum(TypeDecorator):
         if dialect.name == 'postgresql':
             # PostgreSQL tiene valores en MAYÚSCULAS: 'BORRADOR', 'ENVIADO', 'RECIBIDO', 'CANCELADO'
             return dialect.type_descriptor(
-                PG_ENUM('estadopedido', values=['BORRADOR', 'ENVIADO', 'RECIBIDO', 'CANCELADO'],
-                       name='estadopedido', create_type=False)
+                PG_ENUM('estadopedido', name='estadopedido', create_type=False)
             )
         return dialect.type_descriptor(SQLString(20))
     
