@@ -19,7 +19,8 @@ class ProgramacionMenu(db.Model):
     __tablename__ = 'programacion_menu'
     
     id = Column(Integer, primary_key=True)
-    fecha = Column(Date, nullable=False)
+    fecha_desde = Column(Date, nullable=False)  # Fecha de inicio del rango
+    fecha_hasta = Column(Date, nullable=False)  # Fecha de fin del rango
     tiempo_comida = Column(Enum(TiempoComida), nullable=False)
     ubicacion = Column(String(100), nullable=False)  # restaurante_A, restaurante_B, etc.
     personas_estimadas = Column(Integer, nullable=False, default=0)
@@ -37,7 +38,9 @@ class ProgramacionMenu(db.Model):
         totales = self.calcular_totales_servicio()
         return {
             'id': self.id,
-            'fecha': self.fecha.isoformat() if self.fecha else None,
+            'fecha_desde': self.fecha_desde.isoformat() if self.fecha_desde else None,
+            'fecha_hasta': self.fecha_hasta.isoformat() if self.fecha_hasta else None,
+            'fecha': self.fecha_desde.isoformat() if self.fecha_desde else None,  # Compatibilidad hacia atrás
             'tiempo_comida': self.tiempo_comida.value if self.tiempo_comida else None,
             'ubicacion': self.ubicacion,
             'personas_estimadas': self.personas_estimadas,
@@ -108,7 +111,7 @@ class ProgramacionMenu(db.Model):
         }
     
     def __repr__(self):
-        return f'<ProgramacionMenu {self.fecha} - {self.tiempo_comida.value}>'
+        return f'<ProgramacionMenu {self.fecha_desde} a {self.fecha_hasta} - {self.tiempo_comida.value}>'
 
 class ProgramacionMenuItem(db.Model):
     """Modelo de receta dentro de una programación de menú."""

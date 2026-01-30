@@ -121,9 +121,34 @@ class RecetaService:
         
         if tipo:
             try:
-                tipo_enum = TipoReceta[tipo.upper()]
-                query = query.filter(Receta.tipo == tipo_enum)
-            except KeyError:
+                # Convertir tipo a minúsculas para buscar por valor del enum
+                tipo_lower = tipo.lower().strip()
+                # Mapeo de valores a enums
+                tipo_map = {
+                    'desayuno': TipoReceta.DESAYUNO,
+                    'almuerzo': TipoReceta.ALMUERZO,
+                    'cena': TipoReceta.CENA,
+                }
+                tipo_enum = tipo_map.get(tipo_lower)
+                if tipo_enum is None:
+                    # Fallback: intentar por nombre del enum (mayúsculas)
+                    try:
+                        tipo_enum = TipoReceta[tipo.upper()]
+                    except KeyError:
+                        import logging
+                        logging.warning(f"Tipo inválido '{tipo}', ignorando filtro")
+                        tipo_enum = None
+                
+                if tipo_enum:
+                    # Usar el valor del enum (string minúsculas) directamente para la comparación
+                    # Esto funciona porque el TypeDecorator usa String como base y compara strings
+                    # El process_bind_param convertirá el enum a string si es necesario
+                    from sqlalchemy import cast, String
+                    # Comparar usando el valor del enum directamente
+                    query = query.filter(cast(Receta.tipo, String) == tipo_enum.value)
+            except (KeyError, AttributeError, Exception) as e:
+                import logging
+                logging.warning(f"Error al filtrar por tipo '{tipo}': {str(e)}", exc_info=True)
                 pass  # Tipo inválido, ignorar filtro
         
         if busqueda:

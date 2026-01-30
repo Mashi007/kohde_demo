@@ -146,7 +146,9 @@ class ProgramacionMenuService:
         
         return {
             'programacion_id': programacion_id,
-            'fecha': programacion.fecha.isoformat(),
+            'fecha_desde': programacion.fecha_desde.isoformat() if programacion.fecha_desde else None,
+            'fecha_hasta': programacion.fecha_hasta.isoformat() if programacion.fecha_hasta else None,
+            'fecha': programacion.fecha_desde.isoformat() if programacion.fecha_desde else None,  # Compatibilidad hacia atrás
             'items_suficientes': items_suficientes,
             'items_faltantes': items_faltantes,
             'necesidades_totales': necesidades
@@ -228,11 +230,13 @@ class ProgramacionMenuService:
         
         query = db.query(ProgramacionMenu)
         
+        # Filtrar por rango de fechas: programaciones que se solapen con el rango solicitado
+        # Una programación se solapa si: fecha_desde <= fecha_hasta_solicitada AND fecha_hasta >= fecha_desde_solicitada
         if fecha_desde:
-            query = query.filter(ProgramacionMenu.fecha >= fecha_desde)
+            query = query.filter(ProgramacionMenu.fecha_hasta >= fecha_desde)
         
         if fecha_hasta:
-            query = query.filter(ProgramacionMenu.fecha <= fecha_hasta)
+            query = query.filter(ProgramacionMenu.fecha_desde <= fecha_hasta)
         
         if ubicacion:
             query = query.filter(ProgramacionMenu.ubicacion == ubicacion)
@@ -244,7 +248,7 @@ class ProgramacionMenuService:
             except KeyError:
                 pass  # Ignorar si el valor no es válido
         
-        return query.order_by(ProgramacionMenu.fecha.desc(), ProgramacionMenu.tiempo_comida).offset(skip).limit(limit).all()
+        return query.order_by(ProgramacionMenu.fecha_desde.desc(), ProgramacionMenu.tiempo_comida).offset(skip).limit(limit).all()
     
     @staticmethod
     def generar_pedidos_inteligentes(
@@ -362,7 +366,9 @@ class ProgramacionMenuService:
         
         return {
             'programacion_id': programacion_id,
-            'fecha': programacion.fecha.isoformat(),
+            'fecha_desde': programacion.fecha_desde.isoformat() if programacion.fecha_desde else None,
+            'fecha_hasta': programacion.fecha_hasta.isoformat() if programacion.fecha_hasta else None,
+            'fecha': programacion.fecha_desde.isoformat() if programacion.fecha_desde else None,  # Compatibilidad hacia atrás
             'items_suficientes_programacion': items_suficientes_programacion,
             'items_para_programacion': items_para_programacion,
             'items_para_stock_minimo': items_para_stock_minimo,

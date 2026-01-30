@@ -409,11 +409,11 @@ class ComprasStatsService:
             )
         ).scalar() or 0
         
-        # Programaciones realizadas en el período
+        # Programaciones que se solapan con el período (que tengan algún día en común)
         programaciones = db.query(ProgramacionMenu).filter(
             and_(
-                ProgramacionMenu.fecha >= fecha_desde,
-                ProgramacionMenu.fecha <= fecha_hasta
+                ProgramacionMenu.fecha_hasta >= fecha_desde,
+                ProgramacionMenu.fecha_desde <= fecha_hasta
             )
         ).count()
         

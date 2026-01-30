@@ -46,9 +46,15 @@ export default function Programacion() {
   }
   
   const programacionesArray = Array.isArray(programaciones) ? programaciones : []
+  // Filtrar programaciones que incluyan la fecha seleccionada en su rango
   const programacionesDelDia = programacionesArray.filter(p => {
-    const fechaProg = parseISO(p.fecha)
-    return isSameDay(fechaProg, fechaSeleccionada)
+    const fechaDesde = p.fecha_desde ? parseISO(p.fecha_desde) : (p.fecha ? parseISO(p.fecha) : null)
+    const fechaHasta = p.fecha_hasta ? parseISO(p.fecha_hasta) : (p.fecha ? parseISO(p.fecha) : null)
+    
+    if (!fechaDesde || !fechaHasta) return false
+    
+    // La fecha seleccionada está en el rango si: fecha_desde <= fecha_seleccionada <= fecha_hasta
+    return fechaSeleccionada >= fechaDesde && fechaSeleccionada <= fechaHasta
   })
   
   const programacionesPorServicio = programacionesDelDia.reduce((acc, prog) => {
@@ -252,9 +258,24 @@ function ProgramacionCard({ programacion, onEdit, onVerNecesidades }) {
           <UtensilsCrossed className="w-5 h-5 text-purple-400" />
           <div>
             <h4 className="font-semibold">{programacion.ubicacion}</h4>
-            <span className={`text-xs px-2 py-1 rounded border ${getServicioBadge(programacion.tiempo_comida)}`}>
-              {getServicioLabel(programacion.tiempo_comida)}
-            </span>
+            <div className="flex items-center gap-2 mt-1">
+              <span className={`text-xs px-2 py-1 rounded border ${getServicioBadge(programacion.tiempo_comida)}`}>
+                {getServicioLabel(programacion.tiempo_comida)}
+              </span>
+              {(programacion.fecha_desde || programacion.fecha) && (
+                <span className="text-xs text-slate-400">
+                  {(() => {
+                    const fechaDesde = programacion.fecha_desde || programacion.fecha
+                    const fechaHasta = programacion.fecha_hasta || programacion.fecha
+                    if (fechaDesde === fechaHasta) {
+                      return format(parseISO(fechaDesde), "d 'de' MMM", { locale: es })
+                    } else {
+                      return `${format(parseISO(fechaDesde), "d MMM", { locale: es })} - ${format(parseISO(fechaHasta), "d MMM", { locale: es })}`
+                    }
+                  })()}
+                </span>
+              )}
+            </div>
           </div>
         </div>
         {programacion.personas_estimadas > 0 && (

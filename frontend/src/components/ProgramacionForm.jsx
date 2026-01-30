@@ -9,7 +9,8 @@ export default function ProgramacionForm({ programacion, fecha, tiempoComida, on
   const queryClient = useQueryClient()
   
   const [formData, setFormData] = useState({
-    fecha: fecha || new Date().toISOString().split('T')[0],
+    fecha_desde: programacion?.fecha_desde || programacion?.fecha || fecha || new Date().toISOString().split('T')[0],
+    fecha_hasta: programacion?.fecha_hasta || programacion?.fecha || fecha || new Date().toISOString().split('T')[0],
     tiempo_comida: tiempoComida || TIEMPO_COMIDA_VALUES.DESAYUNO,
     ubicacion: programacion?.ubicacion || 'restaurante_A',
     personas_estimadas: programacion?.personas_estimadas || 0,
@@ -171,15 +172,35 @@ export default function ProgramacionForm({ programacion, fecha, tiempoComida, on
         
         {/* Formulario */}
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          {/* Fecha y Servicio */}
-          <div className="grid grid-cols-2 gap-4">
+          {/* Fechas y Servicio */}
+          <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-2">Fecha *</label>
+              <label className="block text-sm font-medium mb-2">Fecha Desde *</label>
               <input
                 type="date"
                 required
-                value={formData.fecha}
-                onChange={(e) => setFormData({ ...formData, fecha: e.target.value })}
+                value={formData.fecha_desde}
+                onChange={(e) => {
+                  const nuevaFechaDesde = e.target.value
+                  setFormData({
+                    ...formData,
+                    fecha_desde: nuevaFechaDesde,
+                    // Si fecha_hasta es menor que fecha_desde, actualizarla también
+                    fecha_hasta: formData.fecha_hasta < nuevaFechaDesde ? nuevaFechaDesde : formData.fecha_hasta
+                  })
+                }}
+                className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:border-purple-500"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium mb-2">Fecha Hasta *</label>
+              <input
+                type="date"
+                required
+                min={formData.fecha_desde}
+                value={formData.fecha_hasta}
+                onChange={(e) => setFormData({ ...formData, fecha_hasta: e.target.value })}
                 className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:border-purple-500"
               />
             </div>

@@ -43,9 +43,12 @@ class TicketsAutomaticosService:
         
         tickets_generados = []
         
-        # Obtener todas las programaciones del día
+        # Obtener todas las programaciones que incluyan esta fecha en su rango
         programaciones = db.query(ProgramacionMenu).filter(
-            ProgramacionMenu.fecha == fecha
+            and_(
+                ProgramacionMenu.fecha_desde <= fecha,
+                ProgramacionMenu.fecha_hasta >= fecha
+            )
         ).all()
         
         for programacion in programaciones:
@@ -317,10 +320,11 @@ class TicketsAutomaticosService:
         
         for ubicacion in ubicaciones_list:
             for servicio in servicios_requeridos:
-                # Verificar si existe programación para este servicio y ubicación
+                # Verificar si existe programación para este servicio y ubicación que incluya esta fecha
                 programacion = db.query(ProgramacionMenu).filter(
                     and_(
-                        ProgramacionMenu.fecha == fecha,
+                        ProgramacionMenu.fecha_desde <= fecha,
+                        ProgramacionMenu.fecha_hasta >= fecha,
                         ProgramacionMenu.tiempo_comida == servicio,
                         ProgramacionMenu.ubicacion == ubicacion
                     )
@@ -398,10 +402,11 @@ class TicketsAutomaticosService:
             if ahora < hora_limite:
                 continue
             
-            # Verificar si hay programación para este servicio
+            # Verificar si hay programación para este servicio que incluya esta fecha
             programaciones = db.query(ProgramacionMenu).filter(
                 and_(
-                    ProgramacionMenu.fecha == fecha,
+                    ProgramacionMenu.fecha_desde <= fecha,
+                    ProgramacionMenu.fecha_hasta >= fecha,
                     ProgramacionMenu.tiempo_comida == servicio_enum
                 )
             ).all()
@@ -484,9 +489,9 @@ class TicketsAutomaticosService:
         if not programacion:
             return tickets_generados
         
-        # Calcular requerimientos
+        # Calcular requerimientos usando fecha_desde
         requerimientos_data = RequerimientosService.calcular_requerimientos_quincenales(
-            db, programacion.fecha
+            db, programacion.fecha_desde
         )
         
         # Verificar items con proveedor pero sin stock suficiente
@@ -510,13 +515,17 @@ class TicketsAutomaticosService:
                     and_(
                         PedidoCompra.proveedor_id == req['proveedor'].id,
                         PedidoCompra.estado.in_([EstadoPedido.BORRADOR, EstadoPedido.ENVIADO]),
-                        func.date(PedidoCompra.fecha_pedido) == programacion.fecha
+                        func.date(PedidoCompra.fecha_pedido) >= programacion.fecha_desde,
+                        func.date(PedidoCompra.fecha_pedido) <= programacion.fecha_hasta
                     )
                 ).first()
                 
                 asunto = f"Items insuficientes - {req['proveedor'].nombre}"
+                fecha_str = programacion.fecha_desde.strftime('%d/%m/%Y')
+                if programacion.fecha_desde != programacion.fecha_hasta:
+                    fecha_str += f" al {programacion.fecha_hasta.strftime('%d/%m/%Y')}"
                 descripcion = (
-                    f"Al programar el menú del {programacion.fecha.strftime('%d/%m/%Y')} "
+                    f"Al programar el menú del {fecha_str} "
                     f"se detectó que faltan items que requieren compra.\n\n"
                     f"Item: {req['item'].nombre}\n"
                     f"Cantidad necesaria: {req['cantidad_necesaria']:.2f} {req['unidad']}\n"

@@ -71,8 +71,10 @@ def listar_recetas():
         return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
         import logging
-        logging.error(f"Error en listar_recetas: {str(e)}", exc_info=True)
-        return error_response(str(e), 500, 'INTERNAL_ERROR')
+        import traceback
+        error_trace = traceback.format_exc()
+        logging.error(f"Error en listar_recetas: {str(e)}\n{error_trace}", exc_info=True)
+        return error_response(f"Error al listar recetas: {str(e)}", 500, 'INTERNAL_ERROR')
 
 @bp.route('/recetas', methods=['POST'])
 @handle_db_transaction
@@ -168,9 +170,25 @@ def crear_programacion():
     if not datos:
         return error_response('Datos JSON requeridos', 400, 'VALIDATION_ERROR')
     
-    # Convertir fecha string a date
+    # Convertir fechas string a date
+    # Compatibilidad: si viene 'fecha', usar para ambas fechas
     if 'fecha' in datos and isinstance(datos['fecha'], str):
-        datos['fecha'] = parse_date(datos['fecha'])
+        fecha = parse_date(datos['fecha'])
+        datos['fecha_desde'] = fecha
+        datos['fecha_hasta'] = fecha
+        datos.pop('fecha', None)  # Eliminar 'fecha' si existe
+    
+    # Convertir fecha_desde y fecha_hasta si vienen como strings
+    if 'fecha_desde' in datos and isinstance(datos['fecha_desde'], str):
+        datos['fecha_desde'] = parse_date(datos['fecha_desde'])
+    
+    if 'fecha_hasta' in datos and isinstance(datos['fecha_hasta'], str):
+        datos['fecha_hasta'] = parse_date(datos['fecha_hasta'])
+    
+    # Validar que fecha_hasta >= fecha_desde
+    if datos.get('fecha_desde') and datos.get('fecha_hasta'):
+        if datos['fecha_hasta'] < datos['fecha_desde']:
+            return error_response('fecha_hasta debe ser mayor o igual a fecha_desde', 400, 'VALIDATION_ERROR')
     
     programacion = ProgramacionMenuService.crear_programacion(db.session, datos)
     
@@ -189,7 +207,7 @@ def crear_programacion():
         usuario_id = datos.get('usuario_id', 1)
         pedidos_generados = PedidosAutomaticosService.generar_pedidos_desde_programacion(
             db.session,
-            fecha_inicio=programacion.fecha,
+            fecha_inicio=programacion.fecha_desde,  # Usar fecha_desde
             usuario_id=usuario_id
         )
     except Exception as e:
@@ -212,9 +230,25 @@ def actualizar_programacion(programacion_id):
     if not datos:
         return error_response('Datos JSON requeridos', 400, 'VALIDATION_ERROR')
     
-    # Convertir fecha string a date si existe
+    # Convertir fechas string a date
+    # Compatibilidad: si viene 'fecha', usar para ambas fechas
     if 'fecha' in datos and isinstance(datos['fecha'], str):
-        datos['fecha'] = parse_date(datos['fecha'])
+        fecha = parse_date(datos['fecha'])
+        datos['fecha_desde'] = fecha
+        datos['fecha_hasta'] = fecha
+        datos.pop('fecha', None)  # Eliminar 'fecha' si existe
+    
+    # Convertir fecha_desde y fecha_hasta si vienen como strings
+    if 'fecha_desde' in datos and isinstance(datos['fecha_desde'], str):
+        datos['fecha_desde'] = parse_date(datos['fecha_desde'])
+    
+    if 'fecha_hasta' in datos and isinstance(datos['fecha_hasta'], str):
+        datos['fecha_hasta'] = parse_date(datos['fecha_hasta'])
+    
+    # Validar que fecha_hasta >= fecha_desde
+    if datos.get('fecha_desde') and datos.get('fecha_hasta'):
+        if datos['fecha_hasta'] < datos['fecha_desde']:
+            return error_response('fecha_hasta debe ser mayor o igual a fecha_desde', 400, 'VALIDATION_ERROR')
     
     programacion = ProgramacionMenuService.actualizar_programacion(
         db.session,

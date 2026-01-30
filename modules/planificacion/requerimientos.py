@@ -31,11 +31,11 @@ class RequerimientosService:
         if fecha_fin is None:
             fecha_fin = fecha_inicio + timedelta(days=15)
         
-        # Obtener todas las programaciones del período
+        # Obtener todas las programaciones que se solapan con el período
         programaciones = db.query(ProgramacionMenu).filter(
             and_(
-                ProgramacionMenu.fecha >= fecha_inicio,
-                ProgramacionMenu.fecha <= fecha_fin
+                ProgramacionMenu.fecha_hasta >= fecha_inicio,
+                ProgramacionMenu.fecha_desde <= fecha_fin
             )
         ).all()
         
