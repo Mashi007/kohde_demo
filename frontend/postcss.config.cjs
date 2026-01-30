@@ -1,4 +1,4 @@
-const removeProblematicPrefixes = require('./postcss-remove-problematic-prefixes');
+const removeProblematicPrefixes = require('./postcss-remove-problematic-prefixes.cjs');
 
 module.exports = {
   plugins: {
