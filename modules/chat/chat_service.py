@@ -861,11 +861,17 @@ Puedes consultar charolas servidas, mermas, análisis de pérdidas, etc.""",
             }
             
             # Agregar headers específicos de OpenRouter si es necesario
+            # HTTP-Referer es REQUERIDO por OpenRouter para evitar errores 401
             if 'openrouter.ai' in base_url.lower():
-                if Config.OPENROUTER_HTTP_REFERER:
-                    headers["HTTP-Referer"] = Config.OPENROUTER_HTTP_REFERER
+                # HTTP-Referer es obligatorio para OpenRouter
+                referer = Config.OPENROUTER_HTTP_REFERER or "https://github.com/Mashi007/kohde_demo"
+                headers["HTTP-Referer"] = referer
+                
+                # X-Title es opcional pero recomendado
                 if Config.OPENROUTER_X_TITLE:
                     headers["X-Title"] = Config.OPENROUTER_X_TITLE
+                else:
+                    headers["X-Title"] = "Kohde ERP Restaurantes"
             
             data = {
                 "model": model,
@@ -888,8 +894,29 @@ Puedes consultar charolas servidas, mermas, análisis de pérdidas, etc.""",
                     'tokens': result.get('usage', {}).get('total_tokens')
                 }
             else:
+                # Mejorar mensajes de error según el código de estado
+                error_message = f'Error al llamar a la API: {response.status_code}'
+                try:
+                    error_data = response.json()
+                    if 'error' in error_data:
+                        error_detail = error_data['error']
+                        if isinstance(error_detail, dict):
+                            error_message = f'Error {response.status_code}: {error_detail.get("message", str(error_detail))}'
+                        else:
+                            error_message = f'Error {response.status_code}: {error_detail}'
+                    else:
+                        error_message = f'Error {response.status_code}: {response.text[:200]}'
+                except:
+                    error_message = f'Error {response.status_code}: {response.text[:200]}'
+                
+                # Mensajes específicos para errores comunes
+                if response.status_code == 401:
+                    error_message += '\n\nSugerencia: Verifica que la API key de OpenRouter sea válida y que el header HTTP-Referer esté configurado correctamente.'
+                elif response.status_code == 429:
+                    error_message += '\n\nSugerencia: Has excedido el límite de solicitudes. Por favor, espera un momento antes de intentar nuevamente.'
+                
                 return {
-                    'content': f'Error al llamar a la API: {response.status_code} - {response.text}',
+                    'content': error_message,
                     'tokens': None
                 }
         except Exception as e:

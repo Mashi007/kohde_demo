@@ -20,8 +20,9 @@ def main():
     print("-" * 70)
     
     # Variables que vimos en la captura
+    # ⚠️ IMPORTANTE: NO hardcodees tokens aquí. Solo valores de referencia para comparación.
     variables_esperadas = {
-        'OPENROUTER_API_KEY': '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',
+        'OPENROUTER_API_KEY': None,  # Se compara con Config.OPENROUTER_API_KEY (de variables de entorno)
         'OPENAI_MODEL': 'openai/gpt-3.5-turbo',
         'OPENROUTER_HTTP_REFERER': 'https://github.com/Mashi007/kohde_demo.git',
         'OPENROUTER_X_TITLE': 'Kohde ERP Restaurantes',
@@ -34,18 +35,20 @@ def main():
         var_value_actual = getattr(Config, var_name, None)
         
         if var_name == 'OPENROUTER_API_KEY':
-            # Comparar solo los últimos caracteres para verificar
+            # Verificar solo que esté configurada, sin comparar valores específicos
             if var_value_actual:
-                if var_value_actual.endswith(var_value_esperado[-10:]):
-                    print(f"✅ {var_name}: Configurada correctamente")
+                if var_value_actual.startswith('sk-or-v1-'):
+                    print(f"✅ {var_name}: Configurada correctamente (OpenRouter)")
+                    print(f"   Valor (últimos 10 chars): ...{var_value_actual[-10:]}")
+                elif var_value_actual.startswith('sk-'):
+                    print(f"⚠️  {var_name}: Configurada pero parece ser de OpenAI (esperado OpenRouter)")
                     print(f"   Valor (últimos 10 chars): ...{var_value_actual[-10:]}")
                 else:
-                    print(f"⚠️  {var_name}: Configurada pero valor diferente")
-                    print(f"   Esperado (últimos 10): ...{var_value_esperado[-10:]}")
-                    print(f"   Actual (últimos 10): ...{var_value_actual[-10:]}")
+                    print(f"⚠️  {var_name}: Configurada pero formato inesperado")
+                    print(f"   Valor (últimos 10 chars): ...{var_value_actual[-10:]}")
             else:
                 print(f"❌ {var_name}: NO configurada")
-                print(f"   Esperado: {var_value_esperado[:20]}...{var_value_esperado[-10:]}")
+                print(f"   Debe comenzar con: sk-or-v1-...")
         else:
             if var_value_actual == var_value_esperado:
                 print(f"✅ {var_name}: {var_value_actual}")

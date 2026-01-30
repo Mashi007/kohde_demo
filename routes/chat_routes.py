@@ -83,18 +83,25 @@ def eliminar_conversacion(conversacion_id):
     """Elimina (marca como inactiva) una conversación."""
     try:
         validate_positive_int(conversacion_id, 'conversacion_id')
+        logging.info(f"Intentando eliminar conversación {conversacion_id}")
+        
         eliminada = chat_service.eliminar_conversacion(db.session, conversacion_id)
         if not eliminada:
+            logging.warning(f"Conversación {conversacion_id} no encontrada o ya eliminada")
             return error_response('Conversación no encontrada', 404, 'NOT_FOUND')
         
         db.session.commit()
+        logging.info(f"Conversación {conversacion_id} eliminada exitosamente")
+        
         # Retornar un objeto con éxito explícito para que el frontend lo interprete correctamente
         return success_response({'eliminada': True, 'id': conversacion_id}, message='Conversación eliminada correctamente')
     except ValueError as e:
+        logging.warning(f"Error de validación al eliminar conversación {conversacion_id}: {str(e)}")
+        db.session.rollback()
         return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
-        import logging
         logging.error(f"Error al eliminar conversación {conversacion_id}: {str(e)}", exc_info=True)
+        db.session.rollback()
         return error_response(f'Error al eliminar conversación: {str(e)}', 500, 'INTERNAL_ERROR')
 
 # ========== RUTAS DE MENSAJES ==========

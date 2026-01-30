@@ -57,16 +57,26 @@ export default function Chat() {
   })
 
   const eliminarConversacionMutation = useMutation({
-    mutationFn: (id) => api.delete(`/chat/conversaciones/${id}`),
-    onSuccess: () => {
-      if (conversacionActual === id) {
+    mutationFn: async (id) => {
+      const response = await api.delete(`/chat/conversaciones/${id}`)
+      return { id, response }
+    },
+    onSuccess: (result, id) => {
+      // result contiene { id, response }
+      const deletedId = result.id
+      if (conversacionActual === deletedId) {
         setConversacionActual(null)
       }
       queryClient.invalidateQueries(['conversaciones'])
       toast.success('Conversación eliminada')
     },
     onError: (error) => {
-      toast.error(error.response?.data?.error || 'Error al eliminar conversación')
+      const errorMessage = error.response?.data?.error || 
+                          error.response?.data?.message || 
+                          error.message || 
+                          'Error al eliminar conversación'
+      toast.error(errorMessage)
+      console.error('Error al eliminar conversación:', error)
     },
   })
 
@@ -114,8 +124,17 @@ export default function Chat() {
 
   const confirmarEliminacion = () => {
     if (confirmarEliminar) {
-      eliminarConversacionMutation.mutate(confirmarEliminar)
-      setConfirmarEliminar(null)
+      const idAEliminar = confirmarEliminar
+      eliminarConversacionMutation.mutate(idAEliminar, {
+        onSuccess: () => {
+          // Cerrar el diálogo solo cuando la eliminación sea exitosa
+          setConfirmarEliminar(null)
+        },
+        onError: () => {
+          // Mantener el diálogo abierto si hay error para que el usuario vea el mensaje
+          // El error ya se muestra en el toast
+        }
+      })
     }
   }
 
@@ -190,13 +209,21 @@ export default function Chat() {
               <div className="flex items-start justify-between">
                 <div className="flex-1 min-w-0">
                   <p className="font-medium truncate">{conv.titulo || 'Sin título'}</p>
-                  <p className="text-xs opacity-75 mt-1">
-                    {format(new Date(conv.fecha_actualizacion), 'dd MMM HH:mm', { locale: es })}
-                  </p>
+                  <div className="text-xs opacity-75 mt-1 space-y-0.5">
+                    <p>
+                      Creada: {format(new Date(conv.fecha_creacion), 'dd MMM yyyy, HH:mm', { locale: es })}
+                    </p>
+                    {conv.fecha_actualizacion && conv.fecha_actualizacion !== conv.fecha_creacion && (
+                      <p className="opacity-60">
+                        Actualizada: {format(new Date(conv.fecha_actualizacion), 'dd MMM yyyy, HH:mm', { locale: es })}
+                      </p>
+                    )}
+                  </div>
                 </div>
                 <button
                   onClick={(e) => eliminarConversacion(conv.id, e)}
-                  className="ml-2 text-red-400 hover:text-red-300"
+                  className="ml-2 text-red-400 hover:text-red-300 flex-shrink-0"
+                  title="Eliminar conversación"
                 >
                   <Trash2 size={16} />
                 </button>
