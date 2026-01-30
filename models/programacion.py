@@ -20,7 +20,10 @@ class TiempoComida(enum.Enum):
 class TiempoComidaEnum(TypeDecorator):
     """TypeDecorator para manejar el enum tiempocomida de PostgreSQL.
     
-    IMPORTANTE: PostgreSQL tiene valores en MAYÚSCULAS (DESAYUNO, ALMUERZO, CENA),
+    NOTA: Este TypeDecorator ya no se usa en el modelo ProgramacionMenu,
+    que ahora usa PG_ENUM directamente. Se mantiene por compatibilidad.
+    
+    IMPORTANTE: PostgreSQL tiene valores en MAYÚSCULAS ('DESAYUNO', 'ALMUERZO', 'CENA'),
     pero Python usa valores en minúsculas ('desayuno', 'almuerzo', 'cena').
     Este decorator convierte entre ambos formatos.
     """
@@ -36,13 +39,13 @@ class TiempoComidaEnum(TypeDecorator):
         return cast(bindvalue, PG_ENUM('tiempocomida', name='tiempocomida', create_type=False))
     
     def process_bind_param(self, value, dialect):
-        """Convierte el enum a MAYÚSCULAS antes de insertar en PostgreSQL."""
+        """Convierte el enum a su NOMBRE (mayúsculas) antes de insertar en PostgreSQL."""
         if value is None:
             return None
         # PostgreSQL espera valores en MAYÚSCULAS: 'DESAYUNO', 'ALMUERZO', 'CENA'
         if isinstance(value, TiempoComida):
-            # Convertir valor del enum (minúsculas) a nombre del enum (mayúsculas)
-            return value.name  # Usar el nombre del enum (DESAYUNO, ALMUERZO, CENA)
+            # Usar el nombre del enum (mayúsculas)
+            return value.name  # Usar el nombre del enum ('DESAYUNO', 'ALMUERZO', 'CENA')
         if isinstance(value, str):
             valor_lower = value.lower().strip()
             valor_upper = value.upper().strip()
@@ -62,7 +65,7 @@ class TiempoComidaEnum(TypeDecorator):
         return value
     
     def process_result_value(self, value, dialect):
-        """Convierte el valor MAYÚSCULAS de PostgreSQL a objeto Enum."""
+        """Convierte el VALOR (mayúsculas) de PostgreSQL a objeto Enum."""
         if value is None:
             return None
         # Si ya es un objeto Enum, retornarlo directamente
@@ -108,6 +111,8 @@ class ProgramacionMenu(db.Model):
     # Columnas para rango de fechas (ya migradas en la BD)
     fecha_desde = Column(Date, nullable=False)  # Fecha de inicio del rango
     fecha_hasta = Column(Date, nullable=False)  # Fecha de fin del rango
+    # PostgreSQL tiene valores en MAYÚSCULAS: 'DESAYUNO', 'ALMUERZO', 'CENA'
+    # Usar values_callable para convertir nombres (mayúsculas) en lugar de valores (minúsculas)
     tiempo_comida = Column(PG_ENUM('tiempocomida', name='tiempocomida', create_type=False, values_callable=lambda x: [e.name for e in TiempoComida]), nullable=False)
     ubicacion = Column(String(100), nullable=False)  # restaurante_A, restaurante_B, etc.
     personas_estimadas = Column(Integer, nullable=False, default=0)

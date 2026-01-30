@@ -22,7 +22,7 @@ class RecetaService:
         """
         ingredientes_data = datos.pop('ingredientes', [])
         
-        # Convertir tipo string a enum si es necesario
+        # Convertir tipo string a valor del enum (minúsculas) para PostgreSQL
         if isinstance(datos.get('tipo'), str):
             from models.receta import TipoReceta
             tipo_str = datos['tipo'].lower().strip()  # Convertir a minúsculas y limpiar
@@ -43,7 +43,11 @@ class RecetaService:
                 except KeyError:
                     tipo_enum = TipoReceta.ALMUERZO  # Valor por defecto
             
-            datos['tipo'] = tipo_enum
+            # Usar el VALOR del enum (minúsculas) para PostgreSQL, no el objeto enum
+            datos['tipo'] = tipo_enum.value
+        elif isinstance(datos.get('tipo'), type) and hasattr(datos['tipo'], 'value'):
+            # Si ya es un enum, convertir a su valor
+            datos['tipo'] = datos['tipo'].value
         
         receta = Receta(**datos)
         db.add(receta)
@@ -173,6 +177,25 @@ class RecetaService:
         if not receta:
             raise ValueError("Receta no encontrada")
         
+        # Convertir tipo string a valor del enum (minúsculas) para PostgreSQL
+        if isinstance(datos.get('tipo'), str):
+            from models.receta import TipoReceta
+            tipo_str = datos['tipo'].lower().strip()
+            tipo_map = {
+                'desayuno': TipoReceta.DESAYUNO,
+                'almuerzo': TipoReceta.ALMUERZO,
+                'cena': TipoReceta.CENA,
+            }
+            tipo_enum = tipo_map.get(tipo_str)
+            if tipo_enum is None:
+                try:
+                    tipo_enum = TipoReceta[tipo_str.upper()]
+                except KeyError:
+                    tipo_enum = TipoReceta.ALMUERZO
+            datos['tipo'] = tipo_enum.value
+        elif isinstance(datos.get('tipo'), type) and hasattr(datos['tipo'], 'value'):
+            datos['tipo'] = datos['tipo'].value
+        
         # Si se actualizan ingredientes, eliminar los antiguos y crear nuevos
         if 'ingredientes' in datos:
             # Eliminar ingredientes existentes
@@ -192,7 +215,7 @@ class RecetaService:
             
             datos.pop('ingredientes')
         
-        # Convertir tipo string a enum si es necesario
+        # Convertir tipo string a valor del enum (minúsculas) para PostgreSQL
         if isinstance(datos.get('tipo'), str):
             from models.receta import TipoReceta
             tipo_str = datos['tipo'].lower().strip()  # Convertir a minúsculas y limpiar
@@ -213,7 +236,11 @@ class RecetaService:
                 except KeyError:
                     tipo_enum = TipoReceta.ALMUERZO  # Valor por defecto
             
-            datos['tipo'] = tipo_enum
+            # Usar el VALOR del enum (minúsculas) para PostgreSQL, no el objeto enum
+            datos['tipo'] = tipo_enum.value
+        elif isinstance(datos.get('tipo'), type) and hasattr(datos['tipo'], 'value'):
+            # Si ya es un enum, convertir a su valor
+            datos['tipo'] = datos['tipo'].value
         
         # Actualizar otros campos
         for key, value in datos.items():

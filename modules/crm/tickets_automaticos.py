@@ -321,11 +321,12 @@ class TicketsAutomaticosService:
         for ubicacion in ubicaciones_list:
             for servicio in servicios_requeridos:
                 # Verificar si existe programación para este servicio y ubicación que incluya esta fecha
+                # Usar el nombre del enum (mayúsculas) para comparar con PostgreSQL
                 programacion = db.query(ProgramacionMenu).filter(
                     and_(
                         ProgramacionMenu.fecha_desde <= fecha,
                         ProgramacionMenu.fecha_hasta >= fecha,
-                        ProgramacionMenu.tiempo_comida == servicio,
+                        ProgramacionMenu.tiempo_comida == servicio.name,  # Usar nombre (mayúsculas)
                         ProgramacionMenu.ubicacion == ubicacion
                     )
                 ).first()
@@ -403,20 +404,22 @@ class TicketsAutomaticosService:
                 continue
             
             # Verificar si hay programación para este servicio que incluya esta fecha
+            # Usar el nombre del enum (mayúsculas) para comparar con PostgreSQL
             programaciones = db.query(ProgramacionMenu).filter(
                 and_(
                     ProgramacionMenu.fecha_desde <= fecha,
                     ProgramacionMenu.fecha_hasta >= fecha,
-                    ProgramacionMenu.tiempo_comida == servicio_enum
+                    ProgramacionMenu.tiempo_comida == servicio_enum.name  # Usar nombre (mayúsculas)
                 )
             ).all()
             
             for programacion in programaciones:
                 # Verificar si hay charolas reportadas para este servicio
+                # Charola.tiempo_comida es String, comparar con valor (minúsculas) del enum
                 charolas_reportadas = db.query(Charola).filter(
                     and_(
                         func.date(Charola.fecha_servicio) == fecha,
-                        Charola.tiempo_comida == servicio,
+                        Charola.tiempo_comida == servicio_enum.value,  # Usar valor (minúsculas) para String
                         Charola.ubicacion == programacion.ubicacion
                     )
                 ).count()

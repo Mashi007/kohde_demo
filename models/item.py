@@ -2,8 +2,9 @@
 Modelo de Item (Producto/Insumo).
 """
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Numeric, ForeignKey, Enum
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Numeric, ForeignKey
 from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
 import enum
 
 from models import db
@@ -26,7 +27,18 @@ class Item(db.Model):
     codigo = Column(String(50), unique=True, nullable=False)
     nombre = Column(String(200), nullable=False)
     descripcion = Column(Text, nullable=True)
-    categoria = Column(Enum(CategoriaItem), nullable=False, default=CategoriaItem.INSUMO)
+    # PostgreSQL tiene valores mixtos: algunos en MAYÚSCULAS (nombres) y otros en minúsculas (valores)
+    # Mapeo: MATERIA_PRIMA, INSUMO, PRODUCTO_TERMINADO -> nombres (MAYÚSCULAS)
+    #        BEBIDA, LIMPIEZA, OTROS -> valores (minúsculas)
+    def _categoria_values():
+        return ['MATERIA_PRIMA', 'INSUMO', 'PRODUCTO_TERMINADO', 'bebida', 'limpieza', 'otros']
+    
+    categoria = Column(
+        PG_ENUM('categoriaitem', name='categoriaitem', create_type=False,
+                values_callable=lambda x: _categoria_values()),
+        nullable=False,
+        default='INSUMO'  # Usar el valor que PostgreSQL espera
+    )
     unidad = Column(String(20), nullable=False)  # Unidad estándar del item (kg, litro, unidad, etc.) - Define la estandarización para todos los módulos
     calorias_por_unidad = Column(Numeric(10, 2), nullable=True)  # Calorías por unidad base
     proveedor_autorizado_id = Column(Integer, ForeignKey('proveedores.id', ondelete='SET NULL'), nullable=True)
@@ -59,12 +71,34 @@ class Item(db.Model):
             logging.warning(f"Error cargando labels para item {self.id}: {str(e)}")
             labels_list = []
         
+        # Convertir categoria desde PostgreSQL (valores mixtos) a valor Python (minúsculas)
+        categoria_value = None
+        if self.categoria:
+            if isinstance(self.categoria, CategoriaItem):
+                categoria_value = self.categoria.value
+            elif isinstance(self.categoria, str):
+                # PostgreSQL puede devolver valores en mayúsculas (nombres) o minúsculas (valores)
+                categoria_upper = self.categoria.upper()
+                categoria_lower = self.categoria.lower()
+                # Mapeo inverso: de valores PostgreSQL a valores Python
+                pg_to_py_map = {
+                    'MATERIA_PRIMA': 'materia_prima',
+                    'INSUMO': 'insumo',
+                    'PRODUCTO_TERMINADO': 'producto_terminado',
+                    'BEBIDA': 'bebida',
+                    'LIMPIEZA': 'limpieza',
+                    'OTROS': 'otros',
+                }
+                categoria_value = pg_to_py_map.get(categoria_upper, categoria_lower)
+            else:
+                categoria_value = str(self.categoria).lower()
+        
         return {
             'id': self.id,
             'codigo': self.codigo,
             'nombre': self.nombre,
             'descripcion': self.descripcion,
-            'categoria': self.categoria.value if self.categoria else None,
+            'categoria': categoria_value,
             'unidad': self.unidad,
             'calorias_por_unidad': float(self.calorias_por_unidad) if self.calorias_por_unidad else None,
             'proveedor_autorizado_id': self.proveedor_autorizado_id,

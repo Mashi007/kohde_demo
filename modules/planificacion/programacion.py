@@ -296,9 +296,21 @@ class ProgramacionMenuService:
         
         if tiempo_comida:
             try:
-                tiempo_enum = TiempoComida[tiempo_comida.upper()]
-                query = query.filter(ProgramacionMenu.tiempo_comida == tiempo_enum)
-            except KeyError:
+                # Convertir string a enum y luego a nombre (mayúsculas) para PostgreSQL
+                tiempo_lower = tiempo_comida.lower().strip()
+                tiempo_upper = tiempo_comida.upper().strip()
+                tiempo_enum = None
+                # Buscar por valor (minúsculas)
+                for tiempo in TiempoComida:
+                    if tiempo.value == tiempo_lower:
+                        tiempo_enum = tiempo
+                        break
+                if not tiempo_enum:
+                    # Si no se encuentra por valor, intentar por nombre
+                    tiempo_enum = TiempoComida[tiempo_upper]
+                # Usar el nombre del enum (mayúsculas) para comparar con PostgreSQL
+                query = query.filter(ProgramacionMenu.tiempo_comida == tiempo_enum.name)
+            except (KeyError, AttributeError):
                 pass  # Ignorar si el valor no es válido
         
         # Ordenar por fecha_desde (rango de fechas) o fecha como fallback

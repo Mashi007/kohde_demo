@@ -235,6 +235,7 @@ def crear_programacion():
         datos['fecha'] = parse_date(datos['fecha'])
     
     # Convertir tiempo_comida string a nombre del enum (mayúsculas) si viene como string
+    # PostgreSQL tiene valores en MAYÚSCULAS: 'DESAYUNO', 'ALMUERZO', 'CENA'
     if 'tiempo_comida' in datos and isinstance(datos['tiempo_comida'], str):
         from models.programacion import TiempoComida
         try:
@@ -249,7 +250,7 @@ def crear_programacion():
             if not tiempo_encontrado:
                 # Si no se encuentra por valor, intentar por nombre
                 tiempo_encontrado = TiempoComida[tiempo_upper]
-            # Usar el nombre del enum (mayúsculas) para PostgreSQL
+            # Usar el NOMBRE del enum (mayúsculas) para PostgreSQL
             datos['tiempo_comida'] = tiempo_encontrado.name
         except (KeyError, AttributeError):
             return error_response(f"tiempo_comida inválido: {datos['tiempo_comida']}", 400, 'VALIDATION_ERROR')

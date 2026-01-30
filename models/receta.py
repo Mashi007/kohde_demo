@@ -111,7 +111,14 @@ class Receta(db.Model):
     id = Column(Integer, primary_key=True)
     nombre = Column(String(200), nullable=False)
     descripcion = Column(Text, nullable=True)
-    tipo = Column(TipoRecetaEnum(), nullable=False, default=TipoReceta.ALMUERZO)
+    # Usar PG_ENUM directamente para evitar el cast a VARCHAR
+    # PostgreSQL tiene valores en MINÚSCULAS, así que usamos values_callable para convertir
+    tipo = Column(
+        PG_ENUM('tiporeceta', name='tiporeceta', create_type=False, 
+                values_callable=lambda x: [e.value for e in TipoReceta]),
+        nullable=False, 
+        default='almuerzo'  # Usar el valor string directamente para el default
+    )
     porciones = Column(Integer, nullable=False, default=1)
     porcion_gramos = Column(Numeric(10, 2), nullable=True)  # Peso total de la receta en gramos
     calorias_totales = Column(Numeric(10, 2), nullable=True)

@@ -114,23 +114,47 @@ class ItemService:
         # Separar labels del resto de datos
         label_ids = datos.pop('label_ids', [])
         
-        # Convertir categoria string a enum si es necesario
+        # Convertir categoria string a valor que PostgreSQL espera
+        # PostgreSQL tiene valores mixtos: algunos en MAYÚSCULAS (nombres) y otros en minúsculas (valores)
         if 'categoria' in datos and isinstance(datos['categoria'], str):
             from models.item import CategoriaItem
-            try:
-                # Intentar convertir el string al enum usando el nombre del enum (mayúsculas)
-                categoria_str = datos['categoria'].upper()
-                datos['categoria'] = CategoriaItem[categoria_str]
-            except KeyError:
-                # Si falla, intentar buscar por valor (minúsculas)
-                categoria_valor = datos['categoria'].lower()
-                for cat_enum in CategoriaItem:
-                    if cat_enum.value == categoria_valor:
-                        datos['categoria'] = cat_enum
-                        break
-                else:
+            categoria_str = datos['categoria'].upper().strip()
+            categoria_lower = datos['categoria'].lower().strip()
+            
+            # Mapeo de valores Python a valores PostgreSQL
+            categoria_pg_map = {
+                'MATERIA_PRIMA': 'MATERIA_PRIMA',  # Nombre en mayúsculas
+                'INSUMO': 'INSUMO',  # Nombre en mayúsculas
+                'PRODUCTO_TERMINADO': 'PRODUCTO_TERMINADO',  # Nombre en mayúsculas
+                'BEBIDA': 'bebida',  # Valor en minúsculas
+                'LIMPIEZA': 'limpieza',  # Valor en minúsculas
+                'OTROS': 'otros',  # Valor en minúsculas
+                # También aceptar valores en minúsculas y convertirlos
+                'materia_prima': 'MATERIA_PRIMA',
+                'insumo': 'INSUMO',
+                'producto_terminado': 'PRODUCTO_TERMINADO',
+                'bebida': 'bebida',
+                'limpieza': 'limpieza',
+                'otros': 'otros',
+            }
+            
+            # Buscar el valor en el mapa
+            if categoria_str in categoria_pg_map:
+                datos['categoria'] = categoria_pg_map[categoria_str]
+            elif categoria_lower in categoria_pg_map:
+                datos['categoria'] = categoria_pg_map[categoria_lower]
+            else:
+                # Intentar buscar por nombre del enum
+                try:
+                    cat_enum = CategoriaItem[categoria_str]
+                    # Convertir a valor PostgreSQL según el mapeo
+                    if cat_enum in [CategoriaItem.MATERIA_PRIMA, CategoriaItem.INSUMO, CategoriaItem.PRODUCTO_TERMINADO]:
+                        datos['categoria'] = cat_enum.name  # Usar nombre (mayúsculas)
+                    else:
+                        datos['categoria'] = cat_enum.value  # Usar valor (minúsculas)
+                except KeyError:
                     # Si no se encuentra, usar OTROS por defecto
-                    datos['categoria'] = CategoriaItem.OTROS
+                    datos['categoria'] = 'otros'
         
         item = Item(**datos)
         db.add(item)
@@ -230,13 +254,45 @@ class ItemService:
         # Separar labels del resto de datos
         label_ids = datos.pop('label_ids', None)
         
+        # Convertir categoria string a valor que PostgreSQL espera (igual que en crear_item)
+        if 'categoria' in datos and isinstance(datos['categoria'], str):
+            from models.item import CategoriaItem
+            categoria_str = datos['categoria'].upper().strip()
+            categoria_lower = datos['categoria'].lower().strip()
+            
+            # Mapeo de valores Python a valores PostgreSQL
+            categoria_pg_map = {
+                'MATERIA_PRIMA': 'MATERIA_PRIMA',
+                'INSUMO': 'INSUMO',
+                'PRODUCTO_TERMINADO': 'PRODUCTO_TERMINADO',
+                'BEBIDA': 'bebida',
+                'LIMPIEZA': 'limpieza',
+                'OTROS': 'otros',
+                'materia_prima': 'MATERIA_PRIMA',
+                'insumo': 'INSUMO',
+                'producto_terminado': 'PRODUCTO_TERMINADO',
+                'bebida': 'bebida',
+                'limpieza': 'limpieza',
+                'otros': 'otros',
+            }
+            
+            if categoria_str in categoria_pg_map:
+                datos['categoria'] = categoria_pg_map[categoria_str]
+            elif categoria_lower in categoria_pg_map:
+                datos['categoria'] = categoria_pg_map[categoria_lower]
+            else:
+                try:
+                    cat_enum = CategoriaItem[categoria_str]
+                    if cat_enum in [CategoriaItem.MATERIA_PRIMA, CategoriaItem.INSUMO, CategoriaItem.PRODUCTO_TERMINADO]:
+                        datos['categoria'] = cat_enum.name
+                    else:
+                        datos['categoria'] = cat_enum.value
+                except KeyError:
+                    datos['categoria'] = 'otros'
+        
         # Actualizar campos
         for key, value in datos.items():
             if hasattr(item, key) and key != 'id':
-                if key in ['categoria']:
-                    from models.item import CategoriaItem
-                    if isinstance(value, str):
-                        value = CategoriaItem[value.upper()]
                 setattr(item, key, value)
         
         # Actualizar labels si se proporcionaron
