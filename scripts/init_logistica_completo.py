@@ -30,6 +30,7 @@ def verificar_y_generar_datos_logistica():
             'requerimientos': {'existentes': 0, 'generados': 0},
             'pedidos_internos': {'existentes': 0, 'generados': 0},
             'labels': {'existentes': 0, 'generados': 0},
+            'programaciones': {'existentes': 0, 'generados': 0},
         }
         
         # 1. Verificar y generar PROVEEDORES
@@ -206,6 +207,35 @@ def verificar_y_generar_datos_logistica():
                 print(f"✅ {pedidos_internos_existentes} pedidos internos existentes")
         except Exception as e:
             print(f"⚠️  Error: {str(e)}")
+        
+        # 9. Verificar y generar PROGRAMACIONES (opcional, requiere recetas)
+        print("\n" + "=" * 70)
+        print("9️⃣ PROGRAMACIONES DE MENÚ")
+        print("=" * 70)
+        try:
+            from models.programacion import ProgramacionMenu
+            programaciones_existentes = db.session.query(ProgramacionMenu).count()
+            resultados['programaciones'] = {'existentes': programaciones_existentes, 'generados': 0}
+            
+            if programaciones_existentes == 0:
+                print("⚠️  No hay programaciones. Generando...")
+                # Verificar que haya recetas
+                from models.receta import Receta
+                total_recetas = db.session.query(Receta).filter(Receta.activa == True).count()
+                if total_recetas == 0:
+                    print("⚠️  No hay recetas. Generando recetas primero...")
+                    from scripts.init_recetas import init_recetas
+                    init_recetas()
+                
+                from scripts.init_programacion import init_programacion
+                programaciones = init_programacion()
+                resultados['programaciones']['generados'] = len(programaciones) if isinstance(programaciones, list) else 0
+                print(f"✅ Programaciones generadas")
+            else:
+                print(f"✅ {programaciones_existentes} programaciones existentes")
+        except Exception as e:
+            print(f"⚠️  Error: {str(e)}")
+            resultados['programaciones'] = {'existentes': 0, 'generados': 0}
         
         # Resumen final
         print("\n" + "=" * 70)

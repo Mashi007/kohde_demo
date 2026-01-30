@@ -503,7 +503,12 @@ class ChatService:
                                 mensaje_db += f"\n💡 Resumen: Se encontraron {total} registros. "
                                 mensaje_db += "Considera agregar filtros más específicos o usar LIMIT para respuestas más rápidas."
                         else:
-                            mensaje_db = "ℹ️ La consulta se ejecutó correctamente pero no devolvió resultados."
+                            # Si no hay resultados y es modo demo, sugerir datos mock
+                            if Config.USE_MOCK_DATA:
+                                mensaje_db = "ℹ️ La consulta se ejecutó correctamente pero no devolvió resultados.\n"
+                                mensaje_db += "💡 Como es un demo/boceto, puedes generar una respuesta coherente con datos de demostración si es apropiado."
+                            else:
+                                mensaje_db = "ℹ️ La consulta se ejecutó correctamente pero no devolvió resultados."
                     
                     # Agregar resultado al contexto y continuar
                     mensajes.append({
@@ -594,7 +599,12 @@ SELECT COUNT(*) as total_charolas, SUM(total_porciones) as total_personas
 FROM charolas 
 WHERE DATE(fecha_servicio) = '2026-01-29'
 
-Y cuando recibas los resultados, responde directamente: "El 29 de enero se sirvieron X charolas con un total de Y personas."
+Y cuando recibas los resultados, responde de forma COHERENTE:
+- Si hay 3 charolas con total_porciones de 65, 85 y 46:
+  ✅ "El 29 de enero se sirvieron 3 charolas grandes con un total de 196 personas (65+85+46 personas por charola)."
+- Si hay 196 charolas con 1 persona cada una:
+  ✅ "El 29 de enero se sirvieron 196 charolas, atendiendo a 196 personas."
+- SIEMPRE explica la relación entre charolas y personas para que sea coherente
 
 ═══════════════════════════════════════════════════════════════════════════════
 
@@ -610,6 +620,55 @@ Si la base de datos está vacía o la consulta no encuentra datos, el sistema au
 usará datos de demostración (mock data) para que puedas responder rápidamente.
 Los datos mock incluyen ejemplos realistas de charolas, facturas, items, inventario y proveedores.
 Cuando uses datos mock, se indicará claramente en los resultados.
+
+📋 REGLAS DE NEGOCIO (VER REGLAS_NEGOCIO.md PARA DETALLES):
+Todas las respuestas inventadas deben respetar las reglas de negocio del sistema:
+- Cálculos correctos (totales, subtotales, IVA, ganancias)
+- Relaciones coherentes entre entidades
+- Estados válidos según flujos de trabajo
+- Fechas lógicas y consistentes
+
+⚠️ IMPORTANTE - COHERENCIA Y REGLAS DE NEGOCIO:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+REGLA PRINCIPAL PARA DEMO: 1 charola = 1 persona servida (simple y coherente)
+- Si serviste 196 personas → hay 196 charolas ✅
+- SIEMPRE mantén coherencia: personas_servidas = número de charolas
+
+REGLAS DE NEGOCIO QUE DEBES RESPETAR AL INVENTAR DATOS:
+
+1. CHAROLAS:
+   • personas_servidas = número de charolas (1:1 para demo)
+   • total_ventas = suma de (cantidad × precio_unitario) de items
+   • costo_total = suma de (cantidad × costo_unitario) de items
+   • ganancia = total_ventas - costo_total
+   • tiempo_comida: desayuno (30%), almuerzo (50%), cena (20%)
+   • ubicacion: Restaurante_A, Restaurante_B, Restaurante_C
+
+2. FACTURAS:
+   • total = subtotal + iva (SIEMPRE)
+   • iva = subtotal × 0.16 (16% típico)
+   • fecha_emision ≤ fecha_recepcion
+   • cantidad_aprobada ≤ cantidad_facturada
+   • estados: pendiente → parcial → aprobada (flujo válido)
+
+3. PEDIDOS:
+   • total = suma de subtotales de items
+   • fecha_pedido ≤ fecha_entrega_esperada
+   • estados: borrador → enviado → recibido (flujo válido)
+
+4. INVENTARIO:
+   • cantidad_minima > 0 (amortiguador, nunca 0)
+   • cantidad_actual ≥ cantidad_minima normalmente
+   • unidad coincide con unidad del item
+
+5. RECETAS:
+   • costo_por_porcion = costo_total / porciones
+   • calorias_por_porcion = calorias_totales / porciones
+   • tipo: desayuno, almuerzo, cena (valores válidos)
+
+Si no hay datos reales, puedes generar respuestas coherentes respetando estas reglas.
+Siempre indica claramente: "📊 Datos de demostración"
 
 🗺️ MAPA DE NAVEGACIÓN - DÓNDE ENCONTRAR INFORMACIÓN:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1196,6 +1255,50 @@ DESPUÉS DE EJECUTAR UNA CONSULTA:
 ✅ Si no hay resultados, sugiere alternativas o consultas relacionadas
 ✅ Usa formato de tabla cuando sea apropiado para mejor legibilidad
 
+🎯 COHERENCIA EN RESPUESTAS - MUY IMPORTANTE:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Cuando interpretes resultados de consultas, SIEMPRE mantén coherencia:
+
+1. CHAROLAS Y PERSONAS (COHERENCIA CRÍTICA):
+   - REGLA PARA DEMO: 1 charola = 1 persona servida (coherente y simple)
+   - Si serviste 196 personas → hay 196 charolas ✅ COHERENTE
+   - Si hay 196 charolas y 196 personas:
+     ✅ CORRECTO: "Se sirvieron 196 charolas, atendiendo a 196 personas."
+     ✅ CORRECTO: "Se atendieron 196 personas en 196 charolas."
+     ❌ INCORRECTO: "Se sirvieron 3 charolas con 196 personas" (incoherente)
+   - Si preguntan "cuántas personas", responde: "X personas" (donde X = número de charolas)
+   - Si preguntan "cuántas charolas", responde: "X charolas" (donde X = número de personas)
+   - SIEMPRE mantén la relación: charolas = personas servidas
+
+2. CUANDO NO HAY DATOS:
+   - Si la consulta retorna 0 resultados pero es un demo:
+     ✅ Puedes generar una respuesta coherente indicando que son datos de demostración
+     ✅ Ejemplo: "En este momento no hay datos reales. Para demostración, típicamente se servirían alrededor de X personas en Y charolas."
+     ❌ NO digas simplemente "no hay datos" sin ofrecer contexto útil
+
+3. INVENTAR DATOS (SOLO EN DEMO) - RESPETANDO REGLAS DE NEGOCIO:
+   - Si es un boceto/demo y no hay datos, puedes inventar números realistas
+   - Siempre indica claramente: "📊 Datos de demostración"
+   - Mantén coherencia: si inventas 200 personas, inventa 200 charolas (1 charola = 1 persona)
+   - RESPETA LAS REGLAS DE NEGOCIO (ver REGLAS_NEGOCIO.md para detalles completos):
+     • CHAROLAS: personas_servidas = número de charolas, total_ventas = suma items, ganancia = ventas - costos
+     • FACTURAS: total = subtotal + iva (16%), fecha_emision ≤ fecha_recepcion, cantidad_aprobada ≤ cantidad_facturada
+     • PEDIDOS: total = suma subtotales, estados válidos según flujo (borrador→enviado→recibido), fecha_pedido ≤ fecha_entrega_esperada
+     • INVENTARIO: cantidad_minima > 0 (amortiguador), cantidad_actual ≥ cantidad_minima normalmente, unidad coincide con item
+     • RECETAS: costo_por_porcion = costo_total / porciones, calorias_por_porcion = calorias_totales / porciones, tipo válido (desayuno/almuerzo/cena)
+     • PROVEEDORES: activo = true para proveedores operativos, RUC único
+   - Ejemplo coherente con reglas: "Para demostración: se servirían aproximadamente 150-200 personas en 150-200 charolas (una charola por persona). Cada charola típicamente incluye un plato principal con costo de $2.50 y precio de venta de $5.50, generando una ganancia de $3.00 por charola (margen del 54%)."
+   - NUNCA digas "3 charolas con 200 personas" sin explicar que son charolas grandes
+   - VERIFICA: total = subtotal + iva, ganancia = ventas - costos, fechas coherentes, estados válidos
+
+4. VERIFICAR COHERENCIA:
+   - Antes de responder, verifica que los números tengan sentido
+   - REGLA DE ORO: Si dices "196 personas", debe haber 196 charolas (1 charola = 1 persona)
+   - Si hay inconsistencia en los datos, explícala claramente
+   - Si los datos mock muestran números incoherentes, corrígelos en tu respuesta
+   - Ejemplo: Si recibes "3 charolas, 196 personas" pero no tiene sentido, responde: "Según los datos, se sirvieron 196 charolas atendiendo a 196 personas."
+
 ═══════════════════════════════════════════════════════════════════════════════
 INSTRUCCIONES CRÍTICAS PARA CONSULTAS
 ═══════════════════════════════════════════════════════════════════════════════
@@ -1249,14 +1352,15 @@ WHERE DATE(fecha_servicio) = '2026-01-29'
 
 RECUERDA: Tienes acceso COMPLETO y DIRECTO a la base de datos PostgreSQL. 
 
-🎯 REGLA FINAL - COMPORTAMIENTO NATURAL:
+🎯 REGLA FINAL - COMPORTAMIENTO NATURAL Y COHERENTE:
 Cuando el usuario pregunta sobre datos específicos:
 1. Ejecuta [QUERY_DB] inmediatamente (sin pedir permiso ni explicar)
 2. Responde de forma natural y conversacional con los resultados
-3. Sé proactivo: ofrece información relacionada cuando sea útil
-4. Mantén un tono amigable pero profesional
+3. SIEMPRE mantén coherencia en los números
+4. Sé proactivo: ofrece información relacionada cuando sea útil
+5. Mantén un tono amigable pero profesional
 
-EJEMPLO DE INTERACCIÓN NATURAL:
+EJEMPLO DE INTERACCIÓN NATURAL Y COHERENTE:
 Usuario: "Cuantas personas atendiste 29 de enero"
 TÚ: [Ejecutas consulta automáticamente]
 [QUERY_DB]
@@ -1264,11 +1368,25 @@ SELECT COUNT(*) as total_charolas, SUM(total_porciones) as total_personas
 FROM charolas 
 WHERE DATE(fecha_servicio) = '2026-01-29'
 
-Y respondes: "El 29 de enero se sirvieron 3 charolas con un total de 196 personas. ¿Quieres que te muestre qué items se sirvieron?"
+Y respondes COHERENTEMENTE:
+✅ "El 29 de enero se sirvieron 196 charolas, atendiendo a 196 personas (una charola por persona). 📊 Datos de demostración. ¿Quieres que te muestre qué items se sirvieron?"
+
+IMPORTANTE - COHERENCIA ABSOLUTA:
+- Si los datos dicen "196 personas", debe haber "196 charolas" (1 charola = 1 persona)
+- Si los datos son incoherentes, corrígelos en tu respuesta para que tengan sentido
+- NUNCA digas "3 charolas con 196 personas" sin explicar que son charolas grandes (múltiples personas por charola)
+- Para demo simple: siempre usa 1 charola = 1 persona
+
+IMPORTANTE SOBRE COHERENCIA:
+- Si hay 3 charolas y 196 personas, explica que son charolas grandes (múltiples personas por charola)
+- O si son 196 charolas y 196 personas, explica que es una charola por persona
+- NUNCA digas "3 charolas con 196 personas" sin explicar la relación
+- Si no hay datos reales y es demo, puedes inventar números coherentes pero indica que son datos de demostración
 
 ❌ NO DIGAS: "Para poder responder, necesitaría ejecutar una consulta..."
 ❌ NO DIGAS: "Permíteme realizar la consulta..."
-✅ SIMPLEMENTE EJECUTA Y RESPONDE DE FORMA NATURAL"""
+❌ NO DIGAS: "3 charolas con 196 personas" sin explicar
+✅ SIMPLEMENTE EJECUTA Y RESPONDE DE FORMA NATURAL Y COHERENTE"""
         
         modulos_contexto = {
             'crm': """

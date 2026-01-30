@@ -164,6 +164,13 @@ export default function Dashboard() {
     staleTime: 30000,
   })
 
+  // Inventario tipo silos
+  const { data: inventarioSilos, isLoading: inventarioSilosLoading } = useQuery({
+    queryKey: ['inventario-silos'],
+    queryFn: () => api.get('/reportes/kpis/inventario-silos').then(extractData),
+    staleTime: 60000, // 1 minuto
+  })
+
   // Datos legacy para compatibilidad
   const { data: stockBajoResponse } = useQuery({
     queryKey: ['stock-bajo'],
@@ -196,6 +203,8 @@ export default function Dashboard() {
   const categoriasAlimentosTotales = categoriasAlimentosDistribucion?.totales || {}
   const costoCharolaTendenciaSeries = costoCharolaTendencia?.series || []
   const costoCharolaTendenciaEstadisticas = costoCharolaTendencia?.estadisticas || {}
+  const silosData = inventarioSilos?.silos || []
+  const silosEstadisticas = inventarioSilos?.estadisticas || {}
 
   // Colores para categorías de alimentos
   const coloresCategorias = {
@@ -456,23 +465,21 @@ export default function Dashboard() {
           </div>
         ) : charolasComparacionSeries.length > 0 ? (
           <ResponsiveContainer width="100%" height={450}>
-            <ComposedChart 
+            <LineChart 
               data={charolasComparacionSeries}
               margin={{ top: 20, right: 30, left: 20, bottom: 80 }}
             >
               <defs>
-                <linearGradient id="colorProgramadas" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={COLORS.blue} stopOpacity={0.9} />
-                  <stop offset="50%" stopColor={COLORS.blue} stopOpacity={0.6} />
-                  <stop offset="95%" stopColor={COLORS.blue} stopOpacity={0.1} />
+                <linearGradient id="colorProgramadasLine" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor={COLORS.blue} stopOpacity={1} />
+                  <stop offset="100%" stopColor={COLORS.blue} stopOpacity={0.8} />
                 </linearGradient>
-                <linearGradient id="colorServidas" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={COLORS.green} stopOpacity={0.9} />
-                  <stop offset="50%" stopColor={COLORS.green} stopOpacity={0.6} />
-                  <stop offset="95%" stopColor={COLORS.green} stopOpacity={0.1} />
+                <linearGradient id="colorServidasLine" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor={COLORS.green} stopOpacity={1} />
+                  <stop offset="100%" stopColor={COLORS.green} stopOpacity={0.8} />
                 </linearGradient>
-                <filter id="areaShadow">
-                  <feDropShadow dx="0" dy="3" stdDeviation="4" floodOpacity="0.25"/>
+                <filter id="lineShadow">
+                  <feDropShadow dx="0" dy="3" stdDeviation="4" floodOpacity="0.3"/>
                 </filter>
               </defs>
               <CartesianGrid 
@@ -550,42 +557,38 @@ export default function Dashboard() {
               />
               <Legend
                 wrapperStyle={{ paddingTop: '30px', paddingBottom: '10px' }}
-                iconType="circle"
-                iconSize={12}
+                iconType="line"
+                iconSize={16}
                 formatter={(value) => (
                   <span className="text-slate-300 text-sm font-semibold">
                     {value === 'programadas' ? 'Programadas' : 'Servidas'}
                   </span>
                 )}
               />
-              <Area
+              <Line
                 type="monotone"
                 dataKey="programadas"
                 stroke={COLORS.blue}
                 strokeWidth={4}
-                fillOpacity={1}
-                fill="url(#colorProgramadas)"
                 name="programadas"
-                dot={{ fill: COLORS.blue, r: 5, strokeWidth: 2, stroke: '#fff' }}
-                activeDot={{ r: 8, strokeWidth: 3, stroke: '#fff', fill: COLORS.blue }}
+                dot={{ fill: COLORS.blue, r: 6, strokeWidth: 2, stroke: '#fff' }}
+                activeDot={{ r: 9, strokeWidth: 3, stroke: '#fff', fill: COLORS.blue }}
                 animationDuration={1200}
                 animationEasing="ease-out"
-                filter="url(#areaShadow)"
+                filter="url(#lineShadow)"
               />
-              <Area
+              <Line
                 type="monotone"
                 dataKey="servidas"
                 stroke={COLORS.green}
                 strokeWidth={4}
-                fillOpacity={1}
-                fill="url(#colorServidas)"
                 name="servidas"
-                dot={{ fill: COLORS.green, r: 5, strokeWidth: 2, stroke: '#fff' }}
-                activeDot={{ r: 8, strokeWidth: 3, stroke: '#fff', fill: COLORS.green }}
+                dot={{ fill: COLORS.green, r: 6, strokeWidth: 2, stroke: '#fff' }}
+                activeDot={{ r: 9, strokeWidth: 3, stroke: '#fff', fill: COLORS.green }}
                 animationDuration={1200}
                 animationEasing="ease-out"
                 animationBegin={200}
-                filter="url(#areaShadow)"
+                filter="url(#lineShadow)"
               />
               <ReferenceLine 
                 y={charolasEstadisticas.total_programadas ? Math.round(charolasEstadisticas.total_programadas / (charolasComparacionSeries.length || 1)) : 0} 
@@ -601,7 +604,7 @@ export default function Dashboard() {
                 fill="#1e293b"
                 tickFormatter={(value) => format(new Date(value), 'dd/MM', { locale: es })}
               />
-            </ComposedChart>
+            </LineChart>
           </ResponsiveContainer>
         ) : (
           <div className="h-96 flex items-center justify-center text-slate-400">
@@ -618,17 +621,17 @@ export default function Dashboard() {
               <AlertTriangle size={28} className="text-yellow-400" />
               Análisis de Mermas
             </h2>
-            {mermasDetalleEstadisticas.total_cantidad !== undefined && (
+            {mermasDetalleEstadisticas.total_peso !== undefined && (
               <p className="text-slate-400 text-sm">
-                Total Mermas: <span className="font-bold text-yellow-400">{mermasDetalleEstadisticas.total_cantidad || 0}</span>
+                Total Peso: <span className="font-bold text-yellow-400">{mermasDetalleEstadisticas.total_peso?.toFixed(2) || 0} kg</span>
                 {' | '}
                 Costo Total: <span className="font-semibold">${(mermasDetalleEstadisticas.total_costo || 0).toLocaleString('es-ES', { minimumFractionDigits: 2 })}</span>
                 {' | '}
-                Promedio Diario: <span className="font-semibold">{mermasDetalleEstadisticas.promedio_diario?.toFixed(1) || 0}</span>
+                Promedio Diario: <span className="font-semibold">{mermasDetalleEstadisticas.promedio_diario?.toFixed(2) || 0} kg</span>
                 {mermasDetalleEstadisticas.dia_max_mermas && (
                   <>
                     {' | '}
-                    Día Máximo: <span className="font-semibold text-red-400">{mermasDetalleEstadisticas.cantidad_max}</span>
+                    Día Máximo: <span className="font-semibold text-red-400">{mermasDetalleEstadisticas.peso_max?.toFixed(2) || 0} kg</span>
                   </>
                 )}
               </p>
@@ -682,6 +685,8 @@ export default function Dashboard() {
                   tick={{ fill: '#9ca3af', fontSize: 11 }}
                   tickLine={{ stroke: '#4b5563' }}
                   axisLine={{ stroke: '#4b5563' }}
+                  label={{ value: 'Peso (kg)', angle: -90, position: 'insideLeft', fill: '#9ca3af', fontSize: 12 }}
+                  tickFormatter={(value) => `${value.toFixed(1)}`}
                 />
                 <YAxis 
                   yAxisId="right" 
@@ -695,9 +700,9 @@ export default function Dashboard() {
                 <Tooltip
                   content={({ active, payload, label }) => {
                     if (active && payload && payload.length) {
-                      const cantidad = payload.find(p => p.dataKey === 'cantidad')?.value || 0
+                      const peso = payload.find(p => p.dataKey === 'peso')?.value || 0
                       const costo = payload.find(p => p.dataKey === 'total_costo')?.value || 0
-                      const costo_unitario = cantidad > 0 ? (costo / cantidad).toFixed(2) : 0
+                      const costo_por_kg = peso > 0 ? (costo / peso).toFixed(2) : 0
                       
                       return (
                         <div className="bg-gradient-to-br from-slate-800 via-slate-800 to-slate-900 border-2 border-slate-600 rounded-xl p-5 shadow-2xl backdrop-blur-md min-w-[260px]">
@@ -710,9 +715,9 @@ export default function Dashboard() {
                             <div className="flex items-center justify-between gap-4 p-2 rounded-lg bg-yellow-500/10">
                               <div className="flex items-center gap-2.5">
                                 <div className="w-3.5 h-3.5 rounded-full bg-yellow-500 shadow-lg" />
-                                <span className="text-sm font-semibold text-slate-300">Cantidad</span>
+                                <span className="text-sm font-semibold text-slate-300">Peso</span>
                               </div>
-                              <span className="text-lg font-bold text-yellow-400">{cantidad}</span>
+                              <span className="text-lg font-bold text-yellow-400">{typeof peso === 'number' ? peso.toFixed(2) : peso} kg</span>
                             </div>
                             <div className="flex items-center justify-between gap-4 p-2 rounded-lg bg-red-500/10">
                               <div className="flex items-center gap-2.5">
@@ -725,8 +730,8 @@ export default function Dashboard() {
                             </div>
                             <div className="border-t-2 border-slate-600 pt-3 mt-3">
                               <div className="flex items-center justify-between gap-4">
-                                <span className="text-xs text-slate-400 font-medium">Costo Unitario:</span>
-                                <span className="font-bold text-sm text-cyan-400">${costo_unitario}</span>
+                                <span className="text-xs text-slate-400 font-medium">Costo por kg:</span>
+                                <span className="font-bold text-sm text-cyan-400">${costo_por_kg}</span>
                               </div>
                             </div>
                           </div>
@@ -744,19 +749,19 @@ export default function Dashboard() {
                   iconSize={12}
                   formatter={(value) => (
                     <span className="text-slate-300 text-sm font-semibold">
-                      {value === 'cantidad' ? 'Cantidad de Mermas' : 'Costo Total ($)'}
+                      {value === 'peso' ? 'Peso (kg)' : 'Costo Total ($)'}
                     </span>
                   )}
                 />
                 <Area
                   yAxisId="left"
                   type="monotone"
-                  dataKey="cantidad"
+                  dataKey="peso"
                   stroke={COLORS.yellow}
                   strokeWidth={4}
                   fillOpacity={1}
                   fill="url(#colorMermasCantidad)"
-                  name="cantidad"
+                  name="peso"
                   dot={{ fill: COLORS.yellow, r: 5, strokeWidth: 2, stroke: '#fff' }}
                   activeDot={{ r: 8, strokeWidth: 3, stroke: '#fff', fill: COLORS.yellow }}
                   animationDuration={1200}
@@ -793,7 +798,7 @@ export default function Dashboard() {
             {mermasPorTipoDetalle.length > 0 && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
                 <div className="bg-slate-800/50 p-4 rounded-lg border border-slate-700">
-                  <h3 className="text-lg font-bold mb-4 text-slate-300">Mermas por Tipo (Cantidad)</h3>
+                  <h3 className="text-lg font-bold mb-4 text-slate-300">Mermas por Tipo (Peso)</h3>
                   <ResponsiveContainer width="100%" height={250}>
                     <PieChart>
                       <Pie
@@ -801,16 +806,16 @@ export default function Dashboard() {
                         cx="50%"
                         cy="50%"
                         labelLine={false}
-                        label={({ tipo, cantidad }) => `${tipo}: ${cantidad}`}
+                        label={({ tipo, peso }) => `${tipo}: ${peso?.toFixed(2) || 0} kg`}
                         outerRadius={80}
                         fill="#8884d8"
-                        dataKey="cantidad"
+                        dataKey="peso"
                       >
                         {mermasPorTipoDetalle.map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
                         ))}
                       </Pie>
-                      <Tooltip />
+                      <Tooltip formatter={(value) => `${Number(value).toFixed(2)} kg`} />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
@@ -2723,6 +2728,178 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {/* Gráfico de Inventario - Silos */}
+      {silosData.length > 0 && (
+        <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-6 rounded-xl border border-slate-700 shadow-xl">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-2xl font-bold flex items-center gap-3 mb-2">
+                <Package size={28} className="text-amber-400" />
+                Inventario - Visualización de Silos
+              </h2>
+              {silosEstadisticas.total_items !== undefined && (
+                <p className="text-slate-400 text-sm">
+                  Total Items: <span className="font-bold text-amber-400">{silosEstadisticas.total_items || 0}</span>
+                  {' | '}
+                  Stock Normal: <span className="font-semibold text-green-400">{silosEstadisticas.items_normal || 0}</span>
+                  {' | '}
+                  Advertencia: <span className="font-semibold text-yellow-400">{silosEstadisticas.items_advertencia || 0}</span>
+                  {' | '}
+                  Stock Bajo: <span className={`font-semibold ${silosEstadisticas.items_bajo_stock > 0 ? 'text-red-400' : 'text-green-400'}`}>
+                    {silosEstadisticas.items_bajo_stock || 0}
+                  </span>
+                </p>
+              )}
+            </div>
+          </div>
+          {inventarioSilosLoading ? (
+            <div className="h-96 flex items-center justify-center">
+              <LoadingSpinner />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {silosData.map((silo, index) => {
+                const porcentajeLlenado = silo.porcentaje_llenado || 0
+                const porcentajeMinimo = silo.porcentaje_minimo || 0
+                const alturaMaxima = 300 // altura máxima del silo en px
+                const alturaLlenado = (porcentajeLlenado / 100) * alturaMaxima
+                const alturaMinimo = (porcentajeMinimo / 100) * alturaMaxima
+                
+                // Colores según estado
+                let colorSilo = COLORS.green
+                let colorBorde = '#10b981'
+                if (silo.estado === 'bajo') {
+                  colorSilo = COLORS.red
+                  colorBorde = '#ef4444'
+                } else if (silo.estado === 'advertencia') {
+                  colorSilo = COLORS.yellow
+                  colorBorde = '#f59e0b'
+                }
+                
+                return (
+                  <div key={silo.id || index} className="bg-slate-800/50 p-6 rounded-xl border border-slate-700 hover:border-slate-600 transition-all">
+                    <div className="text-center mb-4">
+                      <h3 className="text-lg font-bold text-slate-200 mb-1">{silo.nombre}</h3>
+                      <p className="text-xs text-slate-400 capitalize">{silo.categoria?.replace('_', ' ').toLowerCase()}</p>
+                    </div>
+                    
+                    {/* Contenedor del silo */}
+                    <div className="relative mx-auto" style={{ width: '120px', height: `${alturaMaxima}px` }}>
+                      {/* Silo - contenedor exterior con forma redondeada */}
+                      <svg width="120" height={alturaMaxima} className="absolute">
+                        <defs>
+                          <linearGradient id={`siloGradient-${index}`} x1="0%" y1="0%" x2="0%" y2="100%">
+                            <stop offset="0%" stopColor={colorSilo} stopOpacity="0.9" />
+                            <stop offset="50%" stopColor={colorSilo} stopOpacity="0.7" />
+                            <stop offset="100%" stopColor={colorSilo} stopOpacity="0.5" />
+                          </linearGradient>
+                          <filter id={`siloShadow-${index}`}>
+                            <feDropShadow dx="0" dy="2" stdDeviation="3" floodOpacity="0.3"/>
+                          </filter>
+                        </defs>
+                        
+                        {/* Contorno del silo (forma de silo con parte superior más estrecha) */}
+                        <path
+                          d={`M 20 ${alturaMaxima} Q 10 ${alturaMaxima - 20} 10 ${alturaMaxima - 40} L 10 40 Q 10 20 20 20 L 100 20 Q 110 20 110 40 L 110 ${alturaMaxima - 40} Q 110 ${alturaMaxima - 20} 100 ${alturaMaxima} Z`}
+                          fill="none"
+                          stroke={colorBorde}
+                          strokeWidth="3"
+                          filter={`url(#siloShadow-${index})`}
+                        />
+                        
+                        {/* Contenido del silo (grano) - área llena */}
+                        {alturaLlenado > 0 && (
+                          <rect
+                            x="15"
+                            y={alturaMaxima - alturaLlenado}
+                            width="90"
+                            height={alturaLlenado}
+                            rx="5"
+                            fill={`url(#siloGradient-${index})`}
+                            opacity="0.8"
+                          />
+                        )}
+                        
+                        {/* Línea de stock mínimo */}
+                        {alturaMinimo > 0 && (
+                          <line
+                            x1="10"
+                            y1={alturaMaxima - alturaMinimo}
+                            x2="110"
+                            y2={alturaMaxima - alturaMinimo}
+                            stroke="#06b6d4"
+                            strokeWidth="3"
+                            strokeDasharray="5 5"
+                            opacity="0.8"
+                          />
+                        )}
+                        
+                        {/* Etiqueta de stock mínimo */}
+                        {alturaMinimo > 0 && (
+                          <text
+                            x="115"
+                            y={alturaMaxima - alturaMinimo + 5}
+                            fill="#06b6d4"
+                            fontSize="10"
+                            fontWeight="bold"
+                          >
+                            Mín
+                          </text>
+                        )}
+                      </svg>
+                      
+                      {/* Información superpuesta */}
+                      <div className="absolute bottom-0 left-0 right-0 text-center p-2 bg-slate-900/80 rounded-b-lg backdrop-blur-sm">
+                        <div className="text-xs text-slate-300 mb-1">
+                          <span className="font-bold text-slate-200">{silo.cantidad_actual?.toFixed(1) || 0}</span>
+                          <span className="text-slate-400"> / {silo.capacidad_maxima?.toFixed(0) || 0} {silo.unidad}</span>
+                        </div>
+                        <div className="text-xs text-slate-400">
+                          Mín: <span className="text-cyan-400">{silo.cantidad_minima?.toFixed(1) || 0} {silo.unidad}</span>
+                        </div>
+                        <div className={`mt-1 text-xs font-semibold ${
+                          silo.estado === 'bajo' ? 'text-red-400' : 
+                          silo.estado === 'advertencia' ? 'text-yellow-400' : 
+                          'text-green-400'
+                        }`}>
+                          {silo.estado === 'bajo' ? '⚠️ Stock Bajo' : 
+                           silo.estado === 'advertencia' ? '⚠️ Advertencia' : 
+                           '✓ Normal'}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Barra de porcentaje */}
+                    <div className="mt-4">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs text-slate-400">Llenado</span>
+                        <span className={`text-xs font-bold ${
+                          porcentajeLlenado >= porcentajeMinimo * 1.2 ? 'text-green-400' :
+                          porcentajeLlenado >= porcentajeMinimo ? 'text-yellow-400' :
+                          'text-red-400'
+                        }`}>
+                          {porcentajeLlenado.toFixed(1)}%
+                        </span>
+                      </div>
+                      <div className="w-full bg-slate-700 rounded-full h-2 overflow-hidden">
+                        <div
+                          className={`h-full transition-all duration-500 ${
+                            porcentajeLlenado >= porcentajeMinimo * 1.2 ? 'bg-green-500' :
+                            porcentajeLlenado >= porcentajeMinimo ? 'bg-yellow-500' :
+                            'bg-red-500'
+                          }`}
+                          style={{ width: `${Math.min(porcentajeLlenado, 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

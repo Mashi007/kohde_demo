@@ -33,94 +33,138 @@ class ComprasStatsService:
         Returns:
             Diccionario con resumen general
         """
-        if fecha_desde is None:
-            fecha_desde = date.today() - timedelta(days=30)  # Últimos 30 días por defecto
-        if fecha_hasta is None:
-            fecha_hasta = date.today()
-        
-        fecha_desde_dt = datetime.combine(fecha_desde, datetime.min.time())
-        fecha_hasta_dt = datetime.combine(fecha_hasta, datetime.max.time())
-        
-        # Total de pedidos
-        total_pedidos = db.query(PedidoCompra).filter(
-            and_(
-                PedidoCompra.fecha_pedido >= fecha_desde_dt,
-                PedidoCompra.fecha_pedido <= fecha_hasta_dt
-            )
-        ).count()
-        
-        # Pedidos por estado
-        pedidos_por_estado = db.query(
-            PedidoCompra.estado,
-            func.count(PedidoCompra.id).label('cantidad')
-        ).filter(
-            and_(
-                PedidoCompra.fecha_pedido >= fecha_desde_dt,
-                PedidoCompra.fecha_pedido <= fecha_hasta_dt
-            )
-        ).group_by(PedidoCompra.estado).all()
-        
-        # Total de facturas de proveedores
-        total_facturas = db.query(Factura).filter(
-            and_(
-                Factura.tipo == TipoFactura.PROVEEDOR,
-                Factura.fecha_recepcion >= fecha_desde_dt,
-                Factura.fecha_recepcion <= fecha_hasta_dt
-            )
-        ).count()
-        
-        # Total gastado en pedidos recibidos
-        total_gastado_pedidos = db.query(
-            func.sum(PedidoCompra.total)
-        ).filter(
-            and_(
-                PedidoCompra.estado == EstadoPedido.RECIBIDO,
-                PedidoCompra.fecha_pedido >= fecha_desde_dt,
-                PedidoCompra.fecha_pedido <= fecha_hasta_dt
-            )
-        ).scalar() or 0
-        
-        # Total gastado en facturas aprobadas
-        total_gastado_facturas = db.query(
-            func.sum(Factura.total)
-        ).filter(
-            and_(
-                Factura.tipo == TipoFactura.PROVEEDOR,
-                Factura.estado == EstadoFactura.APROBADA,
-                Factura.fecha_recepcion >= fecha_desde_dt,
-                Factura.fecha_recepcion <= fecha_hasta_dt
-            )
-        ).scalar() or 0
-        
-        # Total gastado (pedidos + facturas)
-        total_gastado = float(total_gastado_pedidos) + float(total_gastado_facturas)
-        
-        # Pedidos pendientes de aprobación
-        pedidos_pendientes = db.query(PedidoCompra).filter(
-            PedidoCompra.estado == EstadoPedido.BORRADOR
-        ).count()
-        
-        # Asegurar que siempre retornamos la estructura completa
-        pedidos_por_estado_dict = {}
-        for estado, cantidad in pedidos_por_estado:
-            estado_key = str(estado)  # Ahora es siempre un string simple
-            pedidos_por_estado_dict[estado_key] = cantidad
-        
-        return {
-            'periodo': {
-                'fecha_desde': fecha_desde.isoformat(),
-                'fecha_hasta': fecha_hasta.isoformat()
-            },
-            'resumen': {
-                'total_pedidos': total_pedidos or 0,
-                'total_facturas': total_facturas or 0,
-                'total_gastado': float(total_gastado) if total_gastado else 0.0,
-                'total_gastado_pedidos': float(total_gastado_pedidos) if total_gastado_pedidos else 0.0,
-                'total_gastado_facturas': float(total_gastado_facturas) if total_gastado_facturas else 0.0,
-                'pedidos_pendientes': pedidos_pendientes or 0
-            },
-            'pedidos_por_estado': pedidos_por_estado_dict
-        }
+        try:
+            if fecha_desde is None:
+                fecha_desde = date.today() - timedelta(days=30)  # Últimos 30 días por defecto
+            if fecha_hasta is None:
+                fecha_hasta = date.today()
+            
+            fecha_desde_dt = datetime.combine(fecha_desde, datetime.min.time())
+            fecha_hasta_dt = datetime.combine(fecha_hasta, datetime.max.time())
+            
+            # Total de pedidos
+            try:
+                total_pedidos = db.query(PedidoCompra).filter(
+                    and_(
+                        PedidoCompra.fecha_pedido >= fecha_desde_dt,
+                        PedidoCompra.fecha_pedido <= fecha_hasta_dt
+                    )
+                ).count()
+            except Exception:
+                total_pedidos = 0
+            
+            # Pedidos por estado
+            try:
+                pedidos_por_estado = db.query(
+                    PedidoCompra.estado,
+                    func.count(PedidoCompra.id).label('cantidad')
+                ).filter(
+                    and_(
+                        PedidoCompra.fecha_pedido >= fecha_desde_dt,
+                        PedidoCompra.fecha_pedido <= fecha_hasta_dt
+                    )
+                ).group_by(PedidoCompra.estado).all()
+            except Exception:
+                pedidos_por_estado = []
+            
+            # Total de facturas de proveedores
+            try:
+                total_facturas = db.query(Factura).filter(
+                    and_(
+                        Factura.tipo == TipoFactura.PROVEEDOR,
+                        Factura.fecha_recepcion >= fecha_desde_dt,
+                        Factura.fecha_recepcion <= fecha_hasta_dt
+                    )
+                ).count()
+            except Exception:
+                total_facturas = 0
+            
+            # Total gastado en pedidos recibidos
+            try:
+                total_gastado_pedidos = db.query(
+                    func.sum(PedidoCompra.total)
+                ).filter(
+                    and_(
+                        PedidoCompra.estado == EstadoPedido.RECIBIDO,
+                        PedidoCompra.fecha_pedido >= fecha_desde_dt,
+                        PedidoCompra.fecha_pedido <= fecha_hasta_dt
+                    )
+                ).scalar() or 0
+            except Exception:
+                total_gastado_pedidos = 0
+            
+            # Total gastado en facturas aprobadas
+            try:
+                total_gastado_facturas = db.query(
+                    func.sum(Factura.total)
+                ).filter(
+                    and_(
+                        Factura.tipo == TipoFactura.PROVEEDOR,
+                        Factura.estado == EstadoFactura.APROBADA,
+                        Factura.fecha_recepcion >= fecha_desde_dt,
+                        Factura.fecha_recepcion <= fecha_hasta_dt
+                    )
+                ).scalar() or 0
+            except Exception:
+                total_gastado_facturas = 0
+            
+            # Total gastado (pedidos + facturas)
+            total_gastado = float(total_gastado_pedidos) + float(total_gastado_facturas)
+            
+            # Pedidos pendientes de aprobación
+            try:
+                pedidos_pendientes = db.query(PedidoCompra).filter(
+                    PedidoCompra.estado == EstadoPedido.BORRADOR
+                ).count()
+            except Exception:
+                pedidos_pendientes = 0
+            
+            # Asegurar que siempre retornamos la estructura completa
+            pedidos_por_estado_dict = {}
+            try:
+                for estado, cantidad in pedidos_por_estado:
+                    estado_key = str(estado)  # Ahora es siempre un string simple
+                    pedidos_por_estado_dict[estado_key] = cantidad
+            except Exception:
+                pass
+            
+            return {
+                'periodo': {
+                    'fecha_desde': fecha_desde.isoformat(),
+                    'fecha_hasta': fecha_hasta.isoformat()
+                },
+                'resumen': {
+                    'total_pedidos': total_pedidos or 0,
+                    'total_facturas': total_facturas or 0,
+                    'total_gastado': float(total_gastado) if total_gastado else 0.0,
+                    'total_gastado_pedidos': float(total_gastado_pedidos) if total_gastado_pedidos else 0.0,
+                    'total_gastado_facturas': float(total_gastado_facturas) if total_gastado_facturas else 0.0,
+                    'pedidos_pendientes': pedidos_pendientes or 0
+                },
+                'pedidos_por_estado': pedidos_por_estado_dict
+            }
+        except Exception as e:
+            # En caso de cualquier error, retornar estructura por defecto
+            if fecha_desde is None:
+                fecha_desde = date.today() - timedelta(days=30)
+            if fecha_hasta is None:
+                fecha_hasta = date.today()
+            
+            return {
+                'periodo': {
+                    'fecha_desde': fecha_desde.isoformat(),
+                    'fecha_hasta': fecha_hasta.isoformat()
+                },
+                'resumen': {
+                    'total_pedidos': 0,
+                    'total_facturas': 0,
+                    'total_gastado': 0.0,
+                    'total_gastado_pedidos': 0.0,
+                    'total_gastado_facturas': 0.0,
+                    'pedidos_pendientes': 0
+                },
+                'pedidos_por_estado': {}
+            }
     
     @staticmethod
     def obtener_resumen_por_item(
@@ -190,61 +234,89 @@ class ComprasStatsService:
         resultado = []
         
         # Obtener items únicos de ambas fuentes
-        item_ids_pedidos = db.query(stats_pedidos.c.item_id).all()
-        item_ids_facturas = db.query(stats_facturas.c.item_id).all()
-        item_ids_unicos = set([r[0] for r in item_ids_pedidos] + [r[0] for r in item_ids_facturas if r[0]])
+        try:
+            item_ids_pedidos = db.query(stats_pedidos.c.item_id).all()
+        except Exception:
+            item_ids_pedidos = []
+        
+        try:
+            item_ids_facturas = db.query(stats_facturas.c.item_id).all()
+        except Exception:
+            item_ids_facturas = []
+        
+        item_ids_unicos = set([r[0] for r in item_ids_pedidos if r[0]] + [r[0] for r in item_ids_facturas if r[0]])
         
         for item_id in item_ids_unicos:
-            item = db.query(Item).filter(Item.id == item_id).first()
-            if not item:
+            try:
+                item = db.query(Item).filter(Item.id == item_id).first()
+                if not item:
+                    continue
+                
+                # Obtener stats de pedidos
+                pedido_stats = None
+                try:
+                    pedido_stats = db.query(stats_pedidos).filter(
+                        stats_pedidos.c.item_id == item_id
+                    ).first()
+                except Exception:
+                    pass
+                
+                # Obtener stats de facturas
+                factura_stats = None
+                try:
+                    factura_stats = db.query(stats_facturas).filter(
+                        stats_facturas.c.item_id == item_id
+                    ).first()
+                except Exception:
+                    pass
+                
+                cantidad_total = 0
+                total_gastado = 0
+                veces_comprado = 0
+                precio_promedio = 0
+                
+                if pedido_stats:
+                    cantidad_total += float(pedido_stats.cantidad_total or 0)
+                    total_gastado += float(pedido_stats.total_gastado or 0)
+                    veces_comprado += int(pedido_stats.veces_comprado or 0)
+                
+                if factura_stats:
+                    cantidad_total += float(factura_stats.cantidad_total or 0)
+                    total_gastado += float(factura_stats.total_gastado or 0)
+                    veces_comprado += int(factura_stats.veces_comprado or 0)
+                
+                # Calcular precio promedio ponderado
+                if cantidad_total > 0:
+                    precio_promedio = total_gastado / cantidad_total
+                
+                # Obtener inventario actual
+                inventario = db.query(Inventario).filter(
+                    Inventario.item_id == item_id
+                ).first()
+                
+                # Manejar proveedor de forma segura
+                proveedor_dict = None
+                try:
+                    if item.proveedor_autorizado:
+                        proveedor_dict = item.proveedor_autorizado.to_dict()
+                except Exception:
+                    pass
+                
+                resultado.append({
+                    'item_id': item_id,
+                    'item': item.to_dict(),
+                    'cantidad_total_comprada': cantidad_total,
+                    'total_gastado': total_gastado,
+                    'veces_comprado': veces_comprado,
+                    'precio_promedio': precio_promedio,
+                    'unidad': item.unidad,
+                    'inventario_actual': float(inventario.cantidad_actual) if inventario and inventario.cantidad_actual else 0,
+                    'inventario_minimo': float(inventario.cantidad_minima) if inventario and inventario.cantidad_minima else 0,
+                    'proveedor': proveedor_dict
+                })
+            except Exception as e:
+                # Continuar con el siguiente item si hay error
                 continue
-            
-            # Obtener stats de pedidos
-            pedido_stats = db.query(stats_pedidos).filter(
-                stats_pedidos.c.item_id == item_id
-            ).first()
-            
-            # Obtener stats de facturas
-            factura_stats = db.query(stats_facturas).filter(
-                stats_facturas.c.item_id == item_id
-            ).first()
-            
-            cantidad_total = 0
-            total_gastado = 0
-            veces_comprado = 0
-            precio_promedio = 0
-            
-            if pedido_stats:
-                cantidad_total += float(pedido_stats.cantidad_total or 0)
-                total_gastado += float(pedido_stats.total_gastado or 0)
-                veces_comprado += int(pedido_stats.veces_comprado or 0)
-            
-            if factura_stats:
-                cantidad_total += float(factura_stats.cantidad_total or 0)
-                total_gastado += float(factura_stats.total_gastado or 0)
-                veces_comprado += int(factura_stats.veces_comprado or 0)
-            
-            # Calcular precio promedio ponderado
-            if cantidad_total > 0:
-                precio_promedio = total_gastado / cantidad_total
-            
-            # Obtener inventario actual
-            inventario = db.query(Inventario).filter(
-                Inventario.item_id == item_id
-            ).first()
-            
-            resultado.append({
-                'item_id': item_id,
-                'item': item.to_dict(),
-                'cantidad_total_comprada': cantidad_total,
-                'total_gastado': total_gastado,
-                'veces_comprado': veces_comprado,
-                'precio_promedio': precio_promedio,
-                'unidad': item.unidad,
-                'inventario_actual': float(inventario.cantidad_actual) if inventario else 0,
-                'inventario_minimo': float(inventario.cantidad_minima) if inventario else 0,
-                'proveedor': item.proveedor_autorizado.to_dict() if item.proveedor_autorizado else None
-            })
         
         # Ordenar por total gastado descendente
         resultado.sort(key=lambda x: x['total_gastado'], reverse=True)
@@ -308,58 +380,82 @@ class ComprasStatsService:
         ).group_by(Factura.proveedor_id).subquery()
         
         # Obtener proveedores únicos
-        proveedor_ids_pedidos = db.query(stats_pedidos.c.proveedor_id).all()
-        proveedor_ids_facturas = db.query(stats_facturas.c.proveedor_id).all()
+        try:
+            proveedor_ids_pedidos = db.query(stats_pedidos.c.proveedor_id).all()
+        except Exception:
+            proveedor_ids_pedidos = []
+        
+        try:
+            proveedor_ids_facturas = db.query(stats_facturas.c.proveedor_id).all()
+        except Exception:
+            proveedor_ids_facturas = []
+        
         proveedor_ids_unicos = set(
-            [r[0] for r in proveedor_ids_pedidos] + 
+            [r[0] for r in proveedor_ids_pedidos if r[0]] + 
             [r[0] for r in proveedor_ids_facturas if r[0]]
         )
         
         resultado = []
         
         for proveedor_id in proveedor_ids_unicos:
-            proveedor = db.query(Proveedor).filter(Proveedor.id == proveedor_id).first()
-            if not proveedor:
+            try:
+                proveedor = db.query(Proveedor).filter(Proveedor.id == proveedor_id).first()
+                if not proveedor:
+                    continue
+                
+                # Obtener stats de pedidos
+                pedido_stats = None
+                try:
+                    pedido_stats = db.query(stats_pedidos).filter(
+                        stats_pedidos.c.proveedor_id == proveedor_id
+                    ).first()
+                except Exception:
+                    pass
+                
+                # Obtener stats de facturas
+                factura_stats = None
+                try:
+                    factura_stats = db.query(stats_facturas).filter(
+                        stats_facturas.c.proveedor_id == proveedor_id
+                    ).first()
+                except Exception:
+                    pass
+                
+                total_pedidos = int(pedido_stats.total_pedidos) if pedido_stats and pedido_stats.total_pedidos else 0
+                total_facturas = int(factura_stats.total_facturas) if factura_stats and factura_stats.total_facturas else 0
+                total_gastado_pedidos = float(pedido_stats.total_gastado) if pedido_stats and pedido_stats.total_gastado else 0
+                total_gastado_facturas = float(factura_stats.total_gastado) if factura_stats and factura_stats.total_gastado else 0
+                total_gastado = total_gastado_pedidos + total_gastado_facturas
+                
+                promedio_pedido = float(pedido_stats.promedio_pedido) if pedido_stats and pedido_stats.promedio_pedido else 0
+                promedio_factura = float(factura_stats.promedio_factura) if factura_stats and factura_stats.promedio_factura else 0
+                
+                # Obtener items que provee
+                items_proveedor = 0
+                try:
+                    items_proveedor = db.query(Item).filter(
+                        Item.proveedor_autorizado_id == proveedor_id,
+                        Item.activo == True
+                    ).count()
+                except Exception:
+                    pass
+                
+                resultado.append({
+                    'proveedor_id': proveedor_id,
+                    'proveedor': proveedor.to_dict(),
+                    'total_pedidos': total_pedidos,
+                    'total_facturas': total_facturas,
+                    'total_gastado': total_gastado,
+                    'total_gastado_pedidos': total_gastado_pedidos,
+                    'total_gastado_facturas': total_gastado_facturas,
+                    'promedio_pedido': promedio_pedido,
+                    'promedio_factura': promedio_factura,
+                    'items_que_provee': items_proveedor,
+                    'activo': proveedor.activo if proveedor else False
+                })
+            except Exception as e:
+                # Continuar con el siguiente proveedor si hay error
                 continue
-            
-            # Obtener stats de pedidos
-            pedido_stats = db.query(stats_pedidos).filter(
-                stats_pedidos.c.proveedor_id == proveedor_id
-            ).first()
-            
-            # Obtener stats de facturas
-            factura_stats = db.query(stats_facturas).filter(
-                stats_facturas.c.proveedor_id == proveedor_id
-            ).first()
-            
-            total_pedidos = int(pedido_stats.total_pedidos) if pedido_stats else 0
-            total_facturas = int(factura_stats.total_facturas) if factura_stats else 0
-            total_gastado_pedidos = float(pedido_stats.total_gastado) if pedido_stats and pedido_stats.total_gastado else 0
-            total_gastado_facturas = float(factura_stats.total_gastado) if factura_stats and factura_stats.total_gastado else 0
-            total_gastado = total_gastado_pedidos + total_gastado_facturas
-            
-            promedio_pedido = float(pedido_stats.promedio_pedido) if pedido_stats and pedido_stats.promedio_pedido else 0
-            promedio_factura = float(factura_stats.promedio_factura) if factura_stats and factura_stats.promedio_factura else 0
-            
-            # Obtener items que provee
-            items_proveedor = db.query(Item).filter(
-                Item.proveedor_autorizado_id == proveedor_id,
-                Item.activo == True
-            ).count()
-            
-            resultado.append({
-                'proveedor_id': proveedor_id,
-                'proveedor': proveedor.to_dict(),
-                'total_pedidos': total_pedidos,
-                'total_facturas': total_facturas,
-                'total_gastado': total_gastado,
-                'total_gastado_pedidos': total_gastado_pedidos,
-                'total_gastado_facturas': total_gastado_facturas,
-                'promedio_pedido': promedio_pedido,
-                'promedio_factura': promedio_factura,
-                'items_que_provee': items_proveedor,
-                'activo': proveedor.activo
-            })
         
         # Ordenar por total gastado descendente
         resultado.sort(key=lambda x: x['total_gastado'], reverse=True)

@@ -833,7 +833,7 @@ def obtener_datos_graficos():
             try:
                 mermas_diarias = db.session.query(
                     func.date(Merma.fecha_merma).label('fecha'),
-                    func.count(Merma.id).label('cantidad'),
+                    func.coalesce(func.sum(Merma.cantidad), 0).label('peso'),  # Sumar cantidad como peso (kg)
                     func.coalesce(func.sum(Merma.cantidad * Merma.costo_unitario), 0).label('total_costo')
                 ).filter(
                     func.date(Merma.fecha_merma) >= fecha_inicio_date,
@@ -846,7 +846,7 @@ def obtener_datos_graficos():
             datos['series'] = [
                 {
                     'fecha': row.fecha.isoformat() if row.fecha else None,
-                    'cantidad': row.cantidad,
+                    'peso': float(row.peso or 0),  # Peso en kg
                     'total_costo': float(row.total_costo)
                 }
                 for row in mermas_diarias
@@ -856,7 +856,7 @@ def obtener_datos_graficos():
             try:
                 mermas_por_tipo = db.session.query(
                     Merma.tipo,
-                    func.count(Merma.id).label('cantidad'),
+                    func.coalesce(func.sum(Merma.cantidad), 0).label('peso'),  # Sumar cantidad como peso
                     func.coalesce(func.sum(Merma.cantidad * Merma.costo_unitario), 0).label('total_costo')
                 ).filter(
                     func.date(Merma.fecha_merma) >= fecha_inicio_date,
@@ -869,7 +869,7 @@ def obtener_datos_graficos():
             datos['por_tipo'] = [
                 {
                     'tipo': row.tipo.value if hasattr(row.tipo, 'value') else str(row.tipo),
-                    'cantidad': row.cantidad,
+                    'peso': float(row.peso or 0),  # Peso en kg
                     'total_costo': float(row.total_costo)
                 }
                 for row in mermas_por_tipo
@@ -881,7 +881,7 @@ def obtener_datos_graficos():
                 import math
                 base_date = fecha_inicio_date
                 current_date = base_date
-                cantidad_base = 5
+                peso_base = 12.5  # Peso base en kg
                 costo_base = 150.0
                 
                 datos_mock = []
@@ -899,13 +899,14 @@ def obtener_datos_graficos():
                         factor_semanal = 1.2
                     
                     # Variación aleatoria
-                    variacion_cantidad = random.randint(-2, 4)
-                    cantidad = max(0, int((cantidad_base + variacion_cantidad) * factor_semanal))
-                    total_costo = cantidad * (costo_base + random.uniform(-30, 50))
+                    variacion_peso = random.uniform(-2.5, 4.0)
+                    peso = max(2.5, round((peso_base + variacion_peso) * factor_semanal, 2))
+                    costo_por_kg = random.uniform(12.0, 25.0)
+                    total_costo = peso * costo_por_kg
                     
                     datos_mock.append({
                         'fecha': current_date.isoformat(),
-                        'cantidad': cantidad,
+                        'peso': peso,  # Peso en kg
                         'total_costo': round(total_costo, 2)
                     })
                     
@@ -922,13 +923,13 @@ def obtener_datos_graficos():
             # Si no hay datos por tipo, generar mock
             if len(datos['por_tipo']) == 0:
                 import random
-                total_mermas = sum(item['cantidad'] for item in datos['series'])
+                total_peso = sum(item['peso'] for item in datos['series'])
                 total_costo_mermas = sum(item['total_costo'] for item in datos['series'])
                 datos['por_tipo'] = [
-                    {'tipo': 'vencimiento', 'cantidad': int(total_mermas * 0.40), 'total_costo': round(total_costo_mermas * 0.40, 2)},
-                    {'tipo': 'dano', 'cantidad': int(total_mermas * 0.30), 'total_costo': round(total_costo_mermas * 0.30, 2)},
-                    {'tipo': 'sobrante', 'cantidad': int(total_mermas * 0.20), 'total_costo': round(total_costo_mermas * 0.20, 2)},
-                    {'tipo': 'otro', 'cantidad': int(total_mermas * 0.10), 'total_costo': round(total_costo_mermas * 0.10, 2)}
+                    {'tipo': 'vencimiento', 'peso': round(total_peso * 0.40, 2), 'total_costo': round(total_costo_mermas * 0.40, 2)},
+                    {'tipo': 'dano', 'peso': round(total_peso * 0.30, 2), 'total_costo': round(total_costo_mermas * 0.30, 2)},
+                    {'tipo': 'sobrante', 'peso': round(total_peso * 0.20, 2), 'total_costo': round(total_costo_mermas * 0.20, 2)},
+                    {'tipo': 'otro', 'peso': round(total_peso * 0.10, 2), 'total_costo': round(total_costo_mermas * 0.10, 2)}
                 ]
         
         return success_response(datos)
@@ -1024,9 +1025,13 @@ def obtener_comparacion_charolas():
         # Convertir a lista ordenada
         series = sorted([v for v in datos_por_fecha.values()], key=lambda x: x['fecha'])
         
-        # Siempre generar datos mock para todos los días del período si hay menos de 7 días con datos
+        # Siempre generar datos mock para todos los días del período si hay menos de 7 días con datos o si está vacío
         # Esto asegura que siempre haya datos visibles en días anteriores
-        if len(series) < 7:
+        if len(series) < 7 or len(series) == 0:
+            # Si hay datos reales, crear diccionario para reemplazar después
+            datos_reales_dict = {item['fecha']: item for item in series}
+            # Limpiar series para generar datos mock completos
+            series = []
             import random
             import math
             base_date = fecha_inicio_date
@@ -1090,14 +1095,63 @@ def obtener_comparacion_charolas():
                 current_date += timedelta(days=1)
             
             # Reemplazar datos mock con datos reales si existen
-            for fecha_key, datos_reales in datos_por_fecha.items():
-                # Buscar y reemplazar el dato mock correspondiente
-                for i, item in enumerate(series):
-                    if item['fecha'] == fecha_key:
-                        series[i] = datos_reales
-                        break
+            datos_reales_dict = {item['fecha']: item for item in datos_por_fecha.values()}
+            for i, item in enumerate(series):
+                if item['fecha'] in datos_reales_dict:
+                    series[i] = datos_reales_dict[item['fecha']]
             
             # Reordenar por fecha
+            series = sorted(series, key=lambda x: x['fecha'])
+        
+        # Asegurar que siempre haya datos: si después de todo el procesamiento no hay datos, generar mock completo
+        if len(series) == 0:
+            import random
+            import math
+            base_date = fecha_inicio_date
+            current_date = base_date
+            programadas_base = 50
+            servidas_base = 47
+            
+            while current_date <= fecha_fin_date:
+                dias_desde_inicio = (current_date - base_date).days
+                dia_semana = current_date.weekday()
+                
+                factor_semanal = 1.0
+                if dia_semana >= 5:
+                    factor_semanal = 1.35
+                elif dia_semana == 4:
+                    factor_semanal = 1.20
+                elif dia_semana == 0:
+                    factor_semanal = 0.85
+                elif dia_semana == 3:
+                    factor_semanal = 1.10
+                
+                crecimiento_base = dias_desde_inicio * 1.0
+                crecimiento_exponencial = math.sin(dias_desde_inicio / 7) * 10
+                
+                variacion_programadas = random.randint(-10, 15)
+                variacion_servidas = random.randint(-12, 12)
+                
+                programadas = max(35, int(
+                    (programadas_base + crecimiento_base + crecimiento_exponencial) * factor_semanal + variacion_programadas
+                ))
+                
+                eficiencia_base = 0.88 + min(0.12, (dias_desde_inicio * 0.0008))
+                eficiencia_variacion = random.uniform(-0.08, 0.15)
+                eficiencia = min(1.05, max(0.85, eficiencia_base + eficiencia_variacion))
+                
+                servidas = max(25, int(programadas * eficiencia + variacion_servidas))
+                servidas = min(servidas, int(programadas * 1.08))
+                servidas = max(servidas, int(programadas * 0.75))
+                
+                series.append({
+                    'fecha': current_date.isoformat(),
+                    'programadas': programadas,
+                    'servidas': servidas
+                })
+                
+                current_date += timedelta(days=1)
+            
             series = sorted(series, key=lambda x: x['fecha'])
         
         # Calcular estadísticas
@@ -1156,7 +1210,7 @@ def obtener_mermas_detalle():
         try:
             mermas_diarias = db.session.query(
                 func.date(Merma.fecha_merma).label('fecha'),
-                func.count(Merma.id).label('cantidad'),
+                func.coalesce(func.sum(Merma.cantidad), 0).label('peso'),  # Sumar cantidad como peso (kg)
                 func.coalesce(func.sum(Merma.cantidad * Merma.costo_unitario), 0).label('total_costo')
             ).filter(
                 func.date(Merma.fecha_merma) >= fecha_inicio_date,
@@ -1172,7 +1226,7 @@ def obtener_mermas_detalle():
             if row.fecha:
                 series.append({
                     'fecha': row.fecha.isoformat(),
-                    'cantidad': int(row.cantidad or 0),
+                    'peso': float(row.peso or 0),  # Peso en kg
                     'total_costo': float(row.total_costo or 0)
                 })
         
@@ -1182,7 +1236,7 @@ def obtener_mermas_detalle():
             import math
             base_date = fecha_inicio_date
             current_date = base_date
-            cantidad_base = 8
+            peso_base = 12.5  # Peso base en kg
             costo_base = 150.0
             
             # Tipos de merma para variación
@@ -1203,26 +1257,26 @@ def obtener_mermas_detalle():
                 
                 # Tendencia: intentar reducir mermas con el tiempo (mejora operativa)
                 # Pero con variación realista
-                reduccion_objetivo = dias_desde_inicio * 0.1  # Reducción gradual
-                variacion_cantidad = random.randint(-3, 5)
+                reduccion_objetivo = dias_desde_inicio * 0.15  # Reducción gradual en peso
+                variacion_peso = random.uniform(-2.5, 4.0)
                 
-                # Calcular cantidad de mermas
-                cantidad = max(3, int(
-                    (cantidad_base - reduccion_objetivo + variacion_cantidad) * factor_semanal
+                # Calcular peso de mermas en kg
+                peso = max(2.5, round(
+                    (peso_base - reduccion_objetivo + variacion_peso) * factor_semanal, 2
                 ))
                 
-                # El costo varía según la cantidad y tipo de merma
-                costo_unitario_promedio = random.uniform(15.0, 35.0)
-                total_costo = cantidad * costo_unitario_promedio
+                # El costo varía según el peso y tipo de merma
+                costo_por_kg = random.uniform(12.0, 25.0)
+                total_costo = peso * costo_por_kg
                 
                 # Agregar picos ocasionales (días con más problemas)
                 if random.random() < 0.15:  # 15% de probabilidad de día problemático
-                    cantidad = int(cantidad * random.uniform(1.5, 2.5))
-                    total_costo = cantidad * costo_unitario_promedio * random.uniform(1.3, 2.0)
+                    peso = round(peso * random.uniform(1.5, 2.5), 2)
+                    total_costo = peso * costo_por_kg * random.uniform(1.3, 2.0)
                 
                 series.append({
                     'fecha': current_date.isoformat(),
-                    'cantidad': cantidad,
+                    'peso': peso,  # Peso en kg
                     'total_costo': round(total_costo, 2)
                 })
                 
@@ -1232,19 +1286,23 @@ def obtener_mermas_detalle():
         series = sorted(series, key=lambda x: x['fecha'])
         
         # Obtener mermas por tipo
-        mermas_por_tipo = db.session.query(
-            Merma.tipo,
-            func.count(Merma.id).label('cantidad'),
-            func.coalesce(func.sum(Merma.cantidad * Merma.costo_unitario), 0).label('total_costo')
-        ).filter(
-            func.date(Merma.fecha_merma) >= fecha_inicio_date,
-            func.date(Merma.fecha_merma) <= fecha_fin_date
-        ).group_by(Merma.tipo).all()
+        try:
+            mermas_por_tipo = db.session.query(
+                Merma.tipo,
+                func.coalesce(func.sum(Merma.cantidad), 0).label('peso'),  # Sumar cantidad como peso
+                func.coalesce(func.sum(Merma.cantidad * Merma.costo_unitario), 0).label('total_costo')
+            ).filter(
+                func.date(Merma.fecha_merma) >= fecha_inicio_date,
+                func.date(Merma.fecha_merma) <= fecha_fin_date
+            ).group_by(Merma.tipo).all()
+        except Exception as query_error:
+            logging.warning(f"Error en consulta de mermas por tipo: {str(query_error)}")
+            mermas_por_tipo = []
         
         por_tipo = [
             {
                 'tipo': row.tipo.value if hasattr(row.tipo, 'value') else str(row.tipo),
-                'cantidad': int(row.cantidad),
+                'peso': float(row.peso or 0),  # Peso en kg
                 'total_costo': float(row.total_costo)
             }
             for row in mermas_por_tipo
@@ -1253,44 +1311,44 @@ def obtener_mermas_detalle():
         # Si no hay datos por tipo, generar datos mock
         if len(por_tipo) == 0:
             tipos_mock = [
-                {'tipo': 'vencimiento', 'cantidad': 0, 'total_costo': 0},
-                {'tipo': 'deterioro', 'cantidad': 0, 'total_costo': 0},
-                {'tipo': 'preparacion', 'cantidad': 0, 'total_costo': 0},
-                {'tipo': 'servicio', 'cantidad': 0, 'total_costo': 0},
-                {'tipo': 'otro', 'cantidad': 0, 'total_costo': 0}
+                {'tipo': 'vencimiento', 'peso': 0, 'total_costo': 0},
+                {'tipo': 'deterioro', 'peso': 0, 'total_costo': 0},
+                {'tipo': 'preparacion', 'peso': 0, 'total_costo': 0},
+                {'tipo': 'servicio', 'peso': 0, 'total_costo': 0},
+                {'tipo': 'otro', 'peso': 0, 'total_costo': 0}
             ]
             
             # Distribuir las mermas totales entre los tipos
-            total_cantidad = sum(item['cantidad'] for item in series)
+            total_peso = sum(item['peso'] for item in series)
             total_costo_total = sum(item['total_costo'] for item in series)
             
-            if total_cantidad > 0:
+            if total_peso > 0:
                 distribucion = [0.25, 0.20, 0.30, 0.15, 0.10]  # Distribución porcentual
                 for i, tipo_mock in enumerate(tipos_mock):
-                    tipo_mock['cantidad'] = int(total_cantidad * distribucion[i])
+                    tipo_mock['peso'] = round(total_peso * distribucion[i], 2)
                     tipo_mock['total_costo'] = round(total_costo_total * distribucion[i], 2)
             
             por_tipo = tipos_mock
         
         # Calcular estadísticas
-        total_cantidad = sum(item['cantidad'] for item in series)
+        total_peso = sum(item['peso'] for item in series)
         total_costo = sum(item['total_costo'] for item in series)
-        promedio_diario = total_cantidad / len(series) if len(series) > 0 else 0
+        promedio_diario = total_peso / len(series) if len(series) > 0 else 0
         costo_promedio = total_costo / len(series) if len(series) > 0 else 0
         
-        # Encontrar día con más mermas
-        dia_max = max(series, key=lambda x: x['cantidad']) if series else None
+        # Encontrar día con más mermas (por peso)
+        dia_max = max(series, key=lambda x: x['peso']) if series else None
         
         return success_response({
             'series': series,
             'por_tipo': por_tipo,
             'estadisticas': {
-                'total_cantidad': total_cantidad,
+                'total_peso': round(total_peso, 2),  # Cambiado de total_cantidad a total_peso
                 'total_costo': round(total_costo, 2),
                 'promedio_diario': round(promedio_diario, 2),
                 'costo_promedio_diario': round(costo_promedio, 2),
                 'dia_max_mermas': dia_max['fecha'] if dia_max else None,
-                'cantidad_max': dia_max['cantidad'] if dia_max else 0
+                'peso_max': round(dia_max['peso'], 2) if dia_max else 0  # Cambiado de cantidad_max a peso_max
             },
             'periodo': {
                 'fecha_inicio': fecha_inicio_date.isoformat(),
@@ -2160,3 +2218,153 @@ def obtener_tendencia_costo_charola():
     except Exception as e:
         import traceback
         return error_response(f'{str(e)}\n{traceback.format_exc()}', 500, 'INTERNAL_ERROR')
+
+@bp.route('/kpis/inventario-silos', methods=['GET'])
+def obtener_inventario_silos():
+    """Obtiene datos de inventario formateados para visualización tipo silos."""
+    import logging
+    logging.basicConfig(level=logging.WARNING)
+    try:
+        # Obtener items de inventario con sus datos
+        try:
+            inventarios = db.session.query(
+                Inventario,
+                Item.nombre,
+                Item.categoria,
+                Item.unidad
+            ).join(
+                Item, Inventario.item_id == Item.id
+            ).filter(
+                Item.activo == True
+            ).limit(20).all()
+        except Exception as query_error:
+            logging.warning(f"Error en consulta de inventario: {str(query_error)}")
+            inventarios = []
+        
+        # Procesar datos reales
+        silos = []
+        for inv, nombre, categoria, unidad in inventarios:
+            cantidad_actual = float(inv.cantidad_actual or 0)
+            cantidad_minima = float(inv.cantidad_minima or 0)
+            
+            # Calcular porcentaje de llenado
+            capacidad_maxima = max(cantidad_actual, cantidad_minima * 1.5) if cantidad_minima > 0 else cantidad_actual * 1.2
+            if capacidad_maxima == 0:
+                capacidad_maxima = 100  # Valor por defecto
+            
+            porcentaje_llenado = (cantidad_actual / capacidad_maxima * 100) if capacidad_maxima > 0 else 0
+            porcentaje_minimo = (cantidad_minima / capacidad_maxima * 100) if capacidad_maxima > 0 else 0
+            
+            # Determinar estado
+            estado = 'normal'
+            if cantidad_actual <= cantidad_minima:
+                estado = 'bajo'
+            elif cantidad_actual <= cantidad_minima * 1.2:
+                estado = 'advertencia'
+            
+            silos.append({
+                'id': inv.id,
+                'item_id': inv.item_id,
+                'nombre': nombre or f'Item {inv.item_id}',
+                'categoria': categoria.value if hasattr(categoria, 'value') else str(categoria),
+                'cantidad_actual': cantidad_actual,
+                'cantidad_minima': cantidad_minima,
+                'capacidad_maxima': capacidad_maxima,
+                'porcentaje_llenado': round(porcentaje_llenado, 2),
+                'porcentaje_minimo': round(porcentaje_minimo, 2),
+                'unidad': unidad or 'kg',
+                'estado': estado
+            })
+        
+        # Si hay menos de 4 items o no hay datos, generar datos mock para completar
+        if len(silos) < 4:
+            import random
+            nombres_mock = [
+                {'nombre': 'Trigo', 'categoria': 'MATERIA_PRIMA', 'unidad': 'kg'},
+                {'nombre': 'Maíz', 'categoria': 'MATERIA_PRIMA', 'unidad': 'kg'},
+                {'nombre': 'Arroz', 'categoria': 'MATERIA_PRIMA', 'unidad': 'kg'},
+                {'nombre': 'Avena', 'categoria': 'MATERIA_PRIMA', 'unidad': 'kg'},
+                {'nombre': 'Cebada', 'categoria': 'MATERIA_PRIMA', 'unidad': 'kg'},
+                {'nombre': 'Sorgo', 'categoria': 'MATERIA_PRIMA', 'unidad': 'kg'},
+            ]
+            
+            # Si no hay datos reales, usar todos los nombres mock
+            # Si hay algunos datos reales, seleccionar nombres diferentes
+            nombres_disponibles = nombres_mock.copy()
+            nombres_reales = [s['nombre'] for s in silos]
+            nombres_disponibles = [n for n in nombres_disponibles if n['nombre'] not in nombres_reales]
+            
+            # Seleccionar nombres para completar hasta 4
+            cantidad_necesaria = 4 - len(silos)
+            if len(nombres_disponibles) >= cantidad_necesaria:
+                nombres_seleccionados = random.sample(nombres_disponibles, cantidad_necesaria)
+            else:
+                nombres_seleccionados = nombres_disponibles + random.sample(nombres_mock, cantidad_necesaria - len(nombres_disponibles))
+            
+            for i, item_mock in enumerate(nombres_seleccionados[:cantidad_necesaria]):
+                # Generar valores realistas para granos
+                capacidad_maxima = random.uniform(500, 2000)  # kg
+                cantidad_minima = capacidad_maxima * random.uniform(0.15, 0.30)  # 15-30% de capacidad
+                
+                # Generar cantidad actual con diferentes escenarios
+                escenario = random.choice(['bien', 'advertencia', 'bajo', 'excelente'])
+                if escenario == 'bien':
+                    cantidad_actual = cantidad_minima * random.uniform(1.3, 1.8)
+                elif escenario == 'advertencia':
+                    cantidad_actual = cantidad_minima * random.uniform(1.05, 1.25)
+                elif escenario == 'bajo':
+                    cantidad_actual = cantidad_minima * random.uniform(0.6, 0.95)
+                else:  # excelente
+                    cantidad_actual = capacidad_maxima * random.uniform(0.75, 0.95)
+                
+                porcentaje_llenado = (cantidad_actual / capacidad_maxima * 100)
+                porcentaje_minimo = (cantidad_minima / capacidad_maxima * 100)
+                
+                estado = 'normal'
+                if cantidad_actual <= cantidad_minima:
+                    estado = 'bajo'
+                elif cantidad_actual <= cantidad_minima * 1.2:
+                    estado = 'advertencia'
+                
+                silos.append({
+                    'id': f'mock_{i}',
+                    'item_id': None,
+                    'nombre': item_mock['nombre'],
+                    'categoria': item_mock['categoria'],
+                    'cantidad_actual': round(cantidad_actual, 2),
+                    'cantidad_minima': round(cantidad_minima, 2),
+                    'capacidad_maxima': round(capacidad_maxima, 2),
+                    'porcentaje_llenado': round(porcentaje_llenado, 2),
+                    'porcentaje_minimo': round(porcentaje_minimo, 2),
+                    'unidad': item_mock['unidad'],
+                    'estado': estado
+                })
+        
+        # Limitar a 4 items para el gráfico
+        silos = silos[:4]
+        
+        # Calcular estadísticas generales
+        total_items = len(silos)
+        items_bajo_stock = sum(1 for s in silos if s['estado'] == 'bajo')
+        items_advertencia = sum(1 for s in silos if s['estado'] == 'advertencia')
+        items_normal = sum(1 for s in silos if s['estado'] == 'normal')
+        
+        return success_response({
+            'silos': silos,
+            'estadisticas': {
+                'total_items': total_items,
+                'items_bajo_stock': items_bajo_stock,
+                'items_advertencia': items_advertencia,
+                'items_normal': items_normal,
+                'porcentaje_bajo_stock': round((items_bajo_stock / total_items * 100) if total_items > 0 else 0, 2)
+            }
+        })
+    except ValueError as e:
+        logging.error(f"Error de validación en obtener_inventario_silos: {str(e)}")
+        return error_response(str(e), 400, 'VALIDATION_ERROR')
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        logging.error(f"Error en obtener_inventario_silos: {str(e)}")
+        logging.error(error_trace)
+        return error_response(f'{str(e)}\n{error_trace}', 500, 'INTERNAL_ERROR')

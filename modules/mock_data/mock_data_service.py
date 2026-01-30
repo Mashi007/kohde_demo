@@ -10,42 +10,46 @@ class MockDataService:
     """Servicio para gestionar datos mock."""
     
     @staticmethod
-    def obtener_mock_charolas(fecha: Optional[str] = None) -> List[Dict]:
-        """Retorna charolas mock para una fecha específica o fecha actual."""
+    def obtener_mock_charolas(fecha: Optional[str] = None, limit: int = 20) -> List[Dict]:
+        """
+        Retorna charolas mock para una fecha específica o fecha actual.
+        IMPORTANTE: 1 charola = 1 persona servida (coherente para demo).
+        Para fecha específica (29 de enero), retorna 196 charolas (196 personas).
+        Para otras fechas, retorna número aleatorio coherente (150-200).
+        """
         if fecha:
-            fecha_obj = datetime.strptime(fecha, '%Y-%m-%d')
+            try:
+                fecha_obj = datetime.strptime(fecha, '%Y-%m-%d')
+                # Para fecha específica (29 de enero), usar número fijo coherente
+                if '29' in fecha or fecha == '2026-01-29':
+                    num_personas = 196  # Número fijo para consistencia en demo
+                else:
+                    num_personas = random.randint(150, 200)
+            except:
+                fecha_obj = datetime.now()
+                num_personas = random.randint(150, 200)
         else:
             fecha_obj = datetime.now()
+            num_personas = random.randint(150, 200)
         
-        return [
-            {
-                'id': 1,
-                'numero_charola': f'CHR-{fecha_obj.strftime("%Y%m%d")}-001',
+        # Generar charolas: 1 charola = 1 persona (coherente)
+        charolas = []
+        for i in range(1, min(num_personas + 1, limit + 1)):  # Limitar para no generar demasiadas
+            # Distribuir entre ubicaciones y tipos de comida de forma realista
+            ubicacion = 'Restaurante_A' if i % 2 == 0 else 'Restaurante_B'
+            tipo_comida = 'desayuno' if i % 3 == 0 else ('almuerzo' if i % 3 == 1 else 'cena')
+            
+            charolas.append({
+                'id': i,
+                'numero_charola': f'CHR-{fecha_obj.strftime("%Y%m%d")}-{i:03d}',
                 'fecha_servicio': fecha_obj.isoformat(),
-                'ubicacion': 'Restaurante_A',
-                'tipo_comida': 'desayuno',
-                'total_porciones': 65,
+                'ubicacion': ubicacion,
+                'tipo_comida': tipo_comida,
+                'total_porciones': 1,  # 1 persona por charola (coherente)
                 'observaciones': None
-            },
-            {
-                'id': 2,
-                'numero_charola': f'CHR-{fecha_obj.strftime("%Y%m%d")}-002',
-                'fecha_servicio': fecha_obj.isoformat(),
-                'ubicacion': 'Restaurante_A',
-                'tipo_comida': 'almuerzo',
-                'total_porciones': 85,
-                'observaciones': None
-            },
-            {
-                'id': 3,
-                'numero_charola': f'CHR-{fecha_obj.strftime("%Y%m%d")}-003',
-                'fecha_servicio': fecha_obj.isoformat(),
-                'ubicacion': 'Restaurante_B',
-                'tipo_comida': 'desayuno',
-                'total_porciones': 46,
-                'observaciones': None
-            }
-        ]
+            })
+        
+        return charolas
     
     @staticmethod
     def obtener_mock_facturas() -> List[Dict]:
@@ -183,28 +187,46 @@ class MockDataService:
         if 'CHAROLAS' in query_upper or 'CHAROLA' in query_upper:
             if 'COUNT' in query_upper or 'SUM' in query_upper:
                 # Consulta agregada
+                # IMPORTANTE: total_porciones = número de personas servidas
+                # Si preguntan por personas, retornar SUM(total_porciones)
+                # Si preguntan por charolas, retornar COUNT(*)
+                
+                # Para consultas agregadas, generar números coherentes
+                # REGLA: 1 charola = 1 persona servida (coherente para demo)
+                # Si preguntan por personas servidas, generar número realista (150-200)
+                # Si preguntan por charolas, debe ser igual al número de personas
+                
                 if '29' in query or '2026-01-29' in query:
-                    charolas = MockDataService.obtener_mock_charolas('2026-01-29')
-                    total_personas = sum(c['total_porciones'] for c in charolas)
+                    # Fecha específica (29 de enero): usar número fijo coherente
+                    total_personas = 196
+                    total_charolas = 196  # 1 charola = 1 persona ✅ COHERENTE
+                else:
+                    import random
+                    total_personas = random.randint(150, 200)
+                    total_charolas = total_personas  # 1 charola = 1 persona (coherente)
+                
+                # Detectar qué está preguntando la consulta
+                if 'PERSONAS' in query_upper or 'PERSONA' in query_upper or 'SUM' in query_upper:
+                    # Pregunta sobre personas servidas
                     return {
                         'error': None,
                         'resultados': [
                             {
-                                'total_charolas': len(charolas),
-                                'total_personas': total_personas
+                                'total_personas': total_personas,
+                                'total_charolas': total_charolas,
+                                'personas_servidas': total_personas
                             }
                         ],
                         'total_filas': 1,
                         'is_mock': True
                     }
                 else:
-                    charolas = MockDataService.obtener_mock_charolas()
-                    total_personas = sum(c['total_porciones'] for c in charolas)
+                    # Pregunta sobre número de charolas
                     return {
                         'error': None,
                         'resultados': [
                             {
-                                'total_charolas': len(charolas),
+                                'total_charolas': total_charolas,
                                 'total_personas': total_personas
                             }
                         ],
@@ -212,20 +234,28 @@ class MockDataService:
                         'is_mock': True
                     }
             else:
-                # Consulta de lista
+                # Consulta de lista - retornar muestra representativa de charolas
                 if '29' in query or '2026-01-29' in query:
+                    # Para fecha específica, retornar muestra (primeras 20) pero indicar total real
+                    charolas = MockDataService.obtener_mock_charolas('2026-01-29', limit=20)
                     return {
                         'error': None,
-                        'resultados': MockDataService.obtener_mock_charolas('2026-01-29'),
-                        'total_filas': 3,
-                        'is_mock': True
+                        'resultados': charolas,
+                        'total_filas': len(charolas),
+                        'is_mock': True,
+                        'total_real': 196,  # Total real: 196 charolas = 196 personas
+                        'nota': 'Mostrando muestra de 20 charolas. Total: 196 charolas (196 personas)'
                     }
                 else:
+                    charolas = MockDataService.obtener_mock_charolas(limit=20)
+                    total_real = random.randint(150, 200)
                     return {
                         'error': None,
-                        'resultados': MockDataService.obtener_mock_charolas(),
-                        'total_filas': 3,
-                        'is_mock': True
+                        'resultados': charolas,
+                        'total_filas': len(charolas),
+                        'is_mock': True,
+                        'total_real': total_real,
+                        'nota': f'Mostrando muestra de 20 charolas. Total: {total_real} charolas ({total_real} personas)'
                     }
         
         elif 'FACTURAS' in query_upper or 'FACTURA' in query_upper:

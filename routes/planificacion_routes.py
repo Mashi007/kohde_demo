@@ -208,6 +208,7 @@ def activar_desactivar_receta(receta_id):
 @bp.route('/programacion', methods=['GET'])
 def listar_programaciones():
     """Lista programaciones con filtros opcionales."""
+    import logging
     try:
         fecha_desde = request.args.get('fecha_desde')
         fecha_hasta = request.args.get('fecha_hasta')
@@ -218,6 +219,25 @@ def listar_programaciones():
         
         fecha_desde_obj = parse_date(fecha_desde) if fecha_desde else None
         fecha_hasta_obj = parse_date(fecha_hasta) if fecha_hasta else None
+        
+        # Verificar si hay programaciones, si no hay y no hay filtros específicos, generar datos mock
+        total_programaciones = db.session.query(ProgramacionMenu).count()
+        if total_programaciones == 0 and not fecha_desde and not fecha_hasta and not ubicacion and not tiempo_comida:
+            try:
+                logging.info("No hay programaciones, generando datos mock...")
+                # Verificar que haya recetas
+                from models.receta import Receta
+                total_recetas = db.session.query(Receta).filter(Receta.activa == True).count()
+                if total_recetas == 0:
+                    # Generar recetas primero
+                    from scripts.init_recetas import init_recetas
+                    init_recetas()
+                
+                # Generar programaciones
+                from scripts.init_programacion import init_programacion
+                init_programacion()
+            except Exception as mock_error:
+                logging.warning(f"Error generando programaciones mock: {str(mock_error)}")
         
         programaciones = ProgramacionMenuService.listar_programaciones(
             db.session,
