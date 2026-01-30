@@ -172,7 +172,9 @@ class ChatService:
             # Generar título automático del primer mensaje
             conversacion.titulo = contenido[:50] + "..." if len(contenido) > 50 else contenido
         
-        db.commit()
+        # NO hacer commit aquí - el decorador @handle_db_transaction en la ruta lo maneja
+        # Solo hacer flush para asegurar que los cambios estén en la sesión
+        db.flush()
         db.refresh(mensaje_usuario)
         db.refresh(mensaje_asistente)
         
@@ -216,41 +218,65 @@ class ChatService:
         
         try:
             from sqlalchemy import text
+            from sqlalchemy.exc import SQLAlchemyError
+            import uuid
             
-            # Ejecutar consulta usando SQLAlchemy
-            resultado = db.execute(text(query))
-            filas = resultado.fetchall()
+            # Crear un savepoint para aislar la consulta SQL
+            # Si la consulta falla, solo se revierte el savepoint, no toda la transacción
+            savepoint_name = f"sp_query_{uuid.uuid4().hex[:8]}"
+            savepoint = db.begin_nested()  # Crea un savepoint automáticamente
             
-            # Convertir a lista de diccionarios de forma más eficiente
-            columnas = list(resultado.keys())
-            resultados = []
-            for fila in filas:
-                resultado_dict = {}
-                for i, columna in enumerate(columnas):
-                    valor = fila[i]
-                    # Convertir tipos especiales de forma más completa
-                    if valor is None:
-                        resultado_dict[columna] = None
-                    elif hasattr(valor, 'isoformat'):  # datetime, date, time
-                        resultado_dict[columna] = valor.isoformat()
-                    elif isinstance(valor, (int, float, str, bool)):
-                        resultado_dict[columna] = valor
-                    elif hasattr(valor, '__dict__'):  # objetos SQLAlchemy u otros objetos
-                        resultado_dict[columna] = str(valor)
-                    else:
-                        # Intentar convertir a string como último recurso
-                        try:
-                            resultado_dict[columna] = str(valor)
-                        except:
+            try:
+                resultado = db.execute(text(query))
+                filas = resultado.fetchall()
+                
+                # Convertir a lista de diccionarios de forma más eficiente
+                columnas = list(resultado.keys())
+                resultados = []
+                for fila in filas:
+                    resultado_dict = {}
+                    for i, columna in enumerate(columnas):
+                        valor = fila[i]
+                        # Convertir tipos especiales de forma más completa
+                        if valor is None:
                             resultado_dict[columna] = None
-                resultados.append(resultado_dict)
-            
-            return {
-                'error': None,
-                'resultados': resultados,
-                'total_filas': len(resultados)
-            }
+                        elif hasattr(valor, 'isoformat'):  # datetime, date, time
+                            resultado_dict[columna] = valor.isoformat()
+                        elif isinstance(valor, (int, float, str, bool)):
+                            resultado_dict[columna] = valor
+                        elif hasattr(valor, '__dict__'):  # objetos SQLAlchemy u otros objetos
+                            resultado_dict[columna] = str(valor)
+                        else:
+                            # Intentar convertir a string como último recurso
+                            try:
+                                resultado_dict[columna] = str(valor)
+                            except:
+                                resultado_dict[columna] = None
+                    resultados.append(resultado_dict)
+                
+                # Confirmar el savepoint (commit de la subtransacción)
+                savepoint.commit()
+                
+                return {
+                    'error': None,
+                    'resultados': resultados,
+                    'total_filas': len(resultados)
+                }
+            except SQLAlchemyError as e:
+                # Si hay un error SQL, hacer rollback solo del savepoint
+                # La transacción principal sigue intacta
+                savepoint.rollback()
+                return {
+                    'error': f'Error al ejecutar consulta SQL: {str(e)}',
+                    'resultados': None
+                }
         except Exception as e:
+            # Para otros errores, intentar hacer rollback del savepoint si existe
+            try:
+                if 'savepoint' in locals():
+                    savepoint.rollback()
+            except:
+                pass  # Si ya está abortada o no existe, no importa
             return {
                 'error': f'Error al ejecutar consulta: {str(e)}',
                 'resultados': None

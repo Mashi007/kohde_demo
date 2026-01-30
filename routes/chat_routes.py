@@ -103,26 +103,42 @@ def eliminar_conversacion(conversacion_id):
 @handle_db_transaction
 def enviar_mensaje(conversacion_id):
     """Envía un mensaje y obtiene respuesta del AI."""
-    validate_positive_int(conversacion_id, 'conversacion_id')
-    datos = request.get_json()
-    if not datos:
-        return error_response('Datos JSON requeridos', 400, 'VALIDATION_ERROR')
-    
-    contenido = datos.get('contenido', '').strip()
-    if not contenido:
-        return error_response('El contenido del mensaje no puede estar vacío', 400, 'VALIDATION_ERROR')
-    
-    usuario_id = datos.get('usuario_id')
-    
-    resultado = chat_service.enviar_mensaje(
-        db.session,
-        conversacion_id,
-        contenido,
-        usuario_id=usuario_id
-    )
-    db.session.commit()
-    
-    return success_response(resultado)
+    try:
+        validate_positive_int(conversacion_id, 'conversacion_id')
+        datos = request.get_json()
+        if not datos:
+            return error_response('Datos JSON requeridos', 400, 'VALIDATION_ERROR')
+        
+        contenido = datos.get('contenido', '').strip()
+        if not contenido:
+            return error_response('El contenido del mensaje no puede estar vacío', 400, 'VALIDATION_ERROR')
+        
+        usuario_id = datos.get('usuario_id')
+        
+        resultado = chat_service.enviar_mensaje(
+            db.session,
+            conversacion_id,
+            contenido,
+            usuario_id=usuario_id
+        )
+        
+        # Verificar que la transacción no esté abortada antes de hacer commit
+        try:
+            db.session.commit()
+        except Exception as commit_error:
+            # Si el commit falla, hacer rollback y retornar error
+            db.session.rollback()
+            logging.error(f"Error al hacer commit en enviar_mensaje: {str(commit_error)}", exc_info=True)
+            return error_response(f'Error al guardar el mensaje: {str(commit_error)}', 500, 'DATABASE_ERROR')
+        
+        return success_response(resultado)
+    except ValueError as e:
+        db.session.rollback()
+        return error_response(str(e), 400, 'VALIDATION_ERROR')
+    except Exception as e:
+        db.session.rollback()
+        logging.error(f"Error en enviar_mensaje para conversación {conversacion_id}: {str(e)}", exc_info=True)
+        return error_response(f'Error al enviar mensaje: {str(e)}', 500, 'INTERNAL_ERROR')
 
 @bp.route('/conversaciones/<int:conversacion_id>/mensajes', methods=['GET'])
 def listar_mensajes(conversacion_id):
