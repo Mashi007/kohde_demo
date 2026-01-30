@@ -5,7 +5,7 @@ from flask import Blueprint, jsonify
 from models import db
 from sqlalchemy import text
 from utils.route_helpers import success_response, error_response
-from utils.db_helpers import verify_db_connection, verify_foreign_keys
+from utils.db_helpers import verify_db_connection, verify_foreign_keys, get_pool_stats
 
 bp = Blueprint('health', __name__)
 
@@ -43,7 +43,7 @@ def api_health_check():
             'timestamp': db.session.execute(text('SELECT NOW()')).scalar().isoformat()
         }
         
-        # Agregar información de foreign keys si la conexión es exitosa
+        # Agregar información de foreign keys y pool si la conexión es exitosa
         if db_info['connected']:
             try:
                 fk_info = verify_foreign_keys()
@@ -51,6 +51,12 @@ def api_health_check():
                     'count': fk_info.get('foreign_keys_count', 0),
                     'status': fk_info.get('status', 'unknown')
                 }
+            except Exception:
+                pass  # No crítico
+            
+            try:
+                pool_stats = get_pool_stats()
+                response_data['connection_pool'] = pool_stats
             except Exception:
                 pass  # No crítico
         

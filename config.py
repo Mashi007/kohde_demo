@@ -43,6 +43,20 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ECHO = DEBUG
     
+    # Configuración del pool de conexiones SQLAlchemy
+    # Optimizado para producción con múltiples workers de Gunicorn
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'pool_size': int(os.getenv('DB_POOL_SIZE', '10')),  # Número de conexiones a mantener en el pool
+        'pool_recycle': int(os.getenv('DB_POOL_RECYCLE', '3600')),  # Reciclar conexiones después de 1 hora
+        'pool_pre_ping': os.getenv('DB_POOL_PRE_PING', 'true').lower() == 'true',  # Verificar conexiones antes de usar
+        'max_overflow': int(os.getenv('DB_MAX_OVERFLOW', '20')),  # Conexiones adicionales permitidas más allá del pool_size
+        'pool_timeout': int(os.getenv('DB_POOL_TIMEOUT', '30')),  # Timeout para obtener conexión del pool (segundos)
+        'connect_args': {
+            'connect_timeout': int(os.getenv('DB_CONNECT_TIMEOUT', '10')),  # Timeout de conexión inicial (segundos)
+            'options': '-c statement_timeout=30000'  # Timeout de queries (30 segundos en milisegundos)
+        }
+    }
+    
     # Google Cloud Vision API (OCR)
     GOOGLE_CLOUD_PROJECT = os.getenv('GOOGLE_CLOUD_PROJECT', '')
     GOOGLE_APPLICATION_CREDENTIALS = os.getenv('GOOGLE_APPLICATION_CREDENTIALS', '')

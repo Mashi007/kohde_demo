@@ -93,6 +93,20 @@ def create_app():
     
     # Inicializar extensiones
     db.init_app(app)
+    
+    # Aplicar configuración del pool de conexiones después de init_app
+    # Flask-SQLAlchemy crea el engine en init_app, así que lo reconfiguramos aquí
+    if hasattr(Config, 'SQLALCHEMY_ENGINE_OPTIONS'):
+        from sqlalchemy import create_engine
+        # Obtener la URI actual
+        database_uri = app.config['SQLALCHEMY_DATABASE_URI']
+        # Crear nuevo engine con las opciones del pool
+        new_engine = create_engine(database_uri, **Config.SQLALCHEMY_ENGINE_OPTIONS)
+        # Reemplazar el engine de Flask-SQLAlchemy
+        db.engine = new_engine
+        # Actualizar el método get_engine para que devuelva nuestro engine
+        db.get_engine = lambda bind=None: new_engine
+    
     jwt = JWTManager(app)
     
     # Registrar blueprints
@@ -108,21 +122,40 @@ def create_app():
     app.register_blueprint(whatsapp_webhook.bp, url_prefix='/whatsapp')
     
     # Crear tablas en la base de datos
-    # Nota: En producción, usar migraciones (Alembic) en lugar de create_all()
-    with app.app_context():
-        try:
-            # Solo crear tablas si no existen (útil para desarrollo)
-            # En producción, usar migraciones SQL o Alembic
-            db.create_all()
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.info("✅ Tablas de base de datos verificadas/creadas correctamente")
-        except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error(f"⚠️ Error al crear tablas: {e}", exc_info=True)
-            import traceback
-            traceback.print_exc()
+    # IMPORTANTE: En producción, usar migraciones (Alembic) en lugar de create_all()
+    # Solo crear tablas automáticamente en desarrollo (DEBUG=True)
+    import os
+    is_production = os.getenv('ENVIRONMENT', '').lower() == 'production' or not Config.DEBUG
+    
+    if not is_production:
+        # Solo en desarrollo: crear tablas automáticamente
+        with app.app_context():
+            try:
+                db.create_all()
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.info("✅ Tablas de base de datos verificadas/creadas correctamente (modo desarrollo)")
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"⚠️ Error al crear tablas: {e}", exc_info=True)
+                import traceback
+                traceback.print_exc()
+    else:
+        # En producción: solo verificar conexión, no crear tablas
+        with app.app_context():
+            try:
+                # Solo verificar que la conexión funciona
+                db.session.execute(db.text('SELECT 1'))
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.info("✅ Conexión a base de datos verificada (modo producción - usar migraciones Alembic)")
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"⚠️ Error al conectar a base de datos: {e}", exc_info=True)
+                import traceback
+                traceback.print_exc()
     
     # Configurar tareas programadas (solo en producción o cuando se especifique)
     import os

@@ -12,17 +12,37 @@ logger = logging.getLogger(__name__)
 
 def verify_db_connection() -> Dict[str, Any]:
     """
-    Verifica la conexión a la base de datos.
+    Verifica la conexión a la base de datos y obtiene información del pool.
     
     Returns:
-        Dict con información de la conexión
+        Dict con información de la conexión y estadísticas del pool
     """
     try:
+        import time
+        inicio = time.time()
         db.session.execute(text('SELECT 1'))
+        tiempo_respuesta = time.time() - inicio
+        
+        # Obtener información del pool de conexiones
+        pool_info = {}
+        try:
+            pool = db.engine.pool
+            pool_info = {
+                'size': pool.size(),
+                'checked_in': pool.checkedin(),
+                'checked_out': pool.checkedout(),
+                'overflow': pool.overflow(),
+                'invalid': pool.invalid()
+            }
+        except Exception as pool_error:
+            logger.debug(f"No se pudo obtener información del pool: {pool_error}")
+        
         return {
             'connected': True,
             'status': 'ok',
-            'message': 'Conexión a base de datos exitosa'
+            'message': 'Conexión a base de datos exitosa',
+            'response_time_ms': round(tiempo_respuesta * 1000, 2),
+            'pool': pool_info
         }
     except Exception as e:
         logger.error(f"Error de conexión a BD: {e}", exc_info=True)
@@ -69,6 +89,32 @@ def get_table_count(table_name: str) -> int:
     except Exception as e:
         logger.error(f"Error al contar registros en {table_name}: {e}", exc_info=True)
         return -1
+
+
+def get_pool_stats() -> Dict[str, Any]:
+    """
+    Obtiene estadísticas del pool de conexiones.
+    
+    Returns:
+        Dict con estadísticas del pool
+    """
+    try:
+        pool = db.engine.pool
+        return {
+            'status': 'ok',
+            'pool_size': pool.size(),
+            'checked_in': pool.checkedin(),
+            'checked_out': pool.checkedout(),
+            'overflow': pool.overflow(),
+            'invalid': pool.invalid(),
+            'total_connections': pool.size() + pool.overflow()
+        }
+    except Exception as e:
+        logger.error(f"Error al obtener estadísticas del pool: {e}", exc_info=True)
+        return {
+            'status': 'error',
+            'message': str(e)
+        }
 
 
 def verify_foreign_keys() -> Dict[str, Any]:

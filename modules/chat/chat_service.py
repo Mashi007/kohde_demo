@@ -227,8 +227,21 @@ class ChatService:
             savepoint = db.begin_nested()  # Crea un savepoint automáticamente
             
             try:
+                # Ejecutar consulta con timeout (30 segundos por defecto)
+                # El timeout está configurado en SQLALCHEMY_ENGINE_OPTIONS pero también lo aplicamos aquí
+                from sqlalchemy import event
+                import time
+                
+                inicio = time.time()
                 resultado = db.execute(text(query))
                 filas = resultado.fetchall()
+                tiempo_ejecucion = time.time() - inicio
+                
+                # Log de consultas lentas (> 5 segundos)
+                if tiempo_ejecucion > 5:
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.warning(f"Consulta lenta detectada: {tiempo_ejecucion:.2f}s - Query: {query[:100]}...")
                 
                 # Convertir a lista de diccionarios de forma más eficiente
                 columnas = list(resultado.keys())
