@@ -5,6 +5,7 @@ from datetime import datetime, date
 from sqlalchemy import Column, Integer, String, DateTime, Date, Numeric, ForeignKey, Enum
 from sqlalchemy.orm import relationship
 from sqlalchemy.event import listens_for
+from sqlalchemy.types import TypeDecorator, String as SQLString
 import enum
 
 from models import db
@@ -14,6 +15,82 @@ class TiempoComida(enum.Enum):
     DESAYUNO = 'desayuno'
     ALMUERZO = 'almuerzo'
     CENA = 'cena'
+
+class TiempoComidaEnum(TypeDecorator):
+    """TypeDecorator para manejar el enum tiempocomida de PostgreSQL.
+    
+    IMPORTANTE: PostgreSQL tiene valores en MAYÚSCULAS (DESAYUNO, ALMUERZO, CENA),
+    pero Python usa valores en minúsculas ('desayuno', 'almuerzo', 'cena').
+    Este decorator convierte entre ambos formatos.
+    """
+    impl = SQLString  # Usar String como base, no Enum, para evitar validación automática
+    cache_ok = True
+    
+    def __init__(self):
+        super().__init__(length=20)
+    
+    def process_bind_param(self, value, dialect):
+        """Convierte el enum a MAYÚSCULAS antes de insertar en PostgreSQL."""
+        if value is None:
+            return None
+        # PostgreSQL espera valores en MAYÚSCULAS: 'DESAYUNO', 'ALMUERZO', 'CENA'
+        if isinstance(value, TiempoComida):
+            # Convertir valor del enum (minúsculas) a nombre del enum (mayúsculas)
+            return value.name  # Usar el nombre del enum (DESAYUNO, ALMUERZO, CENA)
+        if isinstance(value, str):
+            valor_lower = value.lower().strip()
+            valor_upper = value.upper().strip()
+            # Buscar el enum por su valor (minúsculas)
+            valores_validos = [e.value for e in TiempoComida]
+            if valor_lower in valores_validos:
+                # Encontrar el enum por valor y retornar su nombre (mayúsculas)
+                for tiempo in TiempoComida:
+                    if tiempo.value == valor_lower:
+                        return tiempo.name  # Retornar nombre en mayúsculas
+            # Si no está en valores, intentar buscar por nombre del enum (mayúsculas)
+            try:
+                tiempo_enum = TiempoComida[valor_upper]
+                return tiempo_enum.name  # Retornar nombre en mayúsculas
+            except KeyError:
+                raise ValueError(f"'{value}' no es un valor válido para TiempoComida. Valores válidos: {valores_validos}")
+        return value
+    
+    def process_result_value(self, value, dialect):
+        """Convierte el valor MAYÚSCULAS de PostgreSQL a objeto Enum."""
+        if value is None:
+            return None
+        # Si ya es un objeto Enum, retornarlo directamente
+        if isinstance(value, TiempoComida):
+            return value
+        # PostgreSQL devuelve valores en MAYÚSCULAS: 'DESAYUNO', 'ALMUERZO', 'CENA'
+        if isinstance(value, str):
+            valor_upper = value.upper().strip()
+            valor_lower = value.lower().strip()
+            
+            # Primero intentar buscar por nombre del enum (mayúsculas) - caso normal
+            try:
+                return TiempoComida[valor_upper]  # Buscar por nombre (DESAYUNO, ALMUERZO, CENA)
+            except KeyError:
+                pass
+            
+            # Si no se encuentra por nombre, intentar buscar por valor (minúsculas) - fallback
+            for tiempo in TiempoComida:
+                if tiempo.value == valor_lower:
+                    return tiempo
+            
+            # Si no se encuentra, retornar un valor por defecto seguro
+            import logging
+            logging.warning(f"Valor de enum no encontrado: '{value}' (upper: '{valor_upper}', lower: '{valor_lower}'), valores válidos: {[t.value for t in TiempoComida]}, nombres: {[t.name for t in TiempoComida]}, usando ALMUERZO como valor por defecto")
+            return TiempoComida.ALMUERZO  # Valor por defecto seguro
+        # Para cualquier otro tipo, intentar convertirlo a string
+        try:
+            str_value = str(value).upper().strip()
+            try:
+                return TiempoComida[str_value]
+            except KeyError:
+                return TiempoComida.ALMUERZO
+        except:
+            return TiempoComida.ALMUERZO
 
 class ProgramacionMenu(db.Model):
     """Modelo de programación de menú."""
@@ -25,7 +102,7 @@ class ProgramacionMenu(db.Model):
     # Columnas para rango de fechas (ya migradas en la BD)
     fecha_desde = Column(Date, nullable=False)  # Fecha de inicio del rango
     fecha_hasta = Column(Date, nullable=False)  # Fecha de fin del rango
-    tiempo_comida = Column(Enum(TiempoComida), nullable=False)
+    tiempo_comida = Column(TiempoComidaEnum(), nullable=False)
     ubicacion = Column(String(100), nullable=False)  # restaurante_A, restaurante_B, etc.
     personas_estimadas = Column(Integer, nullable=False, default=0)
     charolas_planificadas = Column(Integer, nullable=False, default=0)  # Charolas planificadas para este servicio

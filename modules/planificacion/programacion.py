@@ -260,10 +260,20 @@ class ProgramacionMenuService:
         
         # Filtrar por rango de fechas: programaciones que se solapen con el rango solicitado
         # Una programación se solapa si: fecha_desde <= fecha_hasta_solicitada AND fecha_hasta >= fecha_desde_solicitada
-        if fecha_desde:
-            query = query.filter(ProgramacionMenu.fecha_desde <= fecha_hasta)
-        if fecha_hasta:
-            query = query.filter(ProgramacionMenu.fecha_hasta >= fecha_desde)
+        # Manejo temporal: usar fecha si fecha_desde/fecha_hasta no existen en la BD
+        try:
+            if fecha_desde:
+                query = query.filter(ProgramacionMenu.fecha_desde <= fecha_hasta)
+            if fecha_hasta:
+                query = query.filter(ProgramacionMenu.fecha_hasta >= fecha_desde)
+        except Exception as e:
+            # Fallback: usar fecha si fecha_desde/fecha_hasta no existen
+            import logging
+            logging.warning(f"Error al filtrar por fecha_desde/fecha_hasta, usando fecha como fallback: {str(e)}")
+            if fecha_desde:
+                query = query.filter(ProgramacionMenu.fecha >= fecha_desde)
+            if fecha_hasta:
+                query = query.filter(ProgramacionMenu.fecha <= fecha_hasta)
         
         if ubicacion:
             query = query.filter(ProgramacionMenu.ubicacion == ubicacion)
@@ -275,8 +285,14 @@ class ProgramacionMenuService:
             except KeyError:
                 pass  # Ignorar si el valor no es válido
         
-        # Ordenar por fecha_desde (rango de fechas)
-        return query.order_by(ProgramacionMenu.fecha_desde.desc(), ProgramacionMenu.tiempo_comida).offset(skip).limit(limit).all()
+        # Ordenar por fecha_desde (rango de fechas) o fecha como fallback
+        try:
+            return query.order_by(ProgramacionMenu.fecha_desde.desc(), ProgramacionMenu.tiempo_comida).offset(skip).limit(limit).all()
+        except Exception as e:
+            # Fallback: usar fecha si fecha_desde no existe
+            import logging
+            logging.warning(f"Error al ordenar por fecha_desde, usando fecha como fallback: {str(e)}")
+            return query.order_by(ProgramacionMenu.fecha.desc(), ProgramacionMenu.tiempo_comida).offset(skip).limit(limit).all()
     
     @staticmethod
     def generar_pedidos_inteligentes(

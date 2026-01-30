@@ -199,28 +199,41 @@ def crear_programacion():
         return error_response('Datos JSON requeridos', 400, 'VALIDATION_ERROR')
     
     # Convertir fechas string a date
-    # Compatibilidad: usar solo fecha hasta que se ejecute la migración
-    # Si vienen fecha_desde y fecha_hasta, usar fecha_desde como fecha
-    fecha_para_insertar = None
+    # Si viene 'fecha', usar para ambas fechas
+    if 'fecha' in datos and isinstance(datos['fecha'], str):
+        fecha = parse_date(datos['fecha'])
+        if 'fecha_desde' not in datos or not datos['fecha_desde']:
+            datos['fecha_desde'] = fecha
+        if 'fecha_hasta' not in datos or not datos['fecha_hasta']:
+            datos['fecha_hasta'] = fecha
     
-    if 'fecha_desde' in datos and datos['fecha_desde']:
-        if isinstance(datos['fecha_desde'], str):
-            fecha_para_insertar = parse_date(datos['fecha_desde'])
-        else:
-            fecha_para_insertar = datos['fecha_desde']
-    elif 'fecha' in datos and datos['fecha']:
-        if isinstance(datos['fecha'], str):
-            fecha_para_insertar = parse_date(datos['fecha'])
-        else:
-            fecha_para_insertar = datos['fecha']
+    # Convertir fecha_desde y fecha_hasta si vienen como strings
+    if 'fecha_desde' in datos and isinstance(datos['fecha_desde'], str):
+        datos['fecha_desde'] = parse_date(datos['fecha_desde'])
     
-    # Usar solo fecha (remover fecha_desde y fecha_hasta hasta que se ejecute la migración)
-    if fecha_para_insertar:
-        datos['fecha'] = fecha_para_insertar
+    if 'fecha_hasta' in datos and isinstance(datos['fecha_hasta'], str):
+        datos['fecha_hasta'] = parse_date(datos['fecha_hasta'])
     
-    # Remover fecha_desde y fecha_hasta para evitar el error de columnas inexistentes
-    datos.pop('fecha_desde', None)
-    datos.pop('fecha_hasta', None)
+    # Validar que fecha_hasta >= fecha_desde
+    if datos.get('fecha_desde') and datos.get('fecha_hasta'):
+        if datos['fecha_hasta'] < datos['fecha_desde']:
+            return error_response('fecha_hasta debe ser mayor o igual a fecha_desde', 400, 'VALIDATION_ERROR')
+    
+    # Convertir tiempo_comida string a enum si viene como string
+    if 'tiempo_comida' in datos and isinstance(datos['tiempo_comida'], str):
+        from models.programacion import TiempoComida
+        try:
+            tiempo_lower = datos['tiempo_comida'].lower().strip()
+            # Buscar por valor (minúsculas)
+            for tiempo in TiempoComida:
+                if tiempo.value == tiempo_lower:
+                    datos['tiempo_comida'] = tiempo
+                    break
+            else:
+                # Si no se encuentra por valor, intentar por nombre
+                datos['tiempo_comida'] = TiempoComida[datos['tiempo_comida'].upper()]
+        except (KeyError, AttributeError):
+            return error_response(f"tiempo_comida inválido: {datos['tiempo_comida']}", 400, 'VALIDATION_ERROR')
     
     programacion = ProgramacionMenuService.crear_programacion(db.session, datos)
     
