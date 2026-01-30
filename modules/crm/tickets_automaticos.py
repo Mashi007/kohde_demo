@@ -98,7 +98,7 @@ class TicketsAutomaticosService:
                     )
                     
                     ticket = Ticket(
-                        cliente_id=0,  # Tickets automáticos no tienen cliente asociado
+                        cliente_id=0,  # Tickets automáticos usan cliente dummy id=0
                         tipo=tipo_ticket,
                         asunto=asunto,
                         descripcion=descripcion,
@@ -213,7 +213,7 @@ class TicketsAutomaticosService:
                 descripcion += f"\nMerma ID principal: {mermas_item[0].id}"
                 
                 ticket = Ticket(
-                    cliente_id=0,  # Tickets automáticos no tienen cliente asociado
+                    cliente_id=None,  # Tickets automáticos no tienen cliente asociado
                     tipo=TipoTicket.QUEJA,
                     asunto=asunto,
                     descripcion=descripcion,
@@ -279,7 +279,7 @@ class TicketsAutomaticosService:
                 descripcion += f"\nProveedor autorizado: {item.proveedor_autorizado.nombre}"
             
             ticket = Ticket(
-                cliente_id=0,  # Tickets automáticos no tienen cliente asociado
+                cliente_id=None,  # Tickets automáticos no tienen cliente asociado
                 tipo=TipoTicket.CONSULTA,
                 asunto=asunto,
                 descripcion=descripcion,
@@ -318,18 +318,21 @@ class TicketsAutomaticosService:
         servicios_requeridos = [TiempoComida.DESAYUNO, TiempoComida.ALMUERZO, TiempoComida.CENA]
         
         # Obtener ubicaciones activas (de charolas existentes o configuración)
-        ubicaciones = db.query(Charola.ubicacion).distinct().all()
-        ubicaciones_list = [u[0] for u in ubicaciones] if ubicaciones else ['principal']
+        try:
+            ubicaciones = db.query(Charola.ubicacion).distinct().all()
+            ubicaciones_list = [u[0] for u in ubicaciones] if ubicaciones else ['principal']
+        except Exception:
+            ubicaciones_list = ['principal']
         
         for ubicacion in ubicaciones_list:
             for servicio in servicios_requeridos:
                 # Verificar si existe programación para este servicio y ubicación que incluya esta fecha
-                # Usar el nombre del enum (mayúsculas) para comparar con PostgreSQL
+                # Usar el valor del enum (minúsculas) para comparar con PostgreSQL String
                 programacion = db.query(ProgramacionMenu).filter(
                     and_(
                         ProgramacionMenu.fecha_desde <= fecha,
                         ProgramacionMenu.fecha_hasta >= fecha,
-                        ProgramacionMenu.tiempo_comida == servicio.name,  # Usar nombre (mayúsculas)
+                        ProgramacionMenu.tiempo_comida == servicio.value,  # Usar valor (minúsculas) para String
                         ProgramacionMenu.ubicacion == ubicacion
                     )
                 ).first()
@@ -363,7 +366,7 @@ class TicketsAutomaticosService:
                     )
                     
                     ticket = Ticket(
-                        cliente_id=0,  # Tickets automáticos no tienen cliente asociado
+                        cliente_id=0,  # Tickets automáticos usan cliente dummy id=0
                         tipo=TipoTicket.CONSULTA,
                         asunto=asunto,
                         descripcion=descripcion,
@@ -408,12 +411,12 @@ class TicketsAutomaticosService:
                 continue
             
             # Verificar si hay programación para este servicio que incluya esta fecha
-            # Usar el nombre del enum (mayúsculas) para comparar con PostgreSQL
+            # Usar el valor del enum (minúsculas) para comparar con PostgreSQL String
             programaciones = db.query(ProgramacionMenu).filter(
                 and_(
                     ProgramacionMenu.fecha_desde <= fecha,
                     ProgramacionMenu.fecha_hasta >= fecha,
-                    ProgramacionMenu.tiempo_comida == servicio_enum.name  # Usar nombre (mayúsculas)
+                    ProgramacionMenu.tiempo_comida == servicio_enum.value  # Usar valor (minúsculas) para String
                 )
             ).all()
             
@@ -457,7 +460,7 @@ class TicketsAutomaticosService:
                     )
                     
                     ticket = Ticket(
-                        cliente_id=0,  # Tickets automáticos no tienen cliente asociado
+                        cliente_id=0,  # Tickets automáticos usan cliente dummy id=0
                         tipo=TipoTicket.CONSULTA,
                         asunto=asunto,
                         descripcion=descripcion,
@@ -547,7 +550,7 @@ class TicketsAutomaticosService:
                     descripcion += f"\nPedido relacionado ID: {pedido.id}"
                 
                 ticket = Ticket(
-                    cliente_id=0,  # Tickets automáticos no tienen cliente asociado
+                    cliente_id=None,  # Tickets automáticos no tienen cliente asociado
                     tipo=TipoTicket.CONSULTA,
                     asunto=asunto,
                     descripcion=descripcion,

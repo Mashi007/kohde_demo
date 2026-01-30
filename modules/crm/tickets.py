@@ -3,7 +3,7 @@ Lógica de negocio para gestión de tickets.
 """
 from typing import List, Optional, Dict
 from datetime import datetime
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_
 from models import Ticket
 from models.ticket import EstadoTicket, TipoTicket, PrioridadTicket
@@ -123,6 +123,9 @@ class TicketService:
         
         if asignado_a:
             query = query.filter(Ticket.asignado_a == asignado_a)
+        
+        # Cargar el proveedor junto con los tickets para evitar N+1 queries
+        query = query.options(joinedload(Ticket.proveedor))
         
         return query.order_by(Ticket.fecha_creacion.desc()).offset(skip).limit(limit).all()
     

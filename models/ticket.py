@@ -183,7 +183,7 @@ class Ticket(db.Model):
     __tablename__ = 'tickets'
     
     id = Column(Integer, primary_key=True)
-    cliente_id = Column(Integer, nullable=True, default=0)  # Removida FK, ahora opcional. Default 0 para tickets automáticos
+    cliente_id = Column(Integer, nullable=False, default=0)  # FK a clientes. Default 0 para tickets automáticos (cliente dummy)
     tipo = Column(TipoTicketEnum(), nullable=False)
     asunto = Column(String(200), nullable=False)
     descripcion = Column(Text, nullable=False)
@@ -201,6 +201,9 @@ class Ticket(db.Model):
     charola_id = Column(Integer, ForeignKey('charolas.id'), nullable=True)
     merma_id = Column(Integer, ForeignKey('mermas.id'), nullable=True)
     inventario_id = Column(Integer, ForeignKey('inventario.id'), nullable=True)
+    
+    # Relaciones SQLAlchemy
+    proveedor = relationship('Proveedor', foreign_keys=[proveedor_id], lazy='joined')
     
     # Campos adicionales para contexto
     origen_modulo = Column(String(50), nullable=True)  # 'proveedor', 'programacion', 'charola', 'merma', 'inventario'
@@ -223,6 +226,10 @@ class Ticket(db.Model):
             'fecha_resolucion': self.fecha_resolucion.isoformat() if self.fecha_resolucion else None,
             'respuesta': self.respuesta,
             'proveedor_id': self.proveedor_id,
+            'proveedor': {
+                'id': self.proveedor.id,
+                'nombre': self.proveedor.nombre
+            } if self.proveedor else None,
             'pedido_id': self.pedido_id,
             'programacion_id': self.programacion_id,
             'charola_id': self.charola_id,
