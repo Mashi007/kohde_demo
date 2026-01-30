@@ -67,3 +67,6 @@ kohde_demo/
 *.md.backup
 *_BACKUP.md
 *_OLD.md
+
+# Alembic (mantener en git, pero ignorar archivos temporales)
+alembic/versions/*.pyc

@@ -2,78 +2,31 @@
 Modelos de PedidoCompra y PedidoCompraItem.
 """
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Numeric, ForeignKey, Enum
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Numeric, ForeignKey, CheckConstraint
 from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
-from sqlalchemy.types import TypeDecorator, String as SQLString
-import enum
 
 from models import db
 
-class EstadoPedido(enum.Enum):
-    """Estados de pedido."""
+# Valores válidos para estado de pedido (strings simples - más práctico)
+ESTADOS_PEDIDO_VALIDOS = ['borrador', 'enviado', 'recibido', 'cancelado']
+ESTADO_PEDIDO_DEFAULT = 'borrador'
+
+# Clase simple para compatibilidad (reemplaza el enum complejo)
+class EstadoPedido:
+    """Estados de pedido como strings simples."""
     BORRADOR = 'borrador'
     ENVIADO = 'enviado'
     RECIBIDO = 'recibido'
     CANCELADO = 'cancelado'
-
-class EstadoPedidoEnum(TypeDecorator):
-    """TypeDecorator para manejar el enum estadopedido de PostgreSQL."""
-    impl = SQLString(20)
-    cache_ok = True
     
-    def load_dialect_impl(self, dialect):
-        """Cargar la implementación del dialecto - usar String para evitar validación automática."""
-        # Usar String en lugar de PG_ENUM directamente para evitar problemas de validación
-        # El cast se hace en bind_expression para escritura
-        return dialect.type_descriptor(SQLString(20))
-    
-    def bind_expression(self, bindvalue):
-        """Agregar cast explícito al tipo enum de PostgreSQL."""
-        from sqlalchemy import cast
-        return cast(bindvalue, PG_ENUM('estadopedido', name='estadopedido', create_type=False))
-    
-    def process_bind_param(self, value, dialect):
-        """Convierte el enum a su NOMBRE (mayúsculas) antes de insertar en PostgreSQL."""
-        if value is None:
-            return None
-        if isinstance(value, EstadoPedido):
-            return value.name  # 'BORRADOR', 'ENVIADO', etc.
-        if isinstance(value, str):
-            valor_upper = value.upper().strip()
-            try:
-                estado_enum = EstadoPedido[valor_upper]
-                return estado_enum.name
-            except KeyError:
-                # Fallback: buscar por valor
-                for estado in EstadoPedido:
-                    if estado.value.lower() == value.lower():
-                        return estado.name
-                raise ValueError(f"'{value}' no es un valor válido para EstadoPedido")
-        return value
-    
-    def process_result_value(self, value, dialect):
-        """Convierte el NOMBRE (mayúsculas) de PostgreSQL a objeto Enum."""
-        if value is None:
-            return None
-        if isinstance(value, EstadoPedido):
-            return value
-        if isinstance(value, str):
-            valor_upper = value.upper().strip()
-            # Intentar buscar por nombre del enum
-            try:
-                return EstadoPedido[valor_upper]
-            except KeyError:
-                # Si no encuentra por nombre, buscar por valor
-                for estado in EstadoPedido:
-                    if estado.name.upper() == valor_upper:
-                        return estado
-                    if estado.value.upper() == valor_upper:
-                        return estado
-                # Si aún no encuentra, retornar por defecto
-                print(f"⚠️ Advertencia: Valor '{value}' no encontrado en EstadoPedido, usando BORRADOR por defecto")
-                return EstadoPedido.BORRADOR
-        return EstadoPedido.BORRADOR
+    @classmethod
+    def validar(cls, valor):
+        """Valida que el valor sea un estado válido."""
+        if isinstance(valor, str):
+            valor_lower = valor.lower().strip()
+            if valor_lower in ESTADOS_PEDIDO_VALIDOS:
+                return valor_lower
+        raise ValueError(f"Estado inválido: {valor}. Valores válidos: {ESTADOS_PEDIDO_VALIDOS}")
 
 class PedidoCompra(db.Model):
     """Modelo de pedido de compra."""
@@ -83,10 +36,18 @@ class PedidoCompra(db.Model):
     proveedor_id = Column(Integer, ForeignKey('proveedores.id', ondelete='RESTRICT'), nullable=False)
     fecha_pedido = Column(DateTime, default=datetime.utcnow, nullable=False)
     fecha_entrega_esperada = Column(DateTime, nullable=True)
-    estado = Column(EstadoPedidoEnum(), default=EstadoPedido.BORRADOR, nullable=False)
+    estado = Column(String(20), default=ESTADO_PEDIDO_DEFAULT, nullable=False)
     total = Column(Numeric(10, 2), nullable=False, default=0)
     creado_por = Column(Integer, nullable=True)  # usuario_id
     observaciones = Column(Text, nullable=True)
+    
+    # Validación a nivel de base de datos
+    __table_args__ = (
+        CheckConstraint(
+            "estado IN ('borrador', 'enviado', 'recibido', 'cancelado')",
+            name='check_estado_pedido_valido'
+        ),
+    )
     
     # Relaciones
     proveedor = relationship('Proveedor', back_populates='pedidos')
@@ -99,7 +60,7 @@ class PedidoCompra(db.Model):
             'proveedor_id': self.proveedor_id,
             'fecha_pedido': self.fecha_pedido.isoformat() if self.fecha_pedido else None,
             'fecha_entrega_esperada': self.fecha_entrega_esperada.isoformat() if self.fecha_entrega_esperada else None,
-            'estado': self.estado.value if self.estado else None,
+            'estado': self.estado if self.estado else None,
             'total': float(self.total) if self.total else None,
             'creado_por': self.creado_por,
             'observaciones': self.observaciones,

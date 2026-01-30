@@ -103,7 +103,7 @@ class ComprasStatsService:
         # Asegurar que siempre retornamos la estructura completa
         pedidos_por_estado_dict = {}
         for estado, cantidad in pedidos_por_estado:
-            estado_key = estado.value if isinstance(estado, EstadoPedido) else str(estado)
+            estado_key = str(estado)  # Ahora es siempre un string simple
             pedidos_por_estado_dict[estado_key] = cantidad
         
         return {

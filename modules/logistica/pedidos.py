@@ -270,6 +270,11 @@ class PedidoCompraService:
             query = query.filter(PedidoCompra.proveedor_id == proveedor_id)
         
         if estado:
-            query = query.filter(PedidoCompra.estado == EstadoPedido[estado.upper()])
+            # Validar y normalizar el estado (acepta mayúsculas o minúsculas)
+            estado_normalizado = estado.lower().strip()
+            if estado_normalizado in ['borrador', 'enviado', 'recibido', 'cancelado']:
+                query = query.filter(PedidoCompra.estado == estado_normalizado)
+            else:
+                raise ValueError(f"Estado inválido: {estado}. Valores válidos: borrador, enviado, recibido, cancelado")
         
         return query.order_by(PedidoCompra.fecha_pedido.desc()).offset(skip).limit(limit).all()

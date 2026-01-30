@@ -4,8 +4,6 @@ Aplicación principal del ERP para cadena de restaurantes.
 from flask import Flask, request
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
 from config import Config
 from models import db

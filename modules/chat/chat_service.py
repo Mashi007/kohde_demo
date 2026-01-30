@@ -279,8 +279,22 @@ class ChatService:
                 # Si hay un error SQL, hacer rollback solo del savepoint
                 # La transacción principal sigue intacta
                 savepoint.rollback()
+                
+                # Mejorar mensajes de error para valores de enum incorrectos
+                error_msg = str(e)
+                sugerencia = ""
+                
+                # Detectar errores comunes de valores inválidos
+                if 'check constraint' in error_msg.lower() or 'invalid' in error_msg.lower():
+                    if 'pedidos_compra' in error_msg.lower() or 'estado' in error_msg.lower():
+                        sugerencia = "\n\n💡 Sugerencia: Los valores válidos para pedidos_compra.estado son: 'borrador', 'enviado', 'recibido', 'cancelado' (en minúsculas). NO existe 'pendiente'. Para pedidos activos usa: estado IN ('borrador', 'enviado')"
+                    elif 'facturas' in error_msg.lower():
+                        sugerencia = "\n\n💡 Sugerencia: Los valores válidos para facturas.estado son: 'pendiente', 'aprobada', 'rechazada' (en minúsculas)"
+                    else:
+                        sugerencia = "\n\n💡 Sugerencia: Verifica que los valores de estado sean válidos. Consulta: SELECT DISTINCT estado FROM tabla LIMIT 10"
+                
                 return {
-                    'error': f'Error al ejecutar consulta SQL: {str(e)}',
+                    'error': f'Error al ejecutar consulta SQL: {error_msg}{sugerencia}',
                     'resultados': None
                 }
         except Exception as e:
@@ -496,8 +510,8 @@ TABLAS DISPONIBLES EN EL SISTEMA (con estructura completa):
 💰 FACTURACIÓN Y COMPRAS:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 • facturas (facturas de proveedores)
-  - id (PK), numero_factura, tipo (enum: COMPRA, VENTA), proveedor_id (FK → proveedores.id)
-  - fecha_emision, fecha_recepcion, subtotal, iva, total, estado (enum: PENDIENTE, APROBADA, RECHAZADA)
+  - id (PK), numero_factura, tipo (string: 'compra', 'venta' - minúsculas), proveedor_id (FK → proveedores.id)
+  - fecha_emision, fecha_recepcion, subtotal, iva, total, estado (string: 'pendiente', 'aprobada', 'rechazada' - minúsculas)
   - imagen_url, items_json (JSON), aprobado_por, fecha_aprobacion, observaciones
   - remitente_nombre, remitente_telefono, recibida_por_whatsapp (boolean), whatsapp_message_id
   - RELACIÓN: → proveedores, → factura_items (1:N)
@@ -509,8 +523,9 @@ TABLAS DISPONIBLES EN EL SISTEMA (con estructura completa):
 
 • pedidos_compra (pedidos de compra a proveedores)
   - id (PK), proveedor_id (FK → proveedores.id), fecha_pedido, fecha_entrega_esperada
-  - estado (enum), total_estimado, observaciones
+  - estado (string: 'borrador', 'enviado', 'recibido', 'cancelado' - TODOS EN MINÚSCULAS), total, observaciones
   - RELACIONES: → proveedores, → pedido_compra_items (1:N)
+  - ⚠️ IMPORTANTE: NO existe 'pendiente'. Para pedidos activos usa: estado IN ('borrador', 'enviado')
 
 • pedido_compra_items (items de cada pedido de compra)
   - id (PK), pedido_id (FK → pedidos_compra.id), item_id (FK → items.id)
@@ -618,6 +633,84 @@ CAMPOS INDEXADOS PRINCIPALES (úsalos en WHERE y ORDER BY):
 - mermas: fecha_merma, item_id, ubicacion
 
 ═══════════════════════════════════════════════════════════════════════════════
+⚠️ VALORES DE ESTADO - STRINGS SIMPLES (MÁS PRÁCTICO) ⚠️
+═══════════════════════════════════════════════════════════════════════════════
+
+🚨 IMPORTANTE: Los campos de estado ahora usan STRINGS SIMPLES en minúsculas.
+Es más práctico y evita errores de conversión de enum.
+
+VALORES VÁLIDOS POR TABLA (TODOS EN MINÚSCULAS):
+
+📦 pedidos_compra.estado:
+  - 'borrador' (pedidos en creación)
+  - 'enviado' (pedidos enviados al proveedor)
+  - 'recibido' (pedidos recibidos)
+  - 'cancelado' (pedidos cancelados)
+  ⚠️ NO existe 'pendiente'. Para pedidos activos usa: estado IN ('borrador', 'enviado')
+
+💰 facturas.estado:
+  - 'pendiente' (facturas pendientes de aprobación)
+  - 'aprobada' (facturas aprobadas)
+  - 'rechazada' (facturas rechazadas)
+
+📋 requerimientos.estado:
+  - 'pendiente'
+  - 'completado'
+  - 'cancelado'
+
+📦 pedidos_internos.estado:
+  - 'pendiente'
+  - 'enviado'
+  - 'recibido'
+  - 'cancelado'
+
+🎫 tickets.estado:
+  - 'abierto'
+  - 'en_proceso'
+  - 'resuelto'
+  - 'cerrado'
+
+🎫 tickets.prioridad:
+  - 'baja'
+  - 'media'
+  - 'alta'
+  - 'urgente'
+
+📋 items.categoria:
+  - 'materia_prima'
+  - 'insumo'
+  - 'producto_terminado'
+  - 'bebida'
+  - 'limpieza'
+  - 'otros'
+
+📋 recetas.tipo, programacion_menu.tiempo_comida, charolas.tipo_comida:
+  - 'desayuno'
+  - 'almuerzo'
+  - 'cena'
+
+📊 mermas.tipo:
+  - 'perdida'
+  - 'danio'
+  - 'vencimiento'
+  - 'otros'
+
+REGLAS DE ORO (STRINGS SIMPLES):
+✅ TODOS los valores de estado son STRINGS en MINÚSCULAS
+✅ NO uses mayúsculas en los valores de estado
+✅ NO uses valores inventados como 'pendiente' para pedidos_compra
+✅ Si no estás seguro, consulta primero: SELECT DISTINCT estado FROM tabla LIMIT 10
+✅ Para pedidos activos, usa: estado IN ('borrador', 'enviado')
+✅ Para facturas pendientes, usa: estado = 'pendiente'
+
+EJEMPLOS CORRECTOS:
+✅ WHERE pc.estado = 'borrador'
+✅ WHERE pc.estado IN ('borrador', 'enviado')
+✅ WHERE f.estado = 'pendiente'
+❌ WHERE pc.estado = 'pendiente' (no existe)
+❌ WHERE pc.estado = 'BORRADOR' (debe ser minúsculas)
+
+═══════════════════════════════════════════════════════════════════════════════
 USO DE CONSULTAS A BASE DE DATOS - FORMATO ESPECIAL
 ═══════════════════════════════════════════════════════════════════════════════
 
@@ -677,6 +770,23 @@ EJEMPLOS DE CONSULTAS ÚTILES Y OPTIMIZADAS:
   WHERE f.estado = 'aprobada' AND f.fecha_recepcion >= CURRENT_DATE - INTERVAL '30 days'
   GROUP BY p.id, p.nombre 
   ORDER BY total_gastado DESC LIMIT 10
+
+📦 PEDIDOS DE COMPRA:
+• Pedidos pendientes (borradores o enviados):
+  SELECT pc.id, p.nombre as proveedor, pc.fecha_pedido, pc.fecha_entrega_esperada, pc.estado, pc.total
+  FROM pedidos_compra pc
+  JOIN proveedores p ON pc.proveedor_id = p.id
+  WHERE pc.estado IN ('borrador', 'enviado')
+  ORDER BY pc.fecha_entrega_esperada ASC LIMIT 20
+
+• Pedidos que requieren acción (compras pendientes):
+  SELECT pc.id, p.nombre as proveedor, pc.estado, pc.total, COUNT(pci.id) as num_items
+  FROM pedidos_compra pc
+  JOIN proveedores p ON pc.proveedor_id = p.id
+  LEFT JOIN pedido_compra_items pci ON pc.id = pci.pedido_id
+  WHERE pc.estado IN ('borrador', 'enviado')
+  GROUP BY pc.id, p.nombre, pc.estado, pc.total
+  ORDER BY pc.fecha_pedido DESC LIMIT 20
 
 📋 RECETAS Y MENÚS:
 • Recetas activas con costo:
