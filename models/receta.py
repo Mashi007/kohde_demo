@@ -2,7 +2,7 @@
 Modelos de Receta y RecetaIngrediente.
 """
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Numeric, ForeignKey, Enum, TypeDecorator
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Numeric, ForeignKey, TypeDecorator
 from sqlalchemy.orm import relationship
 import enum
 
@@ -15,21 +15,15 @@ class TipoReceta(enum.Enum):
     CENA = 'cena'
 
 class TipoRecetaEnum(TypeDecorator):
-    """TypeDecorator para asegurar que SQLAlchemy use el valor del enum, no el nombre."""
-    impl = Enum
+    """TypeDecorator para manejar el enum tiporeceta de PostgreSQL."""
+    impl = String  # Usar String como base, no Enum, para evitar validación automática
     cache_ok = True
     
     def __init__(self):
-        # Usar native_enum=False para que SQLAlchemy use los valores del enum directamente
-        # PostgreSQL espera valores en MINÚSCULAS: 'desayuno', 'almuerzo', 'cena'
-        # Nuestro enum Python también usa minúsculas ('desayuno', 'almuerzo', 'cena')
-        # La conversión se hace en process_bind_param y process_result_value
-        super().__init__(
-            TipoReceta, 
-            native_enum=False,  # False = usar valores del enum, no nombres
-            name='tiporeceta', 
-            create_constraint=True
-        )
+        # Usar String como base para evitar que SQLAlchemy valide automáticamente
+        # PostgreSQL tiene valores en MINÚSCULAS: 'desayuno', 'almuerzo', 'cena'
+        # Hacemos la validación y conversión manualmente en process_bind_param y process_result_value
+        super().__init__(length=20)  # Longitud suficiente para los valores del enum
     
     def process_bind_param(self, value, dialect):
         """Convierte el enum a su VALOR (minúsculas) antes de insertar en PostgreSQL."""
