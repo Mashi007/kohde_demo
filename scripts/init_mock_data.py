@@ -650,40 +650,213 @@ def init_facturas(proveedores, items):
     return facturas_creadas
 
 def init_recetas(items):
-    """Inicializa recetas de prueba."""
-    print("\n5. INICIALIZANDO RECETAS...")
+    """Inicializa 12 plantillas de recetas de prueba."""
+    print("\n5. INICIALIZANDO RECETAS (12 PLANTILLAS)...")
     
-    if not items or len(items) < 5:
+    if not items or len(items) < 10:
         print("  ⚠ No hay suficientes items, saltando recetas")
         return []
     
+    # Crear un mapa de items por nombre para facilitar la búsqueda
+    items_map = {}
+    for item in items:
+        items_map[item.nombre.lower()] = item
+    
+    def buscar_item(nombre):
+        """Busca un item por nombre (case-insensitive)."""
+        return items_map.get(nombre.lower())
+    
     recetas_data = [
+        # DESAYUNOS (4 recetas)
         {
-            'nombre': 'Pasta con Salsa de Tomate',
-            'descripcion': 'Pasta con salsa de tomate y queso',
-            'tipo': TipoReceta.ALMUERZO.value,
-            'porciones': 4,
-            'tiempo_preparacion': 30,
+            'nombre': 'Huevos Revueltos con Pan',
+            'descripcion': 'Huevos revueltos con pan tostado y mantequilla',
+            'tipo': TipoReceta.DESAYUNO.value,
+            'porciones': 2,
+            'tiempo_preparacion': 15,
             'activa': True,
             'ingredientes': [
-                {'item_id': items[8].id, 'cantidad': 0.5, 'unidad': 'kg'},  # Pasta
-                {'item_id': items[1].id, 'cantidad': 0.5, 'unidad': 'kg'},  # Tomate
-                {'item_id': items[0].id, 'cantidad': 0.1, 'unidad': 'kg'},  # Cebolla
-                {'item_id': items[7].id, 'cantidad': 0.2, 'unidad': 'kg'},  # Queso
+                {'item': buscar_item('Huevos'), 'cantidad': 0.5, 'unidad': 'docena'},
+                {'item': buscar_item('Pan de Molde'), 'cantidad': 4, 'unidad': 'unidad'},
+                {'item': buscar_item('Mantequilla'), 'cantidad': 0.05, 'unidad': 'kg'},
+                {'item': buscar_item('Sal'), 'cantidad': 0.01, 'unidad': 'kg'},
             ]
         },
         {
+            'nombre': 'Avena con Frutas',
+            'descripcion': 'Avena cocida con fresas y plátano',
+            'tipo': TipoReceta.DESAYUNO.value,
+            'porciones': 2,
+            'tiempo_preparacion': 20,
+            'activa': True,
+            'ingredientes': [
+                {'item': buscar_item('Avena'), 'cantidad': 0.2, 'unidad': 'kg'},
+                {'item': buscar_item('Fresas'), 'cantidad': 0.2, 'unidad': 'kg'},
+                {'item': buscar_item('Plátano'), 'cantidad': 0.2, 'unidad': 'kg'},
+                {'item': buscar_item('Leche Entera'), 'cantidad': 0.5, 'unidad': 'litro'},
+            ]
+        },
+        {
+            'nombre': 'Tortillas con Queso',
+            'descripcion': 'Tortillas de harina con queso mozzarella',
+            'tipo': TipoReceta.DESAYUNO.value,
+            'porciones': 4,
+            'tiempo_preparacion': 25,
+            'activa': True,
+            'ingredientes': [
+                {'item': buscar_item('Tortillas'), 'cantidad': 1, 'unidad': 'paquete'},
+                {'item': buscar_item('Queso Mozzarella'), 'cantidad': 0.3, 'unidad': 'kg'},
+                {'item': buscar_item('Aceite de Oliva'), 'cantidad': 0.05, 'unidad': 'litro'},
+            ]
+        },
+        {
+            'nombre': 'Yogurt con Granola y Manzana',
+            'descripcion': 'Yogurt natural con granola y manzana fresca',
+            'tipo': TipoReceta.DESAYUNO.value,
+            'porciones': 2,
+            'tiempo_preparacion': 10,
+            'activa': True,
+            'ingredientes': [
+                {'item': buscar_item('Yogurt Natural'), 'cantidad': 0.5, 'unidad': 'litro'},
+                {'item': buscar_item('Manzana'), 'cantidad': 0.3, 'unidad': 'kg'},
+                {'item': buscar_item('Avena'), 'cantidad': 0.1, 'unidad': 'kg'},
+            ]
+        },
+        
+        # ALMUERZOS (5 recetas)
+        {
             'nombre': 'Arroz con Pollo',
-            'descripcion': 'Arroz con pollo y verduras',
+            'descripcion': 'Arroz con pollo, verduras y especias',
             'tipo': TipoReceta.ALMUERZO.value,
             'porciones': 6,
             'tiempo_preparacion': 45,
             'activa': True,
             'ingredientes': [
-                {'item_id': items[7].id, 'cantidad': 1.0, 'unidad': 'kg'},  # Arroz
-                {'item_id': items[3].id, 'cantidad': 1.0, 'unidad': 'kg'},  # Pollo
-                {'item_id': items[0].id, 'cantidad': 0.2, 'unidad': 'kg'},  # Cebolla
-                {'item_id': items[2].id, 'cantidad': 0.3, 'unidad': 'kg'},  # Papa
+                {'item': buscar_item('Arroz Blanco'), 'cantidad': 1.0, 'unidad': 'kg'},
+                {'item': buscar_item('Pechuga de Pollo'), 'cantidad': 1.0, 'unidad': 'kg'},
+                {'item': buscar_item('Cebolla Blanca'), 'cantidad': 0.2, 'unidad': 'kg'},
+                {'item': buscar_item('Tomate Fresco'), 'cantidad': 0.3, 'unidad': 'kg'},
+                {'item': buscar_item('Pimiento Rojo'), 'cantidad': 0.2, 'unidad': 'kg'},
+                {'item': buscar_item('Ajo'), 'cantidad': 0.05, 'unidad': 'kg'},
+                {'item': buscar_item('Comino'), 'cantidad': 0.01, 'unidad': 'kg'},
+            ]
+        },
+        {
+            'nombre': 'Pasta con Salsa de Tomate y Queso',
+            'descripcion': 'Pasta espagueti con salsa de tomate casera y queso parmesano',
+            'tipo': TipoReceta.ALMUERZO.value,
+            'porciones': 4,
+            'tiempo_preparacion': 30,
+            'activa': True,
+            'ingredientes': [
+                {'item': buscar_item('Pasta Espagueti'), 'cantidad': 0.5, 'unidad': 'kg'},
+                {'item': buscar_item('Tomate Fresco'), 'cantidad': 0.5, 'unidad': 'kg'},
+                {'item': buscar_item('Cebolla Blanca'), 'cantidad': 0.15, 'unidad': 'kg'},
+                {'item': buscar_item('Ajo'), 'cantidad': 0.03, 'unidad': 'kg'},
+                {'item': buscar_item('Queso Parmesano'), 'cantidad': 0.1, 'unidad': 'kg'},
+                {'item': buscar_item('Aceite de Oliva'), 'cantidad': 0.05, 'unidad': 'litro'},
+                {'item': buscar_item('Orégano'), 'cantidad': 0.01, 'unidad': 'kg'},
+            ]
+        },
+        {
+            'nombre': 'Carne de Res con Papas',
+            'descripcion': 'Carne de res en trozos con papas y verduras',
+            'tipo': TipoReceta.ALMUERZO.value,
+            'porciones': 4,
+            'tiempo_preparacion': 60,
+            'activa': True,
+            'ingredientes': [
+                {'item': buscar_item('Carne de Res en Trozos'), 'cantidad': 1.0, 'unidad': 'kg'},
+                {'item': buscar_item('Papa'), 'cantidad': 0.5, 'unidad': 'kg'},
+                {'item': buscar_item('Cebolla Blanca'), 'cantidad': 0.2, 'unidad': 'kg'},
+                {'item': buscar_item('Zanahoria'), 'cantidad': 0.2, 'unidad': 'kg'},
+                {'item': buscar_item('Ajo'), 'cantidad': 0.05, 'unidad': 'kg'},
+                {'item': buscar_item('Pimienta Negra'), 'cantidad': 0.01, 'unidad': 'kg'},
+                {'item': buscar_item('Sal'), 'cantidad': 0.02, 'unidad': 'kg'},
+            ]
+        },
+        {
+            'nombre': 'Ensalada César con Pollo',
+            'descripcion': 'Ensalada fresca con pollo a la parrilla, lechuga y aderezo',
+            'tipo': TipoReceta.ALMUERZO.value,
+            'porciones': 4,
+            'tiempo_preparacion': 25,
+            'activa': True,
+            'ingredientes': [
+                {'item': buscar_item('Lechuga'), 'cantidad': 0.3, 'unidad': 'kg'},
+                {'item': buscar_item('Pechuga de Pollo'), 'cantidad': 0.5, 'unidad': 'kg'},
+                {'item': buscar_item('Queso Parmesano'), 'cantidad': 0.05, 'unidad': 'kg'},
+                {'item': buscar_item('Aceite de Oliva'), 'cantidad': 0.1, 'unidad': 'litro'},
+                {'item': buscar_item('Limón'), 'cantidad': 0.1, 'unidad': 'kg'},
+                {'item': buscar_item('Ajo'), 'cantidad': 0.02, 'unidad': 'kg'},
+            ]
+        },
+        {
+            'nombre': 'Frijoles con Arroz',
+            'descripcion': 'Frijoles negros cocidos con arroz blanco',
+            'tipo': TipoReceta.ALMUERZO.value,
+            'porciones': 6,
+            'tiempo_preparacion': 90,
+            'activa': True,
+            'ingredientes': [
+                {'item': buscar_item('Frijoles Negros'), 'cantidad': 0.5, 'unidad': 'kg'},
+                {'item': buscar_item('Arroz Blanco'), 'cantidad': 0.5, 'unidad': 'kg'},
+                {'item': buscar_item('Cebolla Blanca'), 'cantidad': 0.15, 'unidad': 'kg'},
+                {'item': buscar_item('Ajo'), 'cantidad': 0.03, 'unidad': 'kg'},
+                {'item': buscar_item('Comino'), 'cantidad': 0.01, 'unidad': 'kg'},
+                {'item': buscar_item('Sal'), 'cantidad': 0.02, 'unidad': 'kg'},
+            ]
+        },
+        
+        # CENAS (3 recetas)
+        {
+            'nombre': 'Pescado a la Plancha con Verduras',
+            'descripcion': 'Pescado fresco a la plancha con verduras al vapor',
+            'tipo': TipoReceta.CENA.value,
+            'porciones': 4,
+            'tiempo_preparacion': 30,
+            'activa': True,
+            'ingredientes': [
+                {'item': buscar_item('Pescado Fresco'), 'cantidad': 1.0, 'unidad': 'kg'},
+                {'item': buscar_item('Brócoli'), 'cantidad': 0.3, 'unidad': 'kg'},
+                {'item': buscar_item('Zanahoria'), 'cantidad': 0.2, 'unidad': 'kg'},
+                {'item': buscar_item('Limón'), 'cantidad': 0.1, 'unidad': 'kg'},
+                {'item': buscar_item('Aceite de Oliva'), 'cantidad': 0.05, 'unidad': 'litro'},
+                {'item': buscar_item('Pimienta Negra'), 'cantidad': 0.01, 'unidad': 'kg'},
+            ]
+        },
+        {
+            'nombre': 'Pasta Penne con Pollo y Crema',
+            'descripcion': 'Pasta penne con pollo en salsa de crema',
+            'tipo': TipoReceta.CENA.value,
+            'porciones': 4,
+            'tiempo_preparacion': 35,
+            'activa': True,
+            'ingredientes': [
+                {'item': buscar_item('Pasta Penne'), 'cantidad': 0.5, 'unidad': 'kg'},
+                {'item': buscar_item('Pechuga de Pollo'), 'cantidad': 0.5, 'unidad': 'kg'},
+                {'item': buscar_item('Crema de Leche'), 'cantidad': 0.3, 'unidad': 'litro'},
+                {'item': buscar_item('Cebolla Blanca'), 'cantidad': 0.15, 'unidad': 'kg'},
+                {'item': buscar_item('Ajo'), 'cantidad': 0.03, 'unidad': 'kg'},
+                {'item': buscar_item('Queso Cheddar'), 'cantidad': 0.1, 'unidad': 'kg'},
+            ]
+        },
+        {
+            'nombre': 'Sopa de Verduras',
+            'descripcion': 'Sopa casera de verduras frescas',
+            'tipo': TipoReceta.CENA.value,
+            'porciones': 6,
+            'tiempo_preparacion': 40,
+            'activa': True,
+            'ingredientes': [
+                {'item': buscar_item('Tomate Fresco'), 'cantidad': 0.4, 'unidad': 'kg'},
+                {'item': buscar_item('Cebolla Blanca'), 'cantidad': 0.2, 'unidad': 'kg'},
+                {'item': buscar_item('Zanahoria'), 'cantidad': 0.3, 'unidad': 'kg'},
+                {'item': buscar_item('Papa'), 'cantidad': 0.3, 'unidad': 'kg'},
+                {'item': buscar_item('Lechuga'), 'cantidad': 0.2, 'unidad': 'kg'},
+                {'item': buscar_item('Ajo'), 'cantidad': 0.03, 'unidad': 'kg'},
+                {'item': buscar_item('Sal'), 'cantidad': 0.02, 'unidad': 'kg'},
+                {'item': buscar_item('Pimienta Negra'), 'cantidad': 0.01, 'unidad': 'kg'},
             ]
         }
     ]
@@ -693,6 +866,13 @@ def init_recetas(items):
         # Separar ingredientes
         ingredientes = receta_data.pop('ingredientes', [])
         
+        # Filtrar ingredientes que existen (no None)
+        ingredientes_validos = [ing for ing in ingredientes if ing.get('item') is not None]
+        
+        if not ingredientes_validos:
+            print(f"  ⚠ Saltando receta '{receta_data['nombre']}': no hay ingredientes válidos")
+            continue
+        
         existing = Receta.query.filter_by(nombre=receta_data['nombre']).first()
         if not existing:
             receta = Receta(**receta_data)
@@ -700,10 +880,10 @@ def init_recetas(items):
             db.session.flush()  # Para obtener el ID
             
             # Crear ingredientes
-            for ing_data in ingredientes:
+            for ing_data in ingredientes_validos:
                 ingrediente = RecetaIngrediente(
                     receta_id=receta.id,
-                    item_id=ing_data['item_id'],
+                    item_id=ing_data['item'].id,
                     cantidad=Decimal(str(ing_data['cantidad'])),
                     unidad=ing_data['unidad']
                 )
@@ -713,7 +893,7 @@ def init_recetas(items):
             receta.calcular_totales()
             
             recetas_creadas.append(receta)
-            print(f"  ✓ Creada: {receta_data['nombre']}")
+            print(f"  ✓ Creada: {receta_data['nombre']} ({len(ingredientes_validos)} ingredientes)")
         else:
             recetas_creadas.append(existing)
             print(f"  ↻ Ya existe: {receta_data['nombre']}")
