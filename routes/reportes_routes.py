@@ -637,30 +637,56 @@ def obtener_comparacion_charolas():
         # Convertir a lista ordenada
         series = sorted([v for v in datos_por_fecha.values()], key=lambda x: x['fecha'])
         
-        # Si no hay datos, generar datos mock con una secuencia interesante
-        if len(series) == 0:
+        # Si no hay datos o muy pocos datos, generar datos mock con una secuencia interesante
+        # Generar datos mock si hay menos de 3 días con datos
+        if len(series) < 3:
             import random
+            import math
             base_date = fecha_inicio_date
             current_date = base_date
-            programadas_base = 50
-            servidas_base = 45
+            programadas_base = 45
+            servidas_base = 42
             
+            # Crear una secuencia más interesante con patrones semanales
             while current_date <= fecha_fin_date:
-                # Crear una secuencia con tendencia creciente y variación realista
-                # Las programadas aumentan gradualmente
                 dias_desde_inicio = (current_date - base_date).days
-                variacion_programadas = random.randint(-5, 10)
-                variacion_servidas = random.randint(-8, 7)
+                dia_semana = current_date.weekday()  # 0=Lunes, 6=Domingo
                 
-                # Tendencia: las programadas aumentan con el tiempo
-                programadas = max(30, programadas_base + (dias_desde_inicio * 2) + variacion_programadas)
+                # Patrón semanal: más charolas los fines de semana
+                factor_semanal = 1.0
+                if dia_semana >= 5:  # Sábado y domingo
+                    factor_semanal = 1.3
+                elif dia_semana == 4:  # Viernes
+                    factor_semanal = 1.15
+                elif dia_semana == 0:  # Lunes
+                    factor_semanal = 0.9
                 
-                # Las servidas siguen las programadas pero con variación (eficiencia 85-105%)
-                eficiencia = random.uniform(0.85, 1.05)
-                servidas = max(25, int(programadas * eficiencia + variacion_servidas))
+                # Tendencia creciente con crecimiento exponencial suave
+                crecimiento_base = dias_desde_inicio * 1.5
+                crecimiento_exponencial = math.sin(dias_desde_inicio / 7) * 5  # Patrón semanal suave
                 
-                # Asegurar que servidas no exceda programadas por mucho (máximo 110%)
-                servidas = min(servidas, int(programadas * 1.1))
+                # Variación aleatoria más realista
+                variacion_programadas = random.randint(-8, 12)
+                variacion_servidas = random.randint(-10, 10)
+                
+                # Calcular programadas con tendencia y patrón semanal
+                programadas = max(35, int(
+                    (programadas_base + crecimiento_base + crecimiento_exponencial) * factor_semanal + variacion_programadas
+                ))
+                
+                # Las servidas siguen las programadas con eficiencia variable (88-102%)
+                # La eficiencia mejora ligeramente con el tiempo
+                eficiencia_base = 0.90 + (dias_desde_inicio * 0.0005)  # Mejora gradual
+                eficiencia_variacion = random.uniform(-0.05, 0.12)
+                eficiencia = min(1.02, max(0.88, eficiencia_base + eficiencia_variacion))
+                
+                servidas = max(30, int(programadas * eficiencia + variacion_servidas))
+                
+                # Asegurar que servidas no exceda programadas por mucho (máximo 105%)
+                servidas = min(servidas, int(programadas * 1.05))
+                
+                # Asegurar que servidas no sea menor que 80% de programadas (mínimo realista)
+                servidas = max(servidas, int(programadas * 0.80))
                 
                 series.append({
                     'fecha': current_date.isoformat(),
@@ -669,6 +695,11 @@ def obtener_comparacion_charolas():
                 })
                 
                 current_date += timedelta(days=1)
+            
+            # Si había algunos datos reales, combinarlos con los mock
+            if len(series) > 0 and len(datos_por_fecha) > 0:
+                # Reordenar por fecha
+                series = sorted(series, key=lambda x: x['fecha'])
         
         # Calcular estadísticas
         total_programadas = sum(item['programadas'] for item in series)
@@ -682,6 +713,510 @@ def obtener_comparacion_charolas():
                 'total_servidas': total_servidas,
                 'eficiencia_promedio': round(eficiencia_promedio, 2),
                 'diferencia': total_programadas - total_servidas
+            },
+            'periodo': {
+                'fecha_inicio': fecha_inicio_date.isoformat(),
+                'fecha_fin': fecha_fin_date.isoformat()
+            }
+        })
+    except ValueError as e:
+        return error_response(str(e), 400, 'VALIDATION_ERROR')
+    except Exception as e:
+        import traceback
+        return error_response(f'{str(e)}\n{traceback.format_exc()}', 500, 'INTERNAL_ERROR')
+
+@bp.route('/kpis/mermas-detalle', methods=['GET'])
+def obtener_mermas_detalle():
+    """Obtiene datos detallados de mermas con datos mock si es necesario."""
+    try:
+        fecha_inicio_str = request.args.get('fecha_inicio')
+        fecha_fin_str = request.args.get('fecha_fin')
+        
+        fecha_fin = datetime.now()
+        if fecha_fin_str:
+            fecha_fin = parse_datetime(fecha_fin_str) if isinstance(fecha_fin_str, str) else fecha_fin_str
+        else:
+            fecha_fin = datetime.now()
+        
+        if fecha_inicio_str:
+            fecha_inicio = parse_date(fecha_inicio_str) if isinstance(fecha_inicio_str, str) else fecha_inicio_str
+        else:
+            fecha_inicio = fecha_fin - timedelta(days=30)
+        
+        if isinstance(fecha_inicio, datetime):
+            fecha_inicio_date = fecha_inicio.date()
+        else:
+            fecha_inicio_date = fecha_inicio
+        
+        if isinstance(fecha_fin, datetime):
+            fecha_fin_date = fecha_fin.date()
+        else:
+            fecha_fin_date = fecha_fin
+        
+        # Obtener mermas por día
+        mermas_diarias = db.session.query(
+            func.date(Merma.fecha_merma).label('fecha'),
+            func.count(Merma.id).label('cantidad'),
+            func.coalesce(func.sum(Merma.cantidad * Merma.costo_unitario), 0).label('total_costo')
+        ).filter(
+            func.date(Merma.fecha_merma) >= fecha_inicio_date,
+            func.date(Merma.fecha_merma) <= fecha_fin_date
+        ).group_by(func.date(Merma.fecha_merma)).order_by('fecha').all()
+        
+        # Procesar datos reales
+        series = []
+        for row in mermas_diarias:
+            if row.fecha:
+                series.append({
+                    'fecha': row.fecha.isoformat(),
+                    'cantidad': int(row.cantidad or 0),
+                    'total_costo': float(row.total_costo or 0)
+                })
+        
+        # Si no hay datos o muy pocos datos, generar datos mock con una secuencia interesante
+        if len(series) < 3:
+            import random
+            import math
+            base_date = fecha_inicio_date
+            current_date = base_date
+            cantidad_base = 8
+            costo_base = 150.0
+            
+            # Tipos de merma para variación
+            tipos_merma = ['vencimiento', 'deterioro', 'preparacion', 'servicio', 'otro']
+            
+            while current_date <= fecha_fin_date:
+                dias_desde_inicio = (current_date - base_date).days
+                dia_semana = current_date.weekday()
+                
+                # Patrón semanal: más mermas los fines de semana (más tráfico)
+                factor_semanal = 1.0
+                if dia_semana >= 5:  # Sábado y domingo
+                    factor_semanal = 1.4
+                elif dia_semana == 4:  # Viernes
+                    factor_semanal = 1.2
+                elif dia_semana == 0:  # Lunes (inventario nuevo)
+                    factor_semanal = 0.7
+                
+                # Tendencia: intentar reducir mermas con el tiempo (mejora operativa)
+                # Pero con variación realista
+                reduccion_objetivo = dias_desde_inicio * 0.1  # Reducción gradual
+                variacion_cantidad = random.randint(-3, 5)
+                
+                # Calcular cantidad de mermas
+                cantidad = max(3, int(
+                    (cantidad_base - reduccion_objetivo + variacion_cantidad) * factor_semanal
+                ))
+                
+                # El costo varía según la cantidad y tipo de merma
+                costo_unitario_promedio = random.uniform(15.0, 35.0)
+                total_costo = cantidad * costo_unitario_promedio
+                
+                # Agregar picos ocasionales (días con más problemas)
+                if random.random() < 0.15:  # 15% de probabilidad de día problemático
+                    cantidad = int(cantidad * random.uniform(1.5, 2.5))
+                    total_costo = cantidad * costo_unitario_promedio * random.uniform(1.3, 2.0)
+                
+                series.append({
+                    'fecha': current_date.isoformat(),
+                    'cantidad': cantidad,
+                    'total_costo': round(total_costo, 2)
+                })
+                
+                current_date += timedelta(days=1)
+        
+        # Ordenar por fecha
+        series = sorted(series, key=lambda x: x['fecha'])
+        
+        # Obtener mermas por tipo
+        mermas_por_tipo = db.session.query(
+            Merma.tipo,
+            func.count(Merma.id).label('cantidad'),
+            func.coalesce(func.sum(Merma.cantidad * Merma.costo_unitario), 0).label('total_costo')
+        ).filter(
+            func.date(Merma.fecha_merma) >= fecha_inicio_date,
+            func.date(Merma.fecha_merma) <= fecha_fin_date
+        ).group_by(Merma.tipo).all()
+        
+        por_tipo = [
+            {
+                'tipo': row.tipo.value if hasattr(row.tipo, 'value') else str(row.tipo),
+                'cantidad': int(row.cantidad),
+                'total_costo': float(row.total_costo)
+            }
+            for row in mermas_por_tipo
+        ]
+        
+        # Si no hay datos por tipo, generar datos mock
+        if len(por_tipo) == 0:
+            tipos_mock = [
+                {'tipo': 'vencimiento', 'cantidad': 0, 'total_costo': 0},
+                {'tipo': 'deterioro', 'cantidad': 0, 'total_costo': 0},
+                {'tipo': 'preparacion', 'cantidad': 0, 'total_costo': 0},
+                {'tipo': 'servicio', 'cantidad': 0, 'total_costo': 0},
+                {'tipo': 'otro', 'cantidad': 0, 'total_costo': 0}
+            ]
+            
+            # Distribuir las mermas totales entre los tipos
+            total_cantidad = sum(item['cantidad'] for item in series)
+            total_costo_total = sum(item['total_costo'] for item in series)
+            
+            if total_cantidad > 0:
+                distribucion = [0.25, 0.20, 0.30, 0.15, 0.10]  # Distribución porcentual
+                for i, tipo_mock in enumerate(tipos_mock):
+                    tipo_mock['cantidad'] = int(total_cantidad * distribucion[i])
+                    tipo_mock['total_costo'] = round(total_costo_total * distribucion[i], 2)
+            
+            por_tipo = tipos_mock
+        
+        # Calcular estadísticas
+        total_cantidad = sum(item['cantidad'] for item in series)
+        total_costo = sum(item['total_costo'] for item in series)
+        promedio_diario = total_cantidad / len(series) if len(series) > 0 else 0
+        costo_promedio = total_costo / len(series) if len(series) > 0 else 0
+        
+        # Encontrar día con más mermas
+        dia_max = max(series, key=lambda x: x['cantidad']) if series else None
+        
+        return success_response({
+            'series': series,
+            'por_tipo': por_tipo,
+            'estadisticas': {
+                'total_cantidad': total_cantidad,
+                'total_costo': round(total_costo, 2),
+                'promedio_diario': round(promedio_diario, 2),
+                'costo_promedio_diario': round(costo_promedio, 2),
+                'dia_max_mermas': dia_max['fecha'] if dia_max else None,
+                'cantidad_max': dia_max['cantidad'] if dia_max else 0
+            },
+            'periodo': {
+                'fecha_inicio': fecha_inicio_date.isoformat(),
+                'fecha_fin': fecha_fin_date.isoformat()
+            }
+        })
+    except ValueError as e:
+        return error_response(str(e), 400, 'VALIDATION_ERROR')
+    except Exception as e:
+        import traceback
+        return error_response(f'{str(e)}\n{traceback.format_exc()}', 500, 'INTERNAL_ERROR')
+
+@bp.route('/kpis/costo-charola-servicio', methods=['GET'])
+def obtener_costo_charola_por_servicio():
+    """Obtiene costo por charola por servicio (desayuno, almuerzo, cena) con costo ideal."""
+    try:
+        fecha_inicio_str = request.args.get('fecha_inicio')
+        fecha_fin_str = request.args.get('fecha_fin')
+        
+        fecha_fin = datetime.now()
+        if fecha_fin_str:
+            fecha_fin = parse_datetime(fecha_fin_str) if isinstance(fecha_fin_str, str) else fecha_fin_str
+        else:
+            fecha_fin = datetime.now()
+        
+        if fecha_inicio_str:
+            fecha_inicio = parse_date(fecha_inicio_str) if isinstance(fecha_inicio_str, str) else fecha_inicio_str
+        else:
+            fecha_inicio = fecha_fin - timedelta(days=30)
+        
+        if isinstance(fecha_inicio, datetime):
+            fecha_inicio_date = fecha_inicio.date()
+        else:
+            fecha_inicio_date = fecha_inicio
+        
+        if isinstance(fecha_fin, datetime):
+            fecha_fin_date = fecha_fin.date()
+        else:
+            fecha_fin_date = fecha_fin
+        
+        # Obtener costo promedio por charola por tiempo_comida
+        costos_por_servicio = db.session.query(
+            Charola.tiempo_comida,
+            func.count(Charola.id).label('cantidad_charolas'),
+            func.avg(Charola.costo_total).label('costo_promedio'),
+            func.sum(Charola.costo_total).label('costo_total'),
+            func.avg(Charola.personas_servidas).label('personas_promedio')
+        ).filter(
+            func.date(Charola.fecha_servicio) >= fecha_inicio_date,
+            func.date(Charola.fecha_servicio) <= fecha_fin_date
+        ).group_by(Charola.tiempo_comida).all()
+        
+        # Procesar datos reales
+        datos_por_servicio = {}
+        for row in costos_por_servicio:
+            tiempo_comida = row.tiempo_comida.lower() if row.tiempo_comida else None
+            if tiempo_comida:
+                costo_promedio = float(row.costo_promedio or 0)
+                # Calcular costo ideal (85% del promedio como objetivo de eficiencia)
+                costo_ideal = costo_promedio * 0.85
+                
+                datos_por_servicio[tiempo_comida] = {
+                    'tiempo_comida': tiempo_comida,
+                    'cantidad_charolas': int(row.cantidad_charolas or 0),
+                    'costo_promedio': round(costo_promedio, 2),
+                    'costo_ideal': round(costo_ideal, 2),
+                    'costo_total': round(float(row.costo_total or 0), 2),
+                    'personas_promedio': round(float(row.personas_promedio or 0), 2),
+                    'costo_por_persona': round(costo_promedio / float(row.personas_promedio or 1), 2) if row.personas_promedio else 0
+                }
+        
+        # Si no hay datos o muy pocos datos, generar datos mock
+        servicios_esperados = ['desayuno', 'almuerzo', 'cena']
+        tiene_datos_suficientes = len(datos_por_servicio) >= 2
+        
+        if not tiene_datos_suficientes:
+            import random
+            import math
+            
+            # Costos base ideales por servicio (en pesos/dólares)
+            costos_base_ideales = {
+                'desayuno': 25.0,  # Desayuno más económico
+                'almuerzo': 45.0,  # Almuerzo intermedio
+                'cena': 50.0       # Cena más costosa
+            }
+            
+            # Generar datos para cada servicio
+            for servicio in servicios_esperados:
+                if servicio not in datos_por_servicio:
+                    # Variación aleatoria pero realista
+                    variacion = random.uniform(-0.15, 0.20)  # -15% a +20%
+                    costo_ideal = costos_base_ideales.get(servicio, 40.0)
+                    costo_real = costo_ideal * (1 + variacion)
+                    
+                    # Asegurar que costo_real sea mayor o igual a costo_ideal (objetivo de mejora)
+                    if costo_real < costo_ideal:
+                        costo_real = costo_ideal * random.uniform(1.0, 1.15)
+                    
+                    # Personas promedio por servicio
+                    personas_base = {
+                        'desayuno': 1.5,
+                        'almuerzo': 2.0,
+                        'cena': 2.5
+                    }
+                    personas = personas_base.get(servicio, 2.0) + random.uniform(-0.3, 0.5)
+                    
+                    # Cantidad de charolas (variación según servicio)
+                    cantidad_base = {
+                        'desayuno': 15,
+                        'almuerzo': 25,
+                        'cena': 20
+                    }
+                    cantidad = cantidad_base.get(servicio, 20) + random.randint(-5, 10)
+                    
+                    datos_por_servicio[servicio] = {
+                        'tiempo_comida': servicio,
+                        'cantidad_charolas': max(5, cantidad),
+                        'costo_promedio': round(costo_real, 2),
+                        'costo_ideal': round(costo_ideal, 2),
+                        'costo_total': round(costo_real * max(5, cantidad), 2),
+                        'personas_promedio': round(personas, 1),
+                        'costo_por_persona': round(costo_real / personas, 2)
+                    }
+        
+        # Convertir a lista ordenada
+        series = []
+        orden_servicios = ['desayuno', 'almuerzo', 'cena']
+        for servicio in orden_servicios:
+            if servicio in datos_por_servicio:
+                series.append(datos_por_servicio[servicio])
+        
+        # Calcular estadísticas generales
+        total_charolas = sum(item['cantidad_charolas'] for item in series)
+        costo_total_real = sum(item['costo_total'] for item in series)
+        costo_total_ideal = sum(item['costo_ideal'] * item['cantidad_charolas'] for item in series)
+        ahorro_potencial = costo_total_real - costo_total_ideal
+        eficiencia_promedio = (costo_total_ideal / costo_total_real * 100) if costo_total_real > 0 else 0
+        
+        return success_response({
+            'series': series,
+            'estadisticas': {
+                'total_charolas': total_charolas,
+                'costo_total_real': round(costo_total_real, 2),
+                'costo_total_ideal': round(costo_total_ideal, 2),
+                'ahorro_potencial': round(ahorro_potencial, 2),
+                'eficiencia_promedio': round(eficiencia_promedio, 2),
+                'porcentaje_ahorro': round((ahorro_potencial / costo_total_real * 100) if costo_total_real > 0 else 0, 2)
+            },
+            'periodo': {
+                'fecha_inicio': fecha_inicio_date.isoformat(),
+                'fecha_fin': fecha_fin_date.isoformat()
+            }
+        })
+    except ValueError as e:
+        return error_response(str(e), 400, 'VALIDATION_ERROR')
+    except Exception as e:
+        import traceback
+        return error_response(f'{str(e)}\n{traceback.format_exc()}', 500, 'INTERNAL_ERROR')
+
+@bp.route('/kpis/mermas-por-dia-tolerable', methods=['GET'])
+def obtener_mermas_por_dia_tolerable():
+    """Obtiene mermas por día con porcentaje tolerable como referencia."""
+    try:
+        fecha_inicio_str = request.args.get('fecha_inicio')
+        fecha_fin_str = request.args.get('fecha_fin')
+        porcentaje_tolerable = float(request.args.get('porcentaje_tolerable', 5.0))  # 5% por defecto
+        
+        fecha_fin = datetime.now()
+        if fecha_fin_str:
+            fecha_fin = parse_datetime(fecha_fin_str) if isinstance(fecha_fin_str, str) else fecha_fin_str
+        else:
+            fecha_fin = datetime.now()
+        
+        if fecha_inicio_str:
+            fecha_inicio = parse_date(fecha_inicio_str) if isinstance(fecha_inicio_str, str) else fecha_inicio_str
+        else:
+            fecha_inicio = fecha_fin - timedelta(days=30)
+        
+        if isinstance(fecha_inicio, datetime):
+            fecha_inicio_date = fecha_inicio.date()
+        else:
+            fecha_inicio_date = fecha_inicio
+        
+        if isinstance(fecha_fin, datetime):
+            fecha_fin_date = fecha_fin.date()
+        else:
+            fecha_fin_date = fecha_fin
+        
+        # Obtener mermas por día
+        mermas_diarias = db.session.query(
+            func.date(Merma.fecha_merma).label('fecha'),
+            func.count(Merma.id).label('cantidad'),
+            func.coalesce(func.sum(Merma.cantidad * Merma.costo_unitario), 0).label('total_costo')
+        ).filter(
+            func.date(Merma.fecha_merma) >= fecha_inicio_date,
+            func.date(Merma.fecha_merma) <= fecha_fin_date
+        ).group_by(func.date(Merma.fecha_merma)).order_by('fecha').all()
+        
+        # Obtener costo total de charolas en el mismo período para calcular porcentaje
+        costo_total_charolas = db.session.query(
+            func.coalesce(func.sum(Charola.costo_total), 0)
+        ).filter(
+            func.date(Charola.fecha_servicio) >= fecha_inicio_date,
+            func.date(Charola.fecha_servicio) <= fecha_fin_date
+        ).scalar() or 0
+        
+        # Procesar datos reales
+        series = []
+        costo_total_periodo = 0
+        
+        for row in mermas_diarias:
+            if row.fecha:
+                costo_dia = float(row.total_costo or 0)
+                costo_total_periodo += costo_dia
+                
+                # Obtener costo de charolas del día para calcular porcentaje
+                costo_charolas_dia = db.session.query(
+                    func.coalesce(func.sum(Charola.costo_total), 0)
+                ).filter(
+                    func.date(Charola.fecha_servicio) == row.fecha
+                ).scalar() or 0
+                
+                porcentaje_dia = (costo_dia / costo_charolas_dia * 100) if costo_charolas_dia > 0 else 0
+                
+                series.append({
+                    'fecha': row.fecha.isoformat(),
+                    'cantidad': int(row.cantidad or 0),
+                    'total_costo': round(costo_dia, 2),
+                    'porcentaje': round(porcentaje_dia, 2),
+                    'costo_charolas_dia': round(float(costo_charolas_dia), 2)
+                })
+        
+        # Si no hay datos o muy pocos datos, generar datos mock
+        if len(series) < 3:
+            import random
+            import math
+            base_date = fecha_inicio_date
+            current_date = base_date
+            cantidad_base = 8
+            costo_base = 150.0
+            
+            # Calcular costo promedio de charolas por día para mock
+            dias_periodo = (fecha_fin_date - fecha_inicio_date).days + 1
+            costo_promedio_charolas_dia = float(costo_total_charolas) / dias_periodo if dias_periodo > 0 and costo_total_charolas > 0 else 500.0
+            
+            while current_date <= fecha_fin_date:
+                dias_desde_inicio = (current_date - base_date).days
+                dia_semana = current_date.weekday()
+                
+                # Patrón semanal: más mermas los fines de semana
+                factor_semanal = 1.0
+                if dia_semana >= 5:  # Sábado y domingo
+                    factor_semanal = 1.4
+                elif dia_semana == 4:  # Viernes
+                    factor_semanal = 1.2
+                elif dia_semana == 0:  # Lunes
+                    factor_semanal = 0.7
+                
+                # Tendencia: intentar reducir mermas con el tiempo
+                reduccion_objetivo = dias_desde_inicio * 0.1
+                variacion_cantidad = random.randint(-3, 5)
+                
+                cantidad = max(3, int(
+                    (cantidad_base - reduccion_objetivo + variacion_cantidad) * factor_semanal
+                ))
+                
+                costo_unitario_promedio = random.uniform(15.0, 35.0)
+                total_costo = cantidad * costo_unitario_promedio
+                
+                # Agregar picos ocasionales
+                if random.random() < 0.15:
+                    cantidad = int(cantidad * random.uniform(1.5, 2.5))
+                    total_costo = cantidad * costo_unitario_promedio * random.uniform(1.3, 2.0)
+                
+                # Calcular costo de charolas del día (mock)
+                variacion_charolas = random.uniform(0.8, 1.2)
+                costo_charolas_dia = costo_promedio_charolas_dia * variacion_charolas
+                
+                # Calcular porcentaje
+                porcentaje_dia = (total_costo / costo_charolas_dia * 100) if costo_charolas_dia > 0 else 0
+                
+                series.append({
+                    'fecha': current_date.isoformat(),
+                    'cantidad': cantidad,
+                    'total_costo': round(total_costo, 2),
+                    'porcentaje': round(porcentaje_dia, 2),
+                    'costo_charolas_dia': round(costo_charolas_dia, 2)
+                })
+                
+                current_date += timedelta(days=1)
+        
+        # Ordenar por fecha
+        series = sorted(series, key=lambda x: x['fecha'])
+        
+        # Calcular línea tolerable (porcentaje del costo de charolas por día)
+        # La línea tolerable se calcula como porcentaje del costo de charolas de cada día
+        for item in series:
+            costo_tolerable_dia = (item['costo_charolas_dia'] * porcentaje_tolerable / 100)
+            item['costo_tolerable'] = round(costo_tolerable_dia, 2)
+            item['porcentaje_tolerable'] = porcentaje_tolerable
+        
+        # Calcular estadísticas
+        total_cantidad = sum(item['cantidad'] for item in series)
+        total_costo = sum(item['total_costo'] for item in series)
+        total_costo_tolerable = sum(item['costo_tolerable'] for item in series)
+        promedio_diario = total_costo / len(series) if len(series) > 0 else 0
+        promedio_porcentaje = sum(item['porcentaje'] for item in series) / len(series) if len(series) > 0 else 0
+        
+        # Días que exceden el límite tolerable
+        dias_excedidos = sum(1 for item in series if item['total_costo'] > item['costo_tolerable'])
+        porcentaje_dias_excedidos = (dias_excedidos / len(series) * 100) if len(series) > 0 else 0
+        
+        # Encontrar día con más mermas
+        dia_max = max(series, key=lambda x: x['total_costo']) if series else None
+        
+        return success_response({
+            'series': series,
+            'estadisticas': {
+                'total_cantidad': total_cantidad,
+                'total_costo': round(total_costo, 2),
+                'total_costo_tolerable': round(total_costo_tolerable, 2),
+                'promedio_diario': round(promedio_diario, 2),
+                'promedio_porcentaje': round(promedio_porcentaje, 2),
+                'porcentaje_tolerable': porcentaje_tolerable,
+                'dias_excedidos': dias_excedidos,
+                'porcentaje_dias_excedidos': round(porcentaje_dias_excedidos, 2),
+                'dia_max_mermas': dia_max['fecha'] if dia_max else None,
+                'costo_max': dia_max['total_costo'] if dia_max else 0,
+                'diferencia_total': round(total_costo - total_costo_tolerable, 2)
             },
             'periodo': {
                 'fecha_inicio': fecha_inicio_date.isoformat(),
