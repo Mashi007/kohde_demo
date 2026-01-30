@@ -64,27 +64,50 @@ class TipoRecetaEnum(TypeDecorator):
         # Si ya es un objeto Enum, retornarlo directamente
         if isinstance(value, TipoReceta):
             return value
-        # Si es un string, PostgreSQL devuelve el nombre del enum en mayúsculas (DESAYUNO, ALMUERZO, CENA)
+        # Si es un string, PostgreSQL puede devolver:
+        # 1. El nombre del enum en mayúsculas (DESAYUNO, ALMUERZO, CENA) - si usa native_enum
+        # 2. El valor del enum en minúsculas ('desayuno', 'almuerzo', 'cena') - si usa valores
         if isinstance(value, str):
             valor_upper = value.upper().strip()
-            # Buscar el enum por su nombre (mayúsculas)
+            valor_lower = value.lower().strip()
+            
+            # Primero intentar buscar por nombre del enum (mayúsculas)
             try:
-                return TipoReceta[valor_upper]  # Buscar por nombre del enum
+                return TipoReceta[valor_upper]  # Buscar por nombre del enum (DESAYUNO, ALMUERZO, CENA)
             except KeyError:
-                # Si no se encuentra por nombre, intentar buscar por valor (fallback)
-                valor_lower = value.lower().strip()
-                for tipo in TipoReceta:
-                    if tipo.value == valor_lower:
-                        return tipo
-                # Si no se encuentra, retornar el string (será manejado en to_dict)
-                import logging
-                logging.warning(f"Valor de enum no encontrado: '{value}' (upper: '{valor_upper}', lower: '{valor_lower}'), valores válidos: {[t.value for t in TipoReceta]}")
-                return valor_lower
+                pass
+            
+            # Si no se encuentra por nombre, buscar por valor (minúsculas)
+            for tipo in TipoReceta:
+                if tipo.value == valor_lower:
+                    return tipo
+            
+            # Si no se encuentra, intentar buscar por nombre alternativo
+            # Mapeo de valores comunes a nombres de enum
+            valor_to_name = {
+                'desayuno': 'DESAYUNO',
+                'almuerzo': 'ALMUERZO',
+                'cena': 'CENA',
+            }
+            if valor_lower in valor_to_name:
+                try:
+                    return TipoReceta[valor_to_name[valor_lower]]
+                except KeyError:
+                    pass
+            
+            # Si no se encuentra, retornar un valor por defecto seguro
+            import logging
+            logging.warning(f"Valor de enum no encontrado: '{value}' (upper: '{valor_upper}', lower: '{valor_lower}'), valores válidos: {[t.value for t in TipoReceta]}, nombres: {[t.name for t in TipoReceta]}, usando ALMUERZO como valor por defecto")
+            return TipoReceta.ALMUERZO  # Valor por defecto seguro
         # Para cualquier otro tipo, intentar convertirlo a string
         try:
-            return str(value).upper().strip()
+            str_value = str(value).upper().strip()
+            try:
+                return TipoReceta[str_value]
+            except KeyError:
+                return TipoReceta.ALMUERZO  # Valor por defecto
         except:
-            return value
+            return TipoReceta.ALMUERZO  # Valor por defecto seguro
 
 class Receta(db.Model):
     """Modelo de receta."""
@@ -183,10 +206,19 @@ class Receta(db.Model):
                     except (AttributeError, TypeError):
                         tipo_value = str(self.tipo).lower().strip() if self.tipo else None
         except Exception as e:
-            # Si hay algún error, usar None y continuar
+            # Si hay algún error, usar 'almuerzo' como valor por defecto seguro
             import logging
-            logging.warning(f"Error procesando tipo de receta {self.id}: {str(e)}")
-            tipo_value = None
+            logging.warning(f"Error procesando tipo de receta {self.id if hasattr(self, 'id') else 'N/A'}: {str(e)}", exc_info=True)
+            tipo_value = 'almuerzo'  # Valor por defecto seguro
+        
+        # Asegurar que tipo_value sea válido
+        if tipo_value is None:
+            tipo_value = 'almuerzo'  # Valor por defecto
+        elif tipo_value not in ['desayuno', 'almuerzo', 'cena']:
+            # Si el valor no es válido, usar 'almuerzo' como fallback
+            import logging
+            logging.warning(f"Valor de tipo inválido '{tipo_value}' para receta {self.id if hasattr(self, 'id') else 'N/A'}, usando 'almuerzo'")
+            tipo_value = 'almuerzo'
         
         # Manejar ingredientes de manera segura
         ingredientes_list = []
