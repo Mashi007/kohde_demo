@@ -22,3 +22,28 @@ body {
 /* Nota: Las propiedades text-size-adjust están deshabilitadas en tailwind.config.js */
 /* Si aparecen en el CSS generado, pueden causar errores en algunos navegadores */
 /* La configuración de Tailwind (textSizeAdjust: false) debería prevenir esto */
+
+/* Estilos personalizados para scrollbar en el chat */
+.chat-scrollbar::-webkit-scrollbar {
+  width: 8px;
+}
+
+.chat-scrollbar::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.5);
+  border-radius: 4px;
+}
+
+.chat-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.5);
+  border-radius: 4px;
+}
+
+.chat-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 92, 246, 0.7);
+}
+
+/* Para Firefox */
+.chat-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(139, 92, 246, 0.5) rgba(15, 23, 42, 0.5);
+}

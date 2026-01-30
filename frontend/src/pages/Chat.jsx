@@ -13,6 +13,7 @@ export default function Chat() {
   const [contextoModulo, setContextoModulo] = useState('')
   const [confirmarEliminar, setConfirmarEliminar] = useState(null)
   const messagesEndRef = useRef(null)
+  const messagesContainerRef = useRef(null)
   const queryClient = useQueryClient()
 
   const { data: conversacionesResponse } = useQuery({
@@ -80,9 +81,24 @@ export default function Chat() {
     },
   })
 
+  // Scroll automático mejorado
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [mensajes])
+    const scrollToBottom = () => {
+      if (messagesContainerRef.current) {
+        const container = messagesContainerRef.current
+        // Scroll suave al final
+        container.scrollTo({
+          top: container.scrollHeight,
+          behavior: 'smooth'
+        })
+      }
+    }
+    
+    // Pequeño delay para asegurar que el DOM se actualizó
+    const timeoutId = setTimeout(scrollToBottom, 100)
+    
+    return () => clearTimeout(timeoutId)
+  }, [mensajes, enviarMensajeMutation.isPending])
 
   const crearNuevaConversacion = () => {
     crearConversacionMutation.mutate({
@@ -151,10 +167,10 @@ export default function Chat() {
         variant="danger"
         isLoading={eliminarConversacionMutation.isPending}
       />
-      <div className="flex h-[calc(100vh-4rem)] bg-slate-900">
+      <div className="flex h-screen max-h-screen bg-slate-900 overflow-hidden">
         {/* Sidebar de conversaciones */}
-      <div className="w-80 bg-slate-800 border-r border-slate-700 flex flex-col">
-        <div className="p-4 border-b border-slate-700">
+      <div className="w-80 bg-slate-800 border-r border-slate-700 flex flex-col h-full overflow-hidden">
+        <div className="p-4 border-b border-slate-700 flex-shrink-0">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-bold flex items-center gap-2">
               <MessageSquare size={24} />
@@ -195,7 +211,7 @@ export default function Chat() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-2">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden p-2 min-h-0 chat-scrollbar">
           {conversaciones?.map((conv) => (
             <div
               key={conv.id}
@@ -234,11 +250,11 @@ export default function Chat() {
       </div>
 
       {/* Área de chat */}
-      <div className="flex-1 flex flex-col bg-slate-900">
+      <div className="flex-1 flex flex-col bg-slate-900 h-full overflow-hidden">
         {conversacionActual ? (
-          <div className="flex-1 flex flex-col">
+          <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden">
             {/* Mensajes */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            <div ref={messagesContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden p-6 space-y-4 min-h-0 scroll-smooth chat-scrollbar" style={{ scrollBehavior: 'smooth' }}>
               {cargandoMensajes ? (
                 <div className="text-center py-8 text-slate-400">Cargando mensajes...</div>
               ) : mensajes?.length === 0 ? (
