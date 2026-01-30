@@ -128,17 +128,21 @@ export default function Dashboard() {
 
   // Mermas por día con línea tolerable
   const [porcentajeTolerable, setPorcentajeTolerable] = useState(5.0)
+  const [fechaSeleccionadaMermas, setFechaSeleccionadaMermas] = useState(null)
   const { data: mermasTolerable, isLoading: mermasTolerableLoading } = useQuery({
-    queryKey: ['mermas-tolerable', fechaInicio, fechaFin, porcentajeTolerable],
-    queryFn: () => api.get(`/reportes/kpis/mermas-por-dia-tolerable?fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}&porcentaje_tolerable=${porcentajeTolerable}`).then(extractData),
+    queryKey: ['mermas-tolerable', fechaInicio, fechaFin, porcentajeTolerable, fechaSeleccionadaMermas],
+    queryFn: () => {
+      const url = `/reportes/kpis/mermas-por-dia-tolerable?fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}&porcentaje_tolerable=${porcentajeTolerable}${fechaSeleccionadaMermas ? `&fecha_seleccionada=${fechaSeleccionadaMermas}` : ''}`
+      return api.get(url).then(extractData)
+    },
     staleTime: 30000,
   })
 
-  // Mermas tendencia por categoría
-  const [categoriaSeleccionada, setCategoriaSeleccionada] = useState('MATERIA_PRIMA')
-  const { data: mermasTendenciaCategoria, isLoading: mermasTendenciaCategoriaLoading } = useQuery({
-    queryKey: ['mermas-tendencia-categoria', fechaInicio, fechaFin, categoriaSeleccionada],
-    queryFn: () => api.get(`/reportes/kpis/mermas-tendencia-categoria?categoria=${categoriaSeleccionada}&fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}`).then(extractData),
+  // Mermas tendencia por servicio (desayuno, almuerzo, cena)
+  const [servicioSeleccionadoMermas, setServicioSeleccionadoMermas] = useState('desayuno')
+  const { data: mermasTendenciaServicio, isLoading: mermasTendenciaServicioLoading } = useQuery({
+    queryKey: ['mermas-tendencia-servicio', fechaInicio, fechaFin, servicioSeleccionadoMermas],
+    queryFn: () => api.get(`/reportes/kpis/mermas-tendencia-servicio?servicio=${servicioSeleccionadoMermas}&fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}&limite_porcentaje=5.0`).then(extractData),
     staleTime: 30000,
   })
 
@@ -194,9 +198,11 @@ export default function Dashboard() {
   const costoCharolaEstadisticas = costoCharolaServicio?.estadisticas || {}
   const mermasTolerableSeries = mermasTolerable?.series || []
   const mermasTolerableEstadisticas = mermasTolerable?.estadisticas || {}
-  const mermasTendenciaCategoriaSeries = mermasTendenciaCategoria?.series || []
-  const mermasTendenciaCategoriaEstadisticas = mermasTendenciaCategoria?.estadisticas || {}
-  const categoriaActual = mermasTendenciaCategoria?.categoria || categoriaSeleccionada
+  const productosPorFecha = mermasTolerable?.productos_por_fecha || {}
+  const productosSeleccionados = fechaSeleccionadaMermas ? productosPorFecha[fechaSeleccionadaMermas] || [] : []
+  const mermasTendenciaServicioSeries = mermasTendenciaServicio?.series || []
+  const mermasTendenciaServicioEstadisticas = mermasTendenciaServicio?.estadisticas || {}
+  const servicioActualMermas = mermasTendenciaServicio?.servicio || servicioSeleccionadoMermas
   const serviciosDistribucionData = serviciosDistribucion?.distribucion || []
   const serviciosTotales = serviciosDistribucion?.totales || {}
   const categoriasAlimentosData = categoriasAlimentosDistribucion?.distribucion || []
@@ -1249,11 +1255,11 @@ export default function Dashboard() {
                 barCategoryGap="20%"
               >
                 <defs>
-                  <linearGradient id="colorCostoReal" x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient id="colorCostoRealBar" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor={COLORS.red} stopOpacity={1} />
                     <stop offset="100%" stopColor={COLORS.red} stopOpacity={0.7} />
                   </linearGradient>
-                  <linearGradient id="colorCostoIdeal" x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient id="colorCostoIdealBar" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor={COLORS.green} stopOpacity={1} />
                     <stop offset="100%" stopColor={COLORS.green} stopOpacity={0.7} />
                   </linearGradient>
@@ -1362,7 +1368,7 @@ export default function Dashboard() {
                 />
                 <Bar
                   dataKey="costo_promedio"
-                  fill="url(#colorCostoReal)"
+                  fill="url(#colorCostoRealBar)"
                   name="costo_promedio"
                   radius={[10, 10, 0, 0]}
                   filter="url(#barShadowCostos)"
@@ -1380,7 +1386,7 @@ export default function Dashboard() {
                 </Bar>
                 <Bar
                   dataKey="costo_ideal"
-                  fill="url(#colorCostoIdeal)"
+                  fill="url(#colorCostoIdealBar)"
                   name="costo_ideal"
                   radius={[10, 10, 0, 0]}
                   filter="url(#barShadowCostos)"
@@ -1487,7 +1493,13 @@ export default function Dashboard() {
               max="20"
               step="0.5"
               value={porcentajeTolerable}
-              onChange={(e) => setPorcentajeTolerable(parseFloat(e.target.value) || 5.0)}
+              onChange={(e) => {
+                setPorcentajeTolerable(parseFloat(e.target.value) || 5.0)
+                // Si hay una fecha seleccionada, mantenerla para recargar productos con nuevo filtro
+                if (fechaSeleccionadaMermas) {
+                  // El query se recargará automáticamente por el cambio en porcentajeTolerable
+                }
+              }}
               className="bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm w-20 focus:outline-none focus:ring-2 focus:ring-orange-500 text-slate-200"
             />
             <span className="text-slate-400 text-sm">%</span>
@@ -1547,6 +1559,7 @@ export default function Dashboard() {
                     const cantidad = payload[0]?.payload?.cantidad || 0
                     const excede = costo > tolerable
                     const diferencia = costo - tolerable
+                    const fecha = payload[0]?.payload?.fecha
                     
                     return (
                       <div className="bg-gradient-to-br from-slate-800 via-slate-800 to-slate-900 border-2 border-slate-600 rounded-xl p-5 shadow-2xl backdrop-blur-md min-w-[280px]">
@@ -1554,6 +1567,7 @@ export default function Dashboard() {
                           <p className="text-slate-100 font-bold text-base">
                             {label ? format(new Date(label), 'EEEE, dd MMM yyyy', { locale: es }) : ''}
                           </p>
+                          <p className="text-xs text-slate-400 mt-1">Haz clic para ver productos</p>
                         </div>
                         <div className="space-y-3">
                           <div className={`flex items-center justify-between gap-4 p-2 rounded-lg ${excede ? 'bg-red-500/10 border border-red-500/30' : 'bg-orange-500/10'}`}>
@@ -1623,11 +1637,17 @@ export default function Dashboard() {
                 fillOpacity={1}
                 fill="url(#colorMermasTolerable)"
                 name="total_costo"
-                dot={{ fill: COLORS.orange, r: 5, strokeWidth: 2, stroke: '#fff' }}
-                activeDot={{ r: 8, strokeWidth: 3, stroke: '#fff', fill: COLORS.orange }}
+                dot={{ fill: COLORS.orange, r: 5, strokeWidth: 2, stroke: '#fff', cursor: 'pointer' }}
+                activeDot={{ r: 8, strokeWidth: 3, stroke: '#fff', fill: COLORS.orange, cursor: 'pointer' }}
                 animationDuration={1200}
                 animationEasing="ease-out"
                 filter="url(#mermasTolerableShadow)"
+                onClick={(data, index) => {
+                  if (data && mermasTolerableSeries[index]) {
+                    setFechaSeleccionadaMermas(mermasTolerableSeries[index].fecha)
+                  }
+                }}
+                style={{ cursor: 'pointer' }}
               />
               <Line
                 type="monotone"
@@ -1662,6 +1682,112 @@ export default function Dashboard() {
             No hay datos disponibles
           </div>
         )}
+
+        {/* Visualización de productos por día seleccionado */}
+        {fechaSeleccionadaMermas && productosSeleccionados.length > 0 && (
+          <div className="mt-8 bg-slate-800/50 p-6 rounded-xl border border-slate-700">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h3 className="text-xl font-bold text-slate-200 mb-1">
+                  Productos con {porcentajeTolerable}% de Merma
+                </h3>
+                <p className="text-sm text-slate-400">
+                  Fecha: {fechaSeleccionadaMermas ? format(new Date(fechaSeleccionadaMermas), 'EEEE, dd MMM yyyy', { locale: es }) : ''}
+                </p>
+              </div>
+              <button
+                onClick={() => setFechaSeleccionadaMermas(null)}
+                className="text-slate-400 hover:text-slate-200 transition-colors px-3 py-1 rounded-lg hover:bg-slate-700"
+              >
+                ✕ Cerrar
+              </button>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {productosSeleccionados.map((producto, index) => {
+                const costoReal = producto.costo_real || 0
+                const costoTolerable = producto.costo_tolerable || 0
+                const porcentaje = producto.porcentaje || 0
+                const excede = costoReal > costoTolerable
+                const maxCosto = Math.max(costoReal, costoTolerable, costoTolerable * 1.2)
+                const alturaMaxima = 180
+                const alturaReal = maxCosto > 0 ? (costoReal / maxCosto) * alturaMaxima : 0
+                const alturaTolerable = maxCosto > 0 ? (costoTolerable / maxCosto) * alturaMaxima : 0
+                
+                return (
+                  <div key={producto.item_id || index} className="bg-slate-900/70 p-5 rounded-lg border border-slate-600 hover:border-slate-500 transition-all">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex-1">
+                        <h4 className="text-lg font-bold text-slate-200 mb-1">{producto.nombre}</h4>
+                        <div className="flex items-center gap-3 text-xs text-slate-400">
+                          <span>Peso: <span className="text-slate-300 font-semibold">{producto.peso?.toFixed(2) || 0} kg</span></span>
+                          <span>•</span>
+                          <span>% Merma: <span className="text-slate-300 font-semibold">{porcentaje.toFixed(2)}%</span></span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Barra visual */}
+                    <div className="relative mb-4" style={{ height: `${alturaMaxima + 30}px` }}>
+                      {/* Valor arriba de la barra - Merma Real */}
+                      <div className="absolute top-0 left-0 right-0 text-center mb-2">
+                        <div className="inline-block bg-slate-800/80 px-3 py-1 rounded-lg border border-slate-600">
+                          <span className={`text-base font-bold ${excede ? 'text-red-400' : 'text-orange-400'}`}>
+                            ${costoReal.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                          </span>
+                          <p className="text-xs text-slate-400 mt-0.5">Merma Real</p>
+                        </div>
+                      </div>
+                      
+                      {/* Contenedor de barras */}
+                      <div className="absolute bottom-0 left-0 right-0" style={{ top: '50px' }}>
+                        {/* Barra de merma real */}
+                        <div className="relative h-full">
+                          <div
+                            className={`absolute bottom-0 left-0 right-0 transition-all duration-500 ${
+                              excede ? 'bg-gradient-to-t from-red-600 to-red-500' : 'bg-gradient-to-t from-orange-600 to-orange-500'
+                            } rounded-t-lg shadow-lg`}
+                            style={{ height: `${alturaReal}px` }}
+                          />
+                          
+                          {/* Línea de merma tolerable */}
+                          {alturaTolerable > 0 && (
+                            <>
+                              <div
+                                className="absolute left-0 right-0 border-t-2 border-cyan-400 border-dashed z-10"
+                                style={{ bottom: `${alturaTolerable}px` }}
+                              />
+                              <div className="absolute -left-24 top-0 bottom-0 flex items-center">
+                                <div className="bg-cyan-500/20 border border-cyan-400/50 px-2 py-1 rounded text-xs text-cyan-400 font-semibold whitespace-nowrap">
+                                  Tolerable: ${costoTolerable.toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                                </div>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* Información adicional */}
+                    <div className="flex items-center justify-between pt-3 border-t border-slate-700">
+                      <div className="text-xs text-slate-400">
+                        Límite: <span className="text-cyan-400 font-semibold">${costoTolerable.toLocaleString('es-ES', { minimumFractionDigits: 2 })}</span>
+                      </div>
+                      {excede ? (
+                        <span className="text-red-400 font-semibold text-sm">
+                          ⚠️ Exceso: +${(costoReal - costoTolerable).toLocaleString('es-ES', { minimumFractionDigits: 2 })}
+                        </span>
+                      ) : (
+                        <span className="text-green-400 font-semibold text-sm">
+                          ✓ Dentro del límite
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Gráfico de Tendencia de Mermas por Categoría */}
@@ -1672,41 +1798,47 @@ export default function Dashboard() {
               <TrendingUp size={28} className="text-orange-400" />
               Tendencia de Mermas por Categoría
             </h2>
-            {mermasTendenciaCategoriaEstadisticas.promedio_merma_real !== undefined && (
+            {mermasTendenciaServicioEstadisticas.promedio_merma_real !== undefined && (
               <p className="text-slate-400 text-sm">
-                Promedio Real: <span className="font-bold text-red-400">{mermasTendenciaCategoriaEstadisticas.promedio_merma_real?.toFixed(2) || 0}</span>
+                Promedio Real: <span className="font-bold text-red-400">${mermasTendenciaServicioEstadisticas.promedio_merma_real?.toFixed(2) || 0}</span>
                 {' | '}
-                Promedio Máximo: <span className="font-semibold text-cyan-400">{mermasTendenciaCategoriaEstadisticas.promedio_merma_maxima?.toFixed(2) || 0}</span>
+                Promedio Máximo: <span className="font-semibold text-cyan-400">${mermasTendenciaServicioEstadisticas.promedio_merma_maxima?.toFixed(2) || 0}</span>
                 {' | '}
-                Días Excedidos: <span className={`font-semibold ${mermasTendenciaCategoriaEstadisticas.dias_excedidos > 0 ? 'text-red-400' : 'text-green-400'}`}>
-                  {mermasTendenciaCategoriaEstadisticas.dias_excedidos || 0} ({(mermasTendenciaCategoriaEstadisticas.porcentaje_dias_excedidos || 0).toFixed(1)}%)
+                Días Excedidos (5%): <span className={`font-semibold ${mermasTendenciaServicioEstadisticas.dias_excedidos > 0 ? 'text-red-400' : 'text-green-400'}`}>
+                  {mermasTendenciaServicioEstadisticas.dias_excedidos || 0} ({(mermasTendenciaServicioEstadisticas.porcentaje_dias_excedidos || 0).toFixed(1)}%)
                 </span>
+                {mermasTendenciaServicioEstadisticas.servicio_max_problemas && (
+                  <>
+                    {' | '}
+                    Servicio con más problemas: <span className="font-bold text-red-400 capitalize">
+                      {mermasTendenciaServicioEstadisticas.servicio_max_problemas === 'merienda' ? 'Cena' : mermasTendenciaServicioEstadisticas.servicio_max_problemas}
+                    </span>
+                  </>
+                )}
               </p>
             )}
           </div>
           <div className="flex items-center gap-3">
-            <label className="text-sm text-slate-300 font-semibold">Categoría:</label>
+            <label className="text-sm text-slate-300 font-semibold">Servicio:</label>
             <select
-              value={categoriaSeleccionada}
-              onChange={(e) => setCategoriaSeleccionada(e.target.value)}
-              className="bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-slate-200 font-medium focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+              value={servicioSeleccionadoMermas}
+              onChange={(e) => setServicioSeleccionadoMermas(e.target.value)}
+              className="bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-slate-200 font-medium focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all capitalize"
             >
-              {categoriasAlimentos.map((cat) => (
-                <option key={cat.value} value={cat.value}>
-                  {cat.label}
-                </option>
-              ))}
+              <option value="desayuno">Desayuno</option>
+              <option value="almuerzo">Almuerzo</option>
+              <option value="cena">Cena</option>
             </select>
           </div>
         </div>
-        {mermasTendenciaCategoriaLoading ? (
+        {mermasTendenciaServicioLoading ? (
           <div className="h-96 flex items-center justify-center">
             <LoadingSpinner />
           </div>
-        ) : mermasTendenciaCategoriaSeries.length > 0 ? (
+        ) : mermasTendenciaServicioSeries.length > 0 ? (
           <ResponsiveContainer width="100%" height={450}>
             <LineChart 
-              data={mermasTendenciaCategoriaSeries}
+              data={mermasTendenciaServicioSeries}
               margin={{ top: 20, right: 30, left: 20, bottom: 80 }}
             >
               <defs>
@@ -1743,7 +1875,8 @@ export default function Dashboard() {
                 tick={{ fill: '#9ca3af', fontSize: 11 }}
                 tickLine={{ stroke: '#4b5563' }}
                 axisLine={{ stroke: '#4b5563' }}
-                label={{ value: 'Cantidad', angle: -90, position: 'insideLeft', fill: '#9ca3af', fontSize: 12 }}
+                label={{ value: 'Costo ($)', angle: -90, position: 'insideLeft', fill: '#9ca3af', fontSize: 12 }}
+                tickFormatter={(value) => `$${value.toFixed(0)}`}
               />
               <Tooltip
                 content={({ active, payload, label }) => {
@@ -1761,8 +1894,14 @@ export default function Dashboard() {
                             {label ? format(new Date(label), 'EEEE, dd MMM yyyy', { locale: es }) : ''}
                           </p>
                           <p className="text-xs text-slate-400 mt-1 capitalize">
-                            Categoría: {categoriasAlimentos.find(c => c.value === categoriaActual)?.label || categoriaActual}
+                            Servicio: {servicioActualMermas === 'merienda' ? 'Cena' : servicioActualMermas}
                           </p>
+                          {payload[0]?.payload?.excede_limite && (
+                            <p className="text-xs text-red-400 mt-1 font-semibold flex items-center gap-1">
+                              <AlertTriangle size={12} />
+                              Excede límite del 5%
+                            </p>
+                          )}
                         </div>
                         <div className="space-y-3">
                           <div className="flex items-center justify-between gap-4 p-2 rounded-lg bg-red-500/10">
@@ -1770,33 +1909,33 @@ export default function Dashboard() {
                               <div className="w-3.5 h-3.5 rounded-full bg-red-500 shadow-lg" />
                               <span className="text-sm font-semibold text-slate-300">Merma Real</span>
                             </div>
-                            <span className="text-lg font-bold text-red-400">{mermaReal.toFixed(2)}</span>
+                            <span className="text-lg font-bold text-red-400">${mermaReal.toFixed(2)}</span>
                           </div>
                           <div className="flex items-center justify-between gap-4 p-2 rounded-lg bg-cyan-500/10">
                             <div className="flex items-center gap-2.5">
                               <div className="w-3.5 h-3.5 rounded-full bg-cyan-500 shadow-lg" />
-                              <span className="text-sm font-semibold text-slate-300">Máxima Aceptada</span>
+                              <span className="text-sm font-semibold text-slate-300">Máxima Aceptada (5%)</span>
                             </div>
-                            <span className="text-lg font-bold text-cyan-400">{mermaMaxima.toFixed(2)}</span>
+                            <span className="text-lg font-bold text-cyan-400">${mermaMaxima.toFixed(2)}</span>
                           </div>
                           <div className="border-t-2 border-slate-600 pt-3 mt-3 space-y-2">
                             <div className="flex items-center justify-between gap-4">
                               <span className="text-xs text-slate-400 font-medium">Diferencia:</span>
                               <span className={`font-bold text-sm ${excede ? 'text-red-400' : 'text-green-400'}`}>
-                                {excede ? '+' : ''}{diferencia.toFixed(2)}
+                                {excede ? '+' : ''}${diferencia.toFixed(2)}
                               </span>
                             </div>
                             <div className="flex items-center justify-between gap-4">
-                              <span className="text-xs text-slate-400 font-medium">% Uso:</span>
-                              <span className={`font-bold text-sm ${porcentajeUso >= 100 ? 'text-red-400' : porcentajeUso >= 90 ? 'text-yellow-400' : 'text-green-400'}`}>
-                                {porcentajeUso}%
+                              <span className="text-xs text-slate-400 font-medium">% Merma:</span>
+                              <span className={`font-bold text-sm ${payload[0]?.payload?.porcentaje > 5 ? 'text-red-400' : payload[0]?.payload?.porcentaje > 4 ? 'text-yellow-400' : 'text-green-400'}`}>
+                                {payload[0]?.payload?.porcentaje?.toFixed(2) || 0}%
                               </span>
                             </div>
                             {excede && (
                               <div className="mt-2 p-2 bg-red-500/20 border border-red-500/50 rounded-lg">
                                 <p className="text-xs text-red-400 font-semibold flex items-center gap-1">
                                   <AlertTriangle size={12} />
-                                  Límite excedido
+                                  Límite del 5% excedido
                                 </p>
                               </div>
                             )}
@@ -1816,7 +1955,7 @@ export default function Dashboard() {
                 iconSize={16}
                 formatter={(value) => (
                   <span className="text-slate-300 text-sm font-semibold">
-                    {value === 'merma_real' ? 'Merma Real' : 'Merma Máxima Aceptada'}
+                    {value === 'merma_real' ? 'Merma Real' : 'Merma Máxima Aceptada (5%)'}
                   </span>
                 )}
               />
@@ -1848,7 +1987,7 @@ export default function Dashboard() {
               />
               <ReferenceArea
                 y1={0}
-                y2={mermasTendenciaCategoriaSeries.reduce((max, item) => Math.max(max, item.merma_maxima_aceptada || 0), 0)}
+                y2={mermasTendenciaServicioSeries.reduce((max, item) => Math.max(max, item.merma_maxima_aceptada || 0), 0)}
                 fill={COLORS.cyan}
                 fillOpacity={0.05}
                 stroke={COLORS.cyan}
@@ -1867,6 +2006,45 @@ export default function Dashboard() {
         ) : (
           <div className="h-96 flex items-center justify-center text-slate-400">
             No hay datos disponibles
+          </div>
+        )}
+
+        {/* Resumen de servicios con más problemas */}
+        {mermasTendenciaServicioEstadisticas.servicios_con_exceso && Object.keys(mermasTendenciaServicioEstadisticas.servicios_con_exceso).length > 0 && (
+          <div className="mt-6 bg-slate-800/50 p-4 rounded-lg border border-slate-700">
+            <h4 className="text-lg font-bold text-slate-200 mb-3">Análisis por Servicio (Excediendo 5%)</h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {Object.entries(mermasTendenciaServicioEstadisticas.servicios_con_exceso).map(([servicio, datos]) => (
+                <div key={servicio} className="bg-slate-900/70 p-4 rounded-lg border border-slate-600">
+                  <div className="flex items-center justify-between mb-2">
+                    <h5 className="text-base font-bold text-slate-200 capitalize">
+                      {servicio === 'merienda' ? 'Cena' : servicio}
+                    </h5>
+                    {servicio === mermasTendenciaServicioEstadisticas.servicio_max_problemas && (
+                      <span className="text-xs bg-red-500/20 text-red-400 px-2 py-1 rounded font-semibold">
+                        ⚠️ Más problemas
+                      </span>
+                    )}
+                  </div>
+                  <div className="space-y-1 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Días excedidos:</span>
+                      <span className="text-red-400 font-semibold">{datos.dias_exceso || 0}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">Merma total:</span>
+                      <span className="text-slate-200 font-semibold">${datos.merma_total_exceso?.toLocaleString('es-ES', { minimumFractionDigits: 2 }) || 0}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-slate-400">% Promedio:</span>
+                      <span className={`font-semibold ${datos.promedio_porcentaje > 5 ? 'text-red-400' : 'text-green-400'}`}>
+                        {datos.promedio_porcentaje?.toFixed(2) || 0}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -2084,12 +2262,12 @@ export default function Dashboard() {
                 margin={{ top: 20, right: 30, left: 20, bottom: 80 }}
               >
                 <defs>
-                  <linearGradient id="colorCostoReal" x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient id="colorCostoRealLine" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor={COLORS.red} stopOpacity={0.9} />
                     <stop offset="50%" stopColor={COLORS.red} stopOpacity={0.6} />
                     <stop offset="95%" stopColor={COLORS.red} stopOpacity={0.1} />
                   </linearGradient>
-                  <linearGradient id="colorCostoEstandar" x1="0" y1="0" x2="0" y2="1">
+                  <linearGradient id="colorCostoEstandarLine" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor={COLORS.cyan} stopOpacity={0.9} />
                     <stop offset="50%" stopColor={COLORS.cyan} stopOpacity={0.6} />
                     <stop offset="95%" stopColor={COLORS.cyan} stopOpacity={0.1} />
@@ -2476,213 +2654,6 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Gráficos de distribución (Donut/Pie) */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {/* Facturas por Estado */}
-        {facturasPorEstado.length > 0 && (
-          <div className="bg-gradient-to-br from-slate-800 to-slate-800/50 p-6 rounded-xl border border-slate-700 hover:border-purple-500/50 transition-all shadow-lg">
-            <h3 className="text-lg font-bold mb-4 text-slate-200">Facturas por Estado</h3>
-            <ResponsiveContainer width="100%" height={220}>
-              <PieChart>
-                <defs>
-                  <filter id="pieShadow">
-                    <feDropShadow dx="0" dy="2" stdDeviation="2" floodOpacity="0.2"/>
-                  </filter>
-                </defs>
-                <Pie
-                  data={facturasPorEstado}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ estado, cantidad, percent }) => `${estado}: ${cantidad} (${(percent * 100).toFixed(0)}%)`}
-                  outerRadius={75}
-                  innerRadius={25}
-                  fill="#8884d8"
-                  dataKey="cantidad"
-                  animationDuration={800}
-                  animationEasing="ease-out"
-                >
-                  {facturasPorEstado.map((entry, index) => (
-                    <Cell 
-                      key={`cell-${index}`} 
-                      fill={CHART_COLORS[index % CHART_COLORS.length]}
-                      stroke="#1e293b"
-                      strokeWidth={2}
-                      filter="url(#pieShadow)"
-                    />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      const data = payload[0]
-                      const total = facturasPorEstado.reduce((sum, item) => sum + item.cantidad, 0)
-                      const percent = ((data.value / total) * 100).toFixed(1)
-                      return (
-                        <div className="bg-gradient-to-br from-slate-800 to-slate-900 border-2 border-slate-600 rounded-lg p-3 shadow-xl">
-                          <p className="text-slate-200 font-bold text-sm mb-2 capitalize">{data.name}</p>
-                          <div className="flex items-center justify-between gap-4">
-                            <span className="text-xs text-slate-400">Cantidad:</span>
-                            <span className="text-sm font-bold text-slate-200">{data.value}</span>
-                          </div>
-                          <div className="flex items-center justify-between gap-4 mt-1">
-                            <span className="text-xs text-slate-400">Porcentaje:</span>
-                            <span className="text-sm font-bold" style={{ color: data.payload.fill }}>{percent}%</span>
-                          </div>
-                        </div>
-                      )
-                    }
-                    return null
-                  }}
-                  animationDuration={200}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-
-        {/* Pedidos por Estado */}
-        {pedidosPorEstado.length > 0 && (
-          <div className="bg-gradient-to-br from-slate-800 to-slate-800/50 p-6 rounded-xl border border-slate-700 hover:border-blue-500/50 transition-all shadow-lg">
-            <h3 className="text-lg font-bold mb-4 text-slate-200">Pedidos por Estado</h3>
-            <ResponsiveContainer width="100%" height={220}>
-              <PieChart>
-                <Pie
-                  data={pedidosPorEstado}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ estado, cantidad, percent }) => `${estado}: ${cantidad} (${(percent * 100).toFixed(0)}%)`}
-                  outerRadius={75}
-                  innerRadius={25}
-                  fill="#8884d8"
-                  dataKey="cantidad"
-                  animationDuration={800}
-                  animationEasing="ease-out"
-                >
-                  {pedidosPorEstado.map((entry, index) => (
-                    <Cell 
-                      key={`cell-${index}`} 
-                      fill={CHART_COLORS[index % CHART_COLORS.length]}
-                      stroke="#1e293b"
-                      strokeWidth={2}
-                      filter="url(#pieShadow)"
-                    />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      const data = payload[0]
-                      const total = pedidosPorEstado.reduce((sum, item) => sum + item.cantidad, 0)
-                      const percent = ((data.value / total) * 100).toFixed(1)
-                      return (
-                        <div className="bg-gradient-to-br from-slate-800 to-slate-900 border-2 border-slate-600 rounded-lg p-3 shadow-xl">
-                          <p className="text-slate-200 font-bold text-sm mb-2 capitalize">{data.name}</p>
-                          <div className="flex items-center justify-between gap-4">
-                            <span className="text-xs text-slate-400">Cantidad:</span>
-                            <span className="text-sm font-bold text-slate-200">{data.value}</span>
-                          </div>
-                          <div className="flex items-center justify-between gap-4 mt-1">
-                            <span className="text-xs text-slate-400">Porcentaje:</span>
-                            <span className="text-sm font-bold" style={{ color: data.payload.fill }}>{percent}%</span>
-                          </div>
-                        </div>
-                      )
-                    }
-                    return null
-                  }}
-                  animationDuration={200}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-
-        {/* Tickets por Estado */}
-        {ticketsPorEstado.length > 0 && (
-          <div className="bg-gradient-to-br from-slate-800 to-slate-800/50 p-6 rounded-xl border border-slate-700 hover:border-green-500/50 transition-all shadow-lg">
-            <h3 className="text-lg font-bold mb-4 text-slate-200">Tickets por Estado</h3>
-            <ResponsiveContainer width="100%" height={220}>
-              <PieChart>
-                <Pie
-                  data={ticketsPorEstado}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ estado, cantidad, percent }) => `${estado}: ${cantidad} (${(percent * 100).toFixed(0)}%)`}
-                  outerRadius={75}
-                  innerRadius={25}
-                  fill="#8884d8"
-                  dataKey="cantidad"
-                  animationDuration={800}
-                  animationEasing="ease-out"
-                >
-                  {ticketsPorEstado.map((entry, index) => (
-                    <Cell 
-                      key={`cell-${index}`} 
-                      fill={CHART_COLORS[index % CHART_COLORS.length]}
-                      stroke="#1e293b"
-                      strokeWidth={2}
-                      filter="url(#pieShadow)"
-                    />
-                  ))}
-                </Pie>
-                <Tooltip 
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      const data = payload[0]
-                      const total = ticketsPorEstado.reduce((sum, item) => sum + item.cantidad, 0)
-                      const percent = ((data.value / total) * 100).toFixed(1)
-                      return (
-                        <div className="bg-gradient-to-br from-slate-800 to-slate-900 border-2 border-slate-600 rounded-lg p-3 shadow-xl">
-                          <p className="text-slate-200 font-bold text-sm mb-2 capitalize">{data.name}</p>
-                          <div className="flex items-center justify-between gap-4">
-                            <span className="text-xs text-slate-400">Cantidad:</span>
-                            <span className="text-sm font-bold text-slate-200">{data.value}</span>
-                          </div>
-                          <div className="flex items-center justify-between gap-4 mt-1">
-                            <span className="text-xs text-slate-400">Porcentaje:</span>
-                            <span className="text-sm font-bold" style={{ color: data.payload.fill }}>{percent}%</span>
-                          </div>
-                        </div>
-                      )
-                    }
-                    return null
-                  }}
-                  animationDuration={200}
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-
-        {/* Mermas por Tipo */}
-        {mermasPorTipo.length > 0 && (
-          <div className="bg-slate-800 p-6 rounded-xl border border-slate-700">
-            <h3 className="text-lg font-bold mb-4">Mermas por Tipo</h3>
-            <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie
-                  data={mermasPorTipo}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ tipo, cantidad }) => `${tipo}: ${cantidad}`}
-                  outerRadius={70}
-                  fill="#8884d8"
-                  dataKey="cantidad"
-                >
-                  {mermasPorTipo.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-        )}
-      </div>
 
       {/* Resumen adicional */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

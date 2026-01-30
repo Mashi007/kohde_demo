@@ -3,7 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '../config/api'
 import toast from 'react-hot-toast'
 import { validateFile, ALLOWED_FILE_TYPES } from '../utils/validation'
-import { Upload } from 'lucide-react'
+import { Upload, Sparkles } from 'lucide-react'
 
 export default function FacturaUploadForm({ onClose, onSuccess }) {
   const [file, setFile] = useState(null)
@@ -16,14 +16,34 @@ export default function FacturaUploadForm({ onClose, onSuccess }) {
     mutationFn: (formData) => api.post('/logistica/facturas/ingresar-imagen', formData, {
       headers: { 'Content-Type': 'multipart/form-data' }
     }),
-    onSuccess: () => {
+    onSuccess: (response) => {
       toast.success('Factura procesada correctamente')
       queryClient.invalidateQueries(['facturas'])
-      onSuccess?.()
+      queryClient.invalidateQueries(['factura-ultima'])
+      queryClient.invalidateQueries(['facturas-pendientes'])
+      onSuccess?.(response.data)
       onClose()
     },
     onError: (error) => {
       toast.error(error.response?.data?.error || 'Error al procesar factura')
+    },
+  })
+
+  const ejemploOCRMutation = useMutation({
+    mutationFn: () => api.post('/logistica/facturas/ejemplo-ocr'),
+    onSuccess: (response) => {
+      toast.success('Factura ejemplo OCR creada correctamente')
+      queryClient.invalidateQueries(['facturas'])
+      queryClient.invalidateQueries(['factura-ultima'])
+      queryClient.invalidateQueries(['facturas-pendientes'])
+      // Pasar la factura creada al callback para abrir el modal de confirmación
+      if (onSuccess) {
+        onSuccess(response.data)
+      }
+      onClose()
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.error || 'Error al crear factura ejemplo')
     },
   })
 
@@ -123,6 +143,30 @@ export default function FacturaUploadForm({ onClose, onSuccess }) {
 
       <div className="bg-blue-500/10 border border-blue-500/50 rounded-lg p-4 text-sm text-blue-400">
         <p>💡 La factura será procesada automáticamente con OCR para extraer los datos.</p>
+      </div>
+
+      <div className="bg-purple-500/10 border border-purple-500/50 rounded-lg p-4">
+        <div className="flex items-start justify-between">
+          <div className="flex-1">
+            <h4 className="font-semibold text-purple-300 mb-1 flex items-center gap-2">
+              <Sparkles size={16} />
+              Ejemplo de Factura OCR
+            </h4>
+            <p className="text-xs text-purple-400">
+              Crea una factura de ejemplo realista con datos OCR simulados que cumple todas las reglas de negocio.
+              Incluye items identificables, cálculos correctos de IVA y estructura completa.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => ejemploOCRMutation.mutate()}
+            disabled={ejemploOCRMutation.isPending}
+            className="ml-4 bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg text-sm flex items-center gap-2 disabled:opacity-50 whitespace-nowrap"
+          >
+            <Sparkles size={16} />
+            {ejemploOCRMutation.isPending ? 'Creando...' : 'Crear Ejemplo'}
+          </button>
+        </div>
       </div>
 
       <div className="flex gap-4 pt-4">

@@ -116,31 +116,377 @@ class MockDataService:
     
     @staticmethod
     def obtener_mock_inventario() -> List[Dict]:
-        """Retorna inventario mock."""
+        """Retorna inventario mock con ejemplos variados y realistas."""
         return [
+            # CARNES Y PROTEÍNAS
             {
                 'id': 1,
                 'item_id': 1,
-                'ubicacion': 'bodega_principal',
-                'cantidad_actual': 150.50,
-                'cantidad_minima': 50.00,
-                'unidad': 'kg'
+                'ubicacion': 'nevera_carnes',
+                'cantidad_actual': 45.50,
+                'cantidad_minima': 20.00,
+                'unidad': 'kg',
+                'ultimo_costo_unitario': 8.50
             },
             {
                 'id': 2,
                 'item_id': 2,
-                'ubicacion': 'bodega_principal',
-                'cantidad_actual': 200.00,
-                'cantidad_minima': 100.00,
-                'unidad': 'kg'
+                'ubicacion': 'nevera_carnes',
+                'cantidad_actual': 12.30,
+                'cantidad_minima': 15.00,
+                'unidad': 'kg',
+                'ultimo_costo_unitario': 12.00
             },
             {
                 'id': 3,
                 'item_id': 3,
-                'ubicacion': 'nevera_principal',
+                'ubicacion': 'nevera_carnes',
+                'cantidad_actual': 8.75,
+                'cantidad_minima': 10.00,
+                'unidad': 'kg',
+                'ultimo_costo_unitario': 15.50
+            },
+            {
+                'id': 4,
+                'item_id': 4,
+                'ubicacion': 'nevera_carnes',
+                'cantidad_actual': 25.00,
+                'cantidad_minima': 20.00,
+                'unidad': 'kg',
+                'ultimo_costo_unitario': 9.80
+            },
+            # VERDURAS Y HORTALIZAS
+            {
+                'id': 5,
+                'item_id': 5,
+                'ubicacion': 'camara_fresca',
+                'cantidad_actual': 35.20,
+                'cantidad_minima': 10.00,
+                'unidad': 'kg',
+                'ultimo_costo_unitario': 1.20
+            },
+            {
+                'id': 6,
+                'item_id': 6,
+                'ubicacion': 'camara_fresca',
+                'cantidad_actual': 28.50,
+                'cantidad_minima': 15.00,
+                'unidad': 'kg',
+                'ultimo_costo_unitario': 0.85
+            },
+            {
+                'id': 7,
+                'item_id': 7,
+                'ubicacion': 'camara_fresca',
+                'cantidad_actual': 42.00,
+                'cantidad_minima': 20.00,
+                'unidad': 'kg',
+                'ultimo_costo_unitario': 0.95
+            },
+            {
+                'id': 8,
+                'item_id': 8,
+                'ubicacion': 'camara_fresca',
+                'cantidad_actual': 15.75,
+                'cantidad_minima': 10.00,
+                'unidad': 'kg',
+                'ultimo_costo_unitario': 1.50
+            },
+            {
+                'id': 9,
+                'item_id': 9,
+                'ubicacion': 'camara_fresca',
+                'cantidad_actual': 3.20,
+                'cantidad_minima': 5.00,
+                'unidad': 'kg',
+                'ultimo_costo_unitario': 2.80
+            },
+            # PRODUCTOS SECOS Y GRANOS
+            {
+                'id': 10,
+                'item_id': 10,
+                'ubicacion': 'bodega_principal',
+                'cantidad_actual': 180.50,
+                'cantidad_minima': 50.00,
+                'unidad': 'kg',
+                'ultimo_costo_unitario': 1.20
+            },
+            {
+                'id': 11,
+                'item_id': 11,
+                'ubicacion': 'bodega_principal',
+                'cantidad_actual': 95.00,
+                'cantidad_minima': 30.00,
+                'unidad': 'kg',
+                'ultimo_costo_unitario': 1.80
+            },
+            {
+                'id': 12,
+                'item_id': 12,
+                'ubicacion': 'bodega_principal',
+                'cantidad_actual': 60.25,
+                'cantidad_minima': 25.00,
+                'unidad': 'kg',
+                'ultimo_costo_unitario': 2.50
+            },
+            {
+                'id': 13,
+                'item_id': 13,
+                'ubicacion': 'bodega_principal',
+                'cantidad_actual': 45.00,
+                'cantidad_minima': 20.00,
+                'unidad': 'kg',
+                'ultimo_costo_unitario': 1.60
+            },
+            {
+                'id': 14,
+                'item_id': 14,
+                'ubicacion': 'bodega_principal',
+                'cantidad_actual': 30.50,
+                'cantidad_minima': 15.00,
+                'unidad': 'kg',
+                'ultimo_costo_unitario': 3.20
+            },
+            # LÁCTEOS Y HUEVOS
+            {
+                'id': 15,
+                'item_id': 15,
+                'ubicacion': 'nevera_lacteos',
+                'cantidad_actual': 120,
+                'cantidad_minima': 50,
+                'unidad': 'unidad',
+                'ultimo_costo_unitario': 0.35
+            },
+            {
+                'id': 16,
+                'item_id': 16,
+                'ubicacion': 'nevera_lacteos',
+                'cantidad_actual': 35,
+                'cantidad_minima': 20,
+                'unidad': 'unidad',
+                'ultimo_costo_unitario': 4.50
+            },
+            {
+                'id': 17,
+                'item_id': 17,
+                'ubicacion': 'nevera_lacteos',
+                'cantidad_actual': 48,
+                'cantidad_minima': 30,
+                'unidad': 'unidad',
+                'ultimo_costo_unitario': 2.50
+            },
+            {
+                'id': 18,
+                'item_id': 18,
+                'ubicacion': 'nevera_lacteos',
+                'cantidad_actual': 8.50,
+                'cantidad_minima': 5.00,
+                'unidad': 'kg',
+                'ultimo_costo_unitario': 6.80
+            },
+            {
+                'id': 19,
+                'item_id': 19,
+                'ubicacion': 'nevera_lacteos',
+                'cantidad_actual': 12,
+                'cantidad_minima': 10,
+                'unidad': 'unidad',
+                'ultimo_costo_unitario': 3.20
+            },
+            # CONDIMENTOS Y ESPECIAS
+            {
+                'id': 20,
+                'item_id': 20,
+                'ubicacion': 'bodega_condimentos',
+                'cantidad_actual': 8.50,
+                'cantidad_minima': 2.00,
+                'unidad': 'kg',
+                'ultimo_costo_unitario': 0.80
+            },
+            {
+                'id': 21,
+                'item_id': 21,
+                'ubicacion': 'bodega_condimentos',
+                'cantidad_actual': 1.20,
+                'cantidad_minima': 1.00,
+                'unidad': 'kg',
+                'ultimo_costo_unitario': 12.50
+            },
+            {
+                'id': 22,
+                'item_id': 22,
+                'ubicacion': 'bodega_condimentos',
+                'cantidad_actual': 0.85,
+                'cantidad_minima': 0.50,
+                'unidad': 'kg',
+                'ultimo_costo_unitario': 15.00
+            },
+            {
+                'id': 23,
+                'item_id': 23,
+                'ubicacion': 'bodega_condimentos',
+                'cantidad_actual': 15.00,
+                'cantidad_minima': 5.00,
+                'unidad': 'litro',
+                'ultimo_costo_unitario': 4.50
+            },
+            {
+                'id': 24,
+                'item_id': 24,
+                'ubicacion': 'bodega_condimentos',
+                'cantidad_actual': 8.00,
+                'cantidad_minima': 3.00,
+                'unidad': 'litro',
+                'ultimo_costo_unitario': 2.80
+            },
+            # BEBIDAS
+            {
+                'id': 25,
+                'item_id': 25,
+                'ubicacion': 'bodega_bebidas',
+                'cantidad_actual': 72,
+                'cantidad_minima': 24,
+                'unidad': 'unidad',
+                'ultimo_costo_unitario': 1.20
+            },
+            {
+                'id': 26,
+                'item_id': 26,
+                'ubicacion': 'bodega_bebidas',
+                'cantidad_actual': 48,
+                'cantidad_minima': 20,
+                'unidad': 'unidad',
+                'ultimo_costo_unitario': 0.85
+            },
+            {
+                'id': 27,
+                'item_id': 27,
+                'ubicacion': 'bodega_bebidas',
+                'cantidad_actual': 36,
+                'cantidad_minima': 15,
+                'unidad': 'unidad',
+                'ultimo_costo_unitario': 2.50
+            },
+            {
+                'id': 28,
+                'item_id': 28,
+                'ubicacion': 'bodega_bebidas',
+                'cantidad_actual': 60,
+                'cantidad_minima': 30,
+                'unidad': 'unidad',
+                'ultimo_costo_unitario': 1.50
+            },
+            # PRODUCTOS DE LIMPIEZA
+            {
+                'id': 29,
+                'item_id': 29,
+                'ubicacion': 'bodega_limpieza',
+                'cantidad_actual': 18,
+                'cantidad_minima': 10,
+                'unidad': 'unidad',
+                'ultimo_costo_unitario': 5.50
+            },
+            {
+                'id': 30,
+                'item_id': 30,
+                'ubicacion': 'bodega_limpieza',
+                'cantidad_actual': 12,
+                'cantidad_minima': 8,
+                'unidad': 'unidad',
+                'ultimo_costo_unitario': 3.80
+            },
+            {
+                'id': 31,
+                'item_id': 31,
+                'ubicacion': 'bodega_limpieza',
+                'cantidad_actual': 25,
+                'cantidad_minima': 15,
+                'unidad': 'unidad',
+                'ultimo_costo_unitario': 2.20
+            },
+            # PANADERÍA
+            {
+                'id': 32,
+                'item_id': 32,
+                'ubicacion': 'camara_fresca',
                 'cantidad_actual': 45,
                 'cantidad_minima': 20,
-                'unidad': 'unidad'
+                'unidad': 'unidad',
+                'ultimo_costo_unitario': 0.25
+            },
+            {
+                'id': 33,
+                'item_id': 33,
+                'ubicacion': 'camara_fresca',
+                'cantidad_actual': 30,
+                'cantidad_minima': 15,
+                'unidad': 'unidad',
+                'ultimo_costo_unitario': 0.30
+            },
+            {
+                'id': 34,
+                'item_id': 34,
+                'ubicacion': 'bodega_principal',
+                'cantidad_actual': 2.50,
+                'cantidad_minima': 1.00,
+                'unidad': 'kg',
+                'ultimo_costo_unitario': 4.50
+            },
+            # OTROS PRODUCTOS
+            {
+                'id': 35,
+                'item_id': 35,
+                'ubicacion': 'bodega_principal',
+                'cantidad_actual': 22.00,
+                'cantidad_minima': 10.00,
+                'unidad': 'kg',
+                'ultimo_costo_unitario': 3.50
+            },
+            {
+                'id': 36,
+                'item_id': 36,
+                'ubicacion': 'nevera_principal',
+                'cantidad_actual': 15,
+                'cantidad_minima': 8,
+                'unidad': 'unidad',
+                'ultimo_costo_unitario': 1.80
+            },
+            {
+                'id': 37,
+                'item_id': 37,
+                'ubicacion': 'bodega_principal',
+                'cantidad_actual': 50.00,
+                'cantidad_minima': 25.00,
+                'unidad': 'kg',
+                'ultimo_costo_unitario': 2.20
+            },
+            # ITEMS CON STOCK BAJO (para alertas)
+            {
+                'id': 38,
+                'item_id': 38,
+                'ubicacion': 'camara_fresca',
+                'cantidad_actual': 2.50,
+                'cantidad_minima': 5.00,
+                'unidad': 'kg',
+                'ultimo_costo_unitario': 3.20
+            },
+            {
+                'id': 39,
+                'item_id': 39,
+                'ubicacion': 'nevera_carnes',
+                'cantidad_actual': 4.20,
+                'cantidad_minima': 10.00,
+                'unidad': 'kg',
+                'ultimo_costo_unitario': 11.50
+            },
+            {
+                'id': 40,
+                'item_id': 40,
+                'ubicacion': 'bodega_condimentos',
+                'cantidad_actual': 0.30,
+                'cantidad_minima': 0.50,
+                'unidad': 'kg',
+                'ultimo_costo_unitario': 18.00
             }
         ]
     
@@ -279,7 +625,7 @@ class MockDataService:
                 return {
                     'error': None,
                     'resultados': MockDataService.obtener_mock_inventario(),
-                    'total_filas': 3,
+                    'total_filas': len(MockDataService.obtener_mock_inventario()),
                     'is_mock': True
                 }
             else:
@@ -302,7 +648,7 @@ class MockDataService:
             return {
                 'error': None,
                 'resultados': MockDataService.obtener_mock_inventario(),
-                'total_filas': 3,
+                'total_filas': len(MockDataService.obtener_mock_inventario()),
                 'is_mock': True
             }
         
@@ -485,10 +831,10 @@ class MockDataService:
                     'total_filas': 1,
                     'is_mock': True
                 }
-            elif tabla == 'inventario':
+                elif tabla == 'inventario':
                 return {
                     'error': None,
-                    'resultados': [{'count': 3}],
+                    'resultados': [{'count': len(MockDataService.obtener_mock_inventario())}],
                     'total_filas': 1,
                     'is_mock': True
                 }

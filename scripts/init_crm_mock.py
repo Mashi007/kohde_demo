@@ -47,6 +47,20 @@ def init_crm_mock():
             print(traceback.format_exc())
             notificaciones = []
         
+        # 2.5. Generar conversaciones operativas (facturas OCR, salidas de bodega)
+        print("\n" + "=" * 70)
+        print("PASO 2.5: Generando Conversaciones Operativas Mock")
+        print("=" * 70)
+        try:
+            from scripts.init_conversaciones_operativas import generar_conversaciones_operativas
+            conversaciones_operativas = generar_conversaciones_operativas()
+            print(f"\n✅ {len(conversaciones_operativas)} conversaciones operativas procesadas")
+        except Exception as e:
+            import traceback
+            print(f"\n⚠️  Error generando conversaciones operativas: {str(e)}")
+            print(traceback.format_exc())
+            conversaciones_operativas = []
+        
         # 3. Generar tickets
         print("\n" + "=" * 70)
         print("PASO 3: Generando Tickets Mock")
@@ -66,10 +80,12 @@ def init_crm_mock():
         print("=" * 70)
         print(f"📇 Contactos: {len(contactos)}")
         print(f"📧 Notificaciones: {len(notificaciones)}")
+        print(f"💬 Conversaciones operativas: {len(conversaciones_operativas)}")
         print(f"🎫 Tickets: {len(tickets)}")
         print("\n💡 Puedes ver los datos en:")
         print("   • Contactos: /contactos")
         print("   • Notificaciones: /notificaciones")
+        print("   • Conversaciones: /notificaciones/conversaciones")
         print("   • Tickets: /tickets")
 
 if __name__ == '__main__':

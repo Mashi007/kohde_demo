@@ -277,7 +277,9 @@ export default function Costos() {
                         )}
                       </td>
                       <td className="px-6 py-4">
-                        <span className="text-slate-300">{costo.cantidad_facturas_usadas}</span>
+                        <span className="text-slate-300">
+                          {costo.cantidad_facturas_usadas || (costo.cantidad_facturas_usadas === 0 ? 0 : '-')}
+                        </span>
                         <span className="text-xs text-slate-500 ml-1">facturas</span>
                       </td>
                       <td className="px-6 py-4 text-sm text-slate-400">

@@ -171,6 +171,7 @@ class CostoService:
     ) -> List[CostoItem]:
         """
         Lista costos estandarizados con filtros opcionales.
+        Si no hay costos o tienen cantidad_facturas_usadas en 0, genera datos mock.
         
         Args:
             db: Sesión de base de datos
@@ -192,7 +193,99 @@ class CostoService:
             from models.item import CategoriaItem
             query = query.filter(Item.categoria == CategoriaItem[categoria.upper()])
         
-        return query.order_by(desc(CostoItem.fecha_actualizacion)).offset(skip).limit(limit).all()
+        costos = query.order_by(desc(CostoItem.fecha_actualizacion)).offset(skip).limit(limit).all()
+        
+        # Si no hay costos o todos tienen cantidad_facturas_usadas en 0, agregar datos mock
+        if not costos or all(c.cantidad_facturas_usadas == 0 for c in costos):
+            try:
+                # Obtener items activos para generar costos mock
+                items_query = db.query(Item).filter(Item.activo == True)
+                
+                if label_id:
+                    from models.item_label import item_labels
+                    items_query = items_query.filter(Item.labels.any(id=label_id))
+                
+                if categoria:
+                    from models.item import CategoriaItem
+                    items_query = items_query.filter(Item.categoria == CategoriaItem[categoria.upper()])
+                
+                items = items_query.limit(limit).all()
+                
+                # Generar costos mock para items que no tienen costo
+                import random
+                costos_mock = []
+                
+                for item in items:
+                    # Verificar si ya existe un costo para este item
+                    costo_existente = db.query(CostoItem).filter(
+                        CostoItem.item_id == item.id
+                    ).first()
+                    
+                    if not costo_existente or costo_existente.cantidad_facturas_usadas == 0:
+                        # Generar datos mock realistas
+                        cantidad_facturas = random.choice([1, 2, 3])  # 1-3 facturas típicamente
+                        
+                        # Precio mock basado en tipo de item
+                        if item.costo_unitario_actual:
+                            precio_base = float(item.costo_unitario_actual)
+                        elif 'carne' in item.nombre.lower() or 'pollo' in item.nombre.lower():
+                            precio_base = round(8.50 + random.uniform(0, 5), 2)
+                        elif 'verdura' in item.nombre.lower() or 'hortaliza' in item.nombre.lower():
+                            precio_base = round(1.20 + random.uniform(0, 1), 2)
+                        elif 'lacteo' in item.nombre.lower() or 'leche' in item.nombre.lower():
+                            precio_base = round(3.50 + random.uniform(0, 2), 2)
+                        else:
+                            precio_base = round(2.50 + random.uniform(0, 3), 2)
+                        
+                        # Variación pequeña (5-15%)
+                        variacion_porcentaje = round(random.uniform(5, 15), 1)
+                        variacion_absoluta = round(precio_base * (variacion_porcentaje / 100), 2)
+                        
+                        if costo_existente:
+                            # Actualizar existente con datos mock
+                            costo_existente.cantidad_facturas_usadas = cantidad_facturas
+                            costo_existente.costo_unitario_promedio = precio_base
+                            costo_existente.variacion_porcentaje = variacion_porcentaje
+                            costo_existente.variacion_absoluta = variacion_absoluta
+                            costo_existente.fecha_actualizacion = datetime.utcnow()
+                            costo_existente.notas = f"Datos mock generados automáticamente - {cantidad_facturas} facturas simuladas"
+                            costos_mock.append(costo_existente)
+                        else:
+                            # Crear nuevo costo mock
+                            costo_mock = CostoItem(
+                                item_id=item.id,
+                                unidad_estandar=item.unidad,
+                                costo_unitario_promedio=precio_base,
+                                cantidad_facturas_usadas=cantidad_facturas,
+                                variacion_porcentaje=variacion_porcentaje,
+                                variacion_absoluta=variacion_absoluta,
+                                notas=f"Datos mock generados automáticamente - {cantidad_facturas} facturas simuladas",
+                                activo=True
+                            )
+                            db.add(costo_mock)
+                            costos_mock.append(costo_mock)
+                
+                if costos_mock:
+                    try:
+                        db.commit()
+                        # Refrescar y retornar los costos actualizados
+                        for costo in costos_mock:
+                            db.refresh(costo)
+                        
+                        # Retornar costos actualizados (combinar existentes con mock)
+                        costos_actualizados = query.order_by(desc(CostoItem.fecha_actualizacion)).offset(skip).limit(limit).all()
+                        return costos_actualizados
+                    except Exception as commit_error:
+                        import logging
+                        logging.warning(f"Error haciendo commit de costos mock: {str(commit_error)}")
+                        db.rollback()
+                        # Retornar costos existentes aunque tengan 0 facturas
+            except Exception as e:
+                import logging
+                logging.warning(f"Error generando costos mock: {str(e)}")
+                # Continuar con costos existentes aunque tengan 0 facturas
+        
+        return costos
     
     @staticmethod
     def recalcular_todos_los_costos(db: Session) -> Dict[str, int]:

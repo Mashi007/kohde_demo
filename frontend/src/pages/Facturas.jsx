@@ -182,6 +182,16 @@ export default function Facturas() {
       >
         <FacturaUploadForm
           onClose={() => setShowUploadModal(false)}
+          onSuccess={(facturaData) => {
+            // Si se creó una factura (ejemplo OCR), abrir modal de confirmación
+            if (facturaData && facturaData.id) {
+              setShowUploadModal(false)
+              // Cargar factura completa con items
+              api.get(`/logistica/facturas/${facturaData.id}`)
+                .then(res => setFacturaOCRAbierta(res.data))
+                .catch(err => handleApiError(err, 'Error al cargar factura'))
+            }
+          }}
         />
       </Modal>
 

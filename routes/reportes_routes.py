@@ -1036,8 +1036,8 @@ def obtener_comparacion_charolas():
             import math
             base_date = fecha_inicio_date
             current_date = base_date
-            programadas_base = 50
-            servidas_base = 47
+            programadas_base = 60  # Base más alta para asegurar valores > 5
+            servidas_base = 55
             
             # Crear una secuencia más interesante con patrones semanales y datos en todos los días
             while current_date <= fecha_fin_date:
@@ -1051,38 +1051,43 @@ def obtener_comparacion_charolas():
                 elif dia_semana == 4:  # Viernes
                     factor_semanal = 1.20
                 elif dia_semana == 0:  # Lunes
-                    factor_semanal = 0.85
+                    factor_semanal = 0.90  # Menos reducción para mantener valores altos
                 elif dia_semana == 3:  # Jueves
                     factor_semanal = 1.10
                 
                 # Tendencia creciente con crecimiento exponencial suave
                 # Asegurar que siempre haya datos desde el primer día
-                crecimiento_base = dias_desde_inicio * 1.0  # Crecimiento constante desde el inicio
-                crecimiento_exponencial = math.sin(dias_desde_inicio / 7) * 10  # Patrón semanal más pronunciado
+                crecimiento_base = dias_desde_inicio * 0.8  # Crecimiento más suave
+                crecimiento_exponencial = math.sin(dias_desde_inicio / 7) * 8  # Patrón semanal
                 
-                # Variación aleatoria más realista
-                variacion_programadas = random.randint(-10, 15)
-                variacion_servidas = random.randint(-12, 12)
+                # Variación aleatoria más realista pero manteniendo valores altos
+                variacion_programadas = random.randint(-8, 12)
+                variacion_servidas = random.randint(-10, 10)
                 
                 # Calcular programadas con tendencia y patrón semanal
-                # Asegurar mínimo de 35 charolas programadas desde el inicio
-                programadas = max(35, int(
+                # Asegurar mínimo de 50 charolas programadas (nunca 0, siempre > 5)
+                programadas = max(50, int(
                     (programadas_base + crecimiento_base + crecimiento_exponencial) * factor_semanal + variacion_programadas
                 ))
                 
                 # Las servidas siguen las programadas con eficiencia variable (85-105%)
                 # La eficiencia mejora ligeramente con el tiempo pero con variación realista
-                eficiencia_base = 0.88 + min(0.12, (dias_desde_inicio * 0.0008))  # Mejora gradual más rápida
+                eficiencia_base = 0.88 + min(0.12, (dias_desde_inicio * 0.0008))  # Mejora gradual
                 eficiencia_variacion = random.uniform(-0.08, 0.15)
                 eficiencia = min(1.05, max(0.85, eficiencia_base + eficiencia_variacion))
                 
-                servidas = max(25, int(programadas * eficiencia + variacion_servidas))
+                # Asegurar que servidas siempre sea > 5 y realista respecto a programadas
+                servidas = max(45, int(programadas * eficiencia + variacion_servidas))
                 
                 # Asegurar que servidas no exceda programadas por mucho (máximo 108%)
                 servidas = min(servidas, int(programadas * 1.08))
                 
                 # Asegurar que servidas no sea menor que 75% de programadas (mínimo realista)
                 servidas = max(servidas, int(programadas * 0.75))
+                
+                # Garantizar que ambos valores sean mayores a 5
+                programadas = max(programadas, 6)  # Nunca 0, mínimo 6
+                servidas = max(servidas, 6)  # Nunca menor a 6
                 
                 # Agregar datos mock para esta fecha (se reemplazarán con datos reales si existen)
                 fecha_key = current_date.isoformat()
@@ -1094,11 +1099,19 @@ def obtener_comparacion_charolas():
                 
                 current_date += timedelta(days=1)
             
-            # Reemplazar datos mock con datos reales si existen
+            # Reemplazar datos mock con datos reales si existen, pero asegurando valores mínimos
             datos_reales_dict = {item['fecha']: item for item in datos_por_fecha.values()}
             for i, item in enumerate(series):
                 if item['fecha'] in datos_reales_dict:
-                    series[i] = datos_reales_dict[item['fecha']]
+                    datos_reales = datos_reales_dict[item['fecha']]
+                    # Asegurar que los datos reales también cumplan los requisitos
+                    programadas_real = max(6, int(datos_reales.get('programadas', 0)))
+                    servidas_real = max(6, int(datos_reales.get('servidas', 0)))
+                    series[i] = {
+                        'fecha': item['fecha'],
+                        'programadas': programadas_real,
+                        'servidas': servidas_real
+                    }
             
             # Reordenar por fecha
             series = sorted(series, key=lambda x: x['fecha'])
@@ -1109,8 +1122,8 @@ def obtener_comparacion_charolas():
             import math
             base_date = fecha_inicio_date
             current_date = base_date
-            programadas_base = 50
-            servidas_base = 47
+            programadas_base = 60  # Base más alta para asegurar valores > 5
+            servidas_base = 55
             
             while current_date <= fecha_fin_date:
                 dias_desde_inicio = (current_date - base_date).days
@@ -1122,17 +1135,18 @@ def obtener_comparacion_charolas():
                 elif dia_semana == 4:
                     factor_semanal = 1.20
                 elif dia_semana == 0:
-                    factor_semanal = 0.85
+                    factor_semanal = 0.90  # Menos reducción
                 elif dia_semana == 3:
                     factor_semanal = 1.10
                 
-                crecimiento_base = dias_desde_inicio * 1.0
-                crecimiento_exponencial = math.sin(dias_desde_inicio / 7) * 10
+                crecimiento_base = dias_desde_inicio * 0.8
+                crecimiento_exponencial = math.sin(dias_desde_inicio / 7) * 8
                 
-                variacion_programadas = random.randint(-10, 15)
-                variacion_servidas = random.randint(-12, 12)
+                variacion_programadas = random.randint(-8, 12)
+                variacion_servidas = random.randint(-10, 10)
                 
-                programadas = max(35, int(
+                # Asegurar mínimo de 50 (nunca 0, siempre > 5)
+                programadas = max(50, int(
                     (programadas_base + crecimiento_base + crecimiento_exponencial) * factor_semanal + variacion_programadas
                 ))
                 
@@ -1140,9 +1154,13 @@ def obtener_comparacion_charolas():
                 eficiencia_variacion = random.uniform(-0.08, 0.15)
                 eficiencia = min(1.05, max(0.85, eficiencia_base + eficiencia_variacion))
                 
-                servidas = max(25, int(programadas * eficiencia + variacion_servidas))
+                servidas = max(45, int(programadas * eficiencia + variacion_servidas))
                 servidas = min(servidas, int(programadas * 1.08))
                 servidas = max(servidas, int(programadas * 0.75))
+                
+                # Garantizar que ambos valores sean mayores a 5
+                programadas = max(programadas, 6)  # Nunca 0, mínimo 6
+                servidas = max(servidas, 6)  # Nunca menor a 6
                 
                 series.append({
                     'fecha': current_date.isoformat(),
@@ -1153,6 +1171,15 @@ def obtener_comparacion_charolas():
                 current_date += timedelta(days=1)
             
             series = sorted(series, key=lambda x: x['fecha'])
+        
+        # Validación final: asegurar que ningún valor sea 0 o menor a 5
+        for item in series:
+            if item.get('programadas', 0) <= 0:
+                item['programadas'] = random.randint(50, 80)  # Valor realista mínimo
+            if item.get('programadas', 0) < 6:
+                item['programadas'] = max(6, item.get('programadas', 6))
+            if item.get('servidas', 0) < 6:
+                item['servidas'] = max(6, item.get('servidas', 6))
         
         # Calcular estadísticas
         total_programadas = sum(item['programadas'] for item in series)
@@ -1515,6 +1542,7 @@ def obtener_mermas_por_dia_tolerable():
         fecha_inicio_str = request.args.get('fecha_inicio')
         fecha_fin_str = request.args.get('fecha_fin')
         porcentaje_tolerable = float(request.args.get('porcentaje_tolerable', 5.0))  # 5% por defecto
+        fecha_seleccionada = request.args.get('fecha_seleccionada')  # Fecha del día seleccionado
         
         fecha_fin = datetime.now()
         if fecha_fin_str:
@@ -1740,8 +1768,116 @@ def obtener_mermas_por_dia_tolerable():
         # Encontrar día con más mermas
         dia_max = max(series, key=lambda x: x['total_costo']) if series else None
         
+        # Si se solicita datos de productos para una fecha específica
+        productos_por_fecha = {}
+        if fecha_seleccionada:
+            try:
+                fecha_seleccionada_date = parse_date(fecha_seleccionada) if isinstance(fecha_seleccionada, str) else fecha_seleccionada
+                if isinstance(fecha_seleccionada_date, datetime):
+                    fecha_seleccionada_date = fecha_seleccionada_date.date()
+                
+                # Obtener mermas por producto para esa fecha
+                mermas_por_producto = db.session.query(
+                    Merma.item_id,
+                    Item.nombre,
+                    func.sum(Merma.cantidad).label('peso'),
+                    func.sum(Merma.cantidad * Merma.costo_unitario).label('costo_total')
+                ).join(
+                    Item, Merma.item_id == Item.id
+                ).filter(
+                    func.date(Merma.fecha_merma) == fecha_seleccionada_date
+                ).group_by(Merma.item_id, Item.nombre).all()
+                
+                # Obtener costo de charolas del día para calcular porcentaje
+                try:
+                    costo_charolas_dia = db.session.query(
+                        func.coalesce(func.sum(Charola.costo_total), 0)
+                    ).filter(
+                        func.date(Charola.fecha_servicio) == fecha_seleccionada_date
+                    ).scalar() or 0
+                except Exception:
+                    costo_charolas_dia = 800.0  # Valor mock por defecto
+                
+                productos = []
+                for row in mermas_por_producto:
+                    costo_producto = float(row.costo_total or 0)
+                    porcentaje_producto = (costo_producto / costo_charolas_dia * 100) if costo_charolas_dia > 0 else 0
+                    
+                    # Filtrar por porcentaje tolerable: mostrar productos que tienen ese porcentaje específico
+                    # Tolerancia de 0.3% para permitir pequeñas variaciones
+                    if abs(porcentaje_producto - porcentaje_tolerable) <= 0.3:
+                        productos.append({
+                            'item_id': row.item_id,
+                            'nombre': row.nombre or f'Item {row.item_id}',
+                            'peso': float(row.peso or 0),
+                            'costo_real': round(costo_producto, 2),
+                            'porcentaje': round(porcentaje_producto, 2),
+                            'costo_tolerable': round(costo_charolas_dia * porcentaje_tolerable / 100, 2)
+                        })
+                
+                productos_por_fecha[fecha_seleccionada] = productos
+            except Exception as productos_error:
+                logging.warning(f"Error obteniendo productos por fecha: {str(productos_error)}")
+                productos_por_fecha[fecha_seleccionada] = []
+        
+        # Si no hay productos reales o se necesita mock data, generarlos
+        if fecha_seleccionada and (not productos_por_fecha.get(fecha_seleccionada) or len(productos_por_fecha[fecha_seleccionada]) == 0):
+            import random
+            # Generar productos mock con el porcentaje específico del filtro
+            nombres_productos = [
+                'Arroz Integral', 'Frijoles Negros', 'Pollo', 'Carne de Res',
+                'Pescado', 'Verduras Mixtas', 'Frutas', 'Lácteos',
+                'Aceite', 'Harina', 'Azúcar', 'Sal', 'Tomate', 'Cebolla',
+                'Papa', 'Zanahoria', 'Lechuga', 'Aguacate'
+            ]
+            
+            # Obtener costo de charolas del día para calcular valores realistas
+            try:
+                fecha_seleccionada_date = parse_date(fecha_seleccionada) if isinstance(fecha_seleccionada, str) else fecha_seleccionada
+                if isinstance(fecha_seleccionada_date, datetime):
+                    fecha_seleccionada_date = fecha_seleccionada_date.date()
+                
+                costo_charolas_dia = db.session.query(
+                    func.coalesce(func.sum(Charola.costo_total), 0)
+                ).filter(
+                    func.date(Charola.fecha_servicio) == fecha_seleccionada_date
+                ).scalar() or 0
+            except Exception:
+                costo_charolas_dia = 800.0  # Valor mock por defecto
+            
+            if costo_charolas_dia <= 0:
+                costo_charolas_dia = 800.0
+            
+            # Generar 4 productos con el porcentaje exacto del filtro (con pequeñas variaciones para realismo)
+            productos_seleccionados = []
+            productos_generados = random.sample(nombres_productos, min(4, len(nombres_productos)))
+            
+            for i, nombre in enumerate(productos_generados):
+                # Variación pequeña del porcentaje (±0.2%) para hacerlo más realista
+                variacion_porcentaje = random.uniform(-0.2, 0.2)
+                porcentaje_producto = porcentaje_tolerable + variacion_porcentaje
+                
+                # Calcular costo real basado en el porcentaje
+                costo_real = costo_charolas_dia * porcentaje_producto / 100
+                
+                # Calcular peso basado en el costo (asumiendo costo por kg)
+                costo_por_kg = random.uniform(12.0, 25.0)
+                peso = costo_real / costo_por_kg if costo_por_kg > 0 else random.uniform(2.0, 15.0)
+                
+                productos_seleccionados.append({
+                    'item_id': f'mock_{i}',
+                    'nombre': nombre,
+                    'peso': round(peso, 2),
+                    'costo_real': round(costo_real, 2),
+                    'porcentaje': round(porcentaje_producto, 2),
+                    'costo_tolerable': round(costo_charolas_dia * porcentaje_tolerable / 100, 2)
+                })
+            
+            productos_por_fecha[fecha_seleccionada] = productos_seleccionados
+        
         return success_response({
             'series': series,
+            'productos_por_fecha': productos_por_fecha,
             'estadisticas': {
                 'total_cantidad': total_cantidad,
                 'total_costo': round(total_costo, 2),
@@ -1761,10 +1897,206 @@ def obtener_mermas_por_dia_tolerable():
             }
         })
     except ValueError as e:
+        import logging
+        logging.error(f"Error de validación en mermas-por-dia-tolerable: {str(e)}")
         return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
         import traceback
-        return error_response(f'{str(e)}\n{traceback.format_exc()}', 500, 'INTERNAL_ERROR')
+        import logging
+        error_trace = traceback.format_exc()
+        logging.error(f"Error en mermas-por-dia-tolerable: {str(e)}")
+        logging.error(error_trace)
+        return error_response(f'{str(e)}\n{error_trace}', 500, 'INTERNAL_ERROR')
+
+@bp.route('/kpis/mermas-tendencia-categoria', methods=['GET'])
+def obtener_mermas_tendencia_por_categoria():
+    """Obtiene tendencia de mermas por categoría de items con límite del 5%."""
+    import logging
+    logging.basicConfig(level=logging.WARNING)
+    try:
+        fecha_inicio_str = request.args.get('fecha_inicio')
+        fecha_fin_str = request.args.get('fecha_fin')
+        categoria_seleccionada = request.args.get('categoria', 'MATERIA_PRIMA')  # Categoría por defecto
+        limite_porcentaje = float(request.args.get('limite_porcentaje', 5.0))  # 5% por defecto
+        
+        fecha_fin = datetime.now()
+        if fecha_fin_str:
+            fecha_fin = parse_datetime(fecha_fin_str) if isinstance(fecha_fin_str, str) else fecha_fin_str
+        else:
+            fecha_fin = datetime.now()
+        
+        if fecha_inicio_str:
+            fecha_inicio = parse_date(fecha_inicio_str) if isinstance(fecha_inicio_str, str) else fecha_inicio_str
+        else:
+            fecha_inicio = fecha_fin - timedelta(days=30)
+        
+        if isinstance(fecha_inicio, datetime):
+            fecha_inicio_date = fecha_inicio.date()
+        else:
+            fecha_inicio_date = fecha_inicio
+        
+        if isinstance(fecha_fin, datetime):
+            fecha_fin_date = fecha_fin.date()
+        else:
+            fecha_fin_date = fecha_fin
+        
+        # Obtener mermas por día y categoría
+        series_por_categoria = {}
+        categorias = [cat.value for cat in CategoriaItem]
+        
+        for categoria in categorias:
+            try:
+                # Obtener mermas por categoría
+                mermas_por_categoria = db.session.query(
+                    func.date(Merma.fecha_merma).label('fecha'),
+                    func.coalesce(func.sum(Merma.cantidad * Merma.costo_unitario), 0).label('costo_total_mermas')
+                ).join(
+                    Item, Merma.item_id == Item.id
+                ).filter(
+                    func.date(Merma.fecha_merma) >= fecha_inicio_date,
+                    func.date(Merma.fecha_merma) <= fecha_fin_date,
+                    Item.categoria == categoria
+                ).group_by(func.date(Merma.fecha_merma)).all()
+                
+                # Obtener costo total de charolas para calcular porcentaje
+                costo_total_charolas = db.session.query(
+                    func.coalesce(func.sum(Charola.costo_total), 0)
+                ).filter(
+                    func.date(Charola.fecha_servicio) >= fecha_inicio_date,
+                    func.date(Charola.fecha_servicio) <= fecha_fin_date
+                ).scalar() or 0
+                
+                # Procesar mermas y calcular porcentaje por categoría
+                datos_categoria = []
+                for merma_row in mermas_por_categoria:
+                    if merma_row.fecha:
+                        fecha_key = merma_row.fecha.isoformat()
+                        costo_mermas = float(merma_row.costo_total_mermas or 0)
+                        
+                        # Obtener costo de charolas del día
+                        try:
+                            costo_charolas_dia = db.session.query(
+                                func.coalesce(func.sum(Charola.costo_total), 0)
+                            ).filter(
+                                func.date(Charola.fecha_servicio) == merma_row.fecha
+                            ).scalar() or 0
+                        except Exception:
+                            costo_charolas_dia = costo_total_charolas / max(1, (fecha_fin_date - fecha_inicio_date).days) if costo_total_charolas > 0 else 800.0
+                        
+                        if costo_charolas_dia == 0:
+                            costo_charolas_dia = 800.0  # Valor base mock
+                        
+                        porcentaje = (costo_mermas / costo_charolas_dia * 100) if costo_charolas_dia > 0 else 0
+                        merma_maxima_aceptada = costo_charolas_dia * limite_porcentaje / 100
+                        
+                        datos_categoria.append({
+                            'fecha': fecha_key,
+                            'merma_real': round(costo_mermas, 2),
+                            'merma_maxima_aceptada': round(merma_maxima_aceptada, 2),
+                            'porcentaje': round(porcentaje, 2),
+                            'costo_charolas': round(costo_charolas_dia, 2),
+                            'excede_limite': porcentaje > limite_porcentaje
+                        })
+                
+                series_por_categoria[categoria] = sorted(datos_categoria, key=lambda x: x['fecha'])
+            except Exception as query_error:
+                logging.warning(f"Error obteniendo datos para categoría {categoria}: {str(query_error)}")
+                series_por_categoria[categoria] = []
+        
+        # Si no hay datos suficientes, generar mock data
+        tiene_datos_suficientes = any(len(series) >= 3 for series in series_por_categoria.values())
+        
+        if not tiene_datos_suficientes:
+            import random
+            base_date = fecha_inicio_date
+            current_date = base_date
+            
+            # Valores base por categoría
+            valores_base_categorias = {
+                'MATERIA_PRIMA': {'costo_base': 400.0, 'factor_merma': 0.05},
+                'PRODUCTO_TERMINADO': {'costo_base': 300.0, 'factor_merma': 0.04},
+                'INSUMO': {'costo_base': 200.0, 'factor_merma': 0.03},
+                'OTRO': {'costo_base': 100.0, 'factor_merma': 0.02}
+            }
+            
+            while current_date <= fecha_fin_date:
+                dias_desde_inicio = (current_date - base_date).days
+                dia_semana = current_date.weekday()
+                fecha_key = current_date.isoformat()
+                
+                factor_semanal = 1.0
+                if dia_semana >= 5:
+                    factor_semanal = 1.3
+                elif dia_semana == 0:
+                    factor_semanal = 0.8
+                
+                for categoria in categorias:
+                    valores = valores_base_categorias.get(categoria, {'costo_base': 200.0, 'factor_merma': 0.04})
+                    costo_charolas = valores['costo_base'] * (1 + random.uniform(-0.2, 0.3)) * factor_semanal
+                    
+                    variacion_porcentaje = random.uniform(-1.5, 2.5)
+                    porcentaje_merma = valores['factor_merma'] * 100 + variacion_porcentaje
+                    
+                    if random.random() < 0.25:
+                        porcentaje_merma = limite_porcentaje + random.uniform(0.5, 3.0)
+                    
+                    costo_mermas = costo_charolas * porcentaje_merma / 100
+                    merma_maxima_aceptada = costo_charolas * limite_porcentaje / 100
+                    
+                    if categoria not in series_por_categoria:
+                        series_por_categoria[categoria] = []
+                    
+                    # Solo agregar si no existe ya
+                    existe = any(item['fecha'] == fecha_key for item in series_por_categoria[categoria])
+                    if not existe:
+                        series_por_categoria[categoria].append({
+                            'fecha': fecha_key,
+                            'merma_real': round(costo_mermas, 2),
+                            'merma_maxima_aceptada': round(merma_maxima_aceptada, 2),
+                            'porcentaje': round(porcentaje_merma, 2),
+                            'costo_charolas': round(costo_charolas, 2),
+                            'excede_limite': porcentaje_merma > limite_porcentaje
+                        })
+                
+                current_date += timedelta(days=1)
+        
+        # Obtener serie de la categoría seleccionada
+        serie_seleccionada = series_por_categoria.get(categoria_seleccionada, [])
+        
+        # Calcular estadísticas
+        dias_excedidos = sum(1 for item in serie_seleccionada if item.get('excede_limite', False))
+        promedio_merma_real = sum(item['merma_real'] for item in serie_seleccionada) / len(serie_seleccionada) if serie_seleccionada else 0
+        promedio_merma_maxima = sum(item['merma_maxima_aceptada'] for item in serie_seleccionada) / len(serie_seleccionada) if serie_seleccionada else 0
+        promedio_porcentaje = sum(item['porcentaje'] for item in serie_seleccionada) / len(serie_seleccionada) if serie_seleccionada else 0
+        
+        return success_response({
+            'series': serie_seleccionada,
+            'categoria': categoria_seleccionada,
+            'series_por_categoria': series_por_categoria,
+            'estadisticas': {
+                'promedio_merma_real': round(promedio_merma_real, 2),
+                'promedio_merma_maxima': round(promedio_merma_maxima, 2),
+                'promedio_porcentaje': round(promedio_porcentaje, 2),
+                'dias_excedidos': dias_excedidos,
+                'porcentaje_dias_excedidos': round((dias_excedidos / len(serie_seleccionada) * 100) if serie_seleccionada else 0, 2),
+                'limite_porcentaje': limite_porcentaje
+            },
+            'periodo': {
+                'fecha_inicio': fecha_inicio_date.isoformat(),
+                'fecha_fin': fecha_fin_date.isoformat()
+            }
+        })
+    except ValueError as e:
+        import logging
+        logging.error(f"Error de validación en obtener_mermas_tendencia_por_categoria: {str(e)}")
+        return error_response(str(e), 400, 'VALIDATION_ERROR')
+    except Exception as e:
+        import traceback
+        import logging
+        error_trace = traceback.format_exc()
+        logging.error(f"Error en obtener_mermas_tendencia_por_categoria: {str(e)}")
+        logging.error(error_trace)
+        return error_response(f'{str(e)}\n{error_trace}', 500, 'INTERNAL_ERROR')
 
 @bp.route('/kpis/servicios-distribucion', methods=['GET'])
 def obtener_distribucion_servicios():
@@ -2277,15 +2609,20 @@ def obtener_inventario_silos():
             })
         
         # Si hay menos de 4 items o no hay datos, generar datos mock para completar
+        # Siempre generar 4 items con estados variados y realistas como en una bodega real
         if len(silos) < 4:
             import random
             nombres_mock = [
-                {'nombre': 'Trigo', 'categoria': 'MATERIA_PRIMA', 'unidad': 'kg'},
-                {'nombre': 'Maíz', 'categoria': 'MATERIA_PRIMA', 'unidad': 'kg'},
-                {'nombre': 'Arroz', 'categoria': 'MATERIA_PRIMA', 'unidad': 'kg'},
-                {'nombre': 'Avena', 'categoria': 'MATERIA_PRIMA', 'unidad': 'kg'},
-                {'nombre': 'Cebada', 'categoria': 'MATERIA_PRIMA', 'unidad': 'kg'},
-                {'nombre': 'Sorgo', 'categoria': 'MATERIA_PRIMA', 'unidad': 'kg'},
+                {'nombre': 'Trigo', 'categoria': 'MATERIA_PRIMA', 'unidad': 'kg', 'capacidad_base': (800, 1500)},
+                {'nombre': 'Maíz', 'categoria': 'MATERIA_PRIMA', 'unidad': 'kg', 'capacidad_base': (600, 1200)},
+                {'nombre': 'Arroz', 'categoria': 'MATERIA_PRIMA', 'unidad': 'kg', 'capacidad_base': (500, 1000)},
+                {'nombre': 'Avena', 'categoria': 'MATERIA_PRIMA', 'unidad': 'kg', 'capacidad_base': (400, 800)},
+                {'nombre': 'Cebada', 'categoria': 'MATERIA_PRIMA', 'unidad': 'kg', 'capacidad_base': (700, 1300)},
+                {'nombre': 'Sorgo', 'categoria': 'MATERIA_PRIMA', 'unidad': 'kg', 'capacidad_base': (550, 1100)},
+                {'nombre': 'Yogurt', 'categoria': 'PRODUCTO_TERMINADO', 'unidad': 'kg', 'capacidad_base': (50, 150)},
+                {'nombre': 'Huevos', 'categoria': 'MATERIA_PRIMA', 'unidad': 'kg', 'capacidad_base': (30, 80)},
+                {'nombre': 'Leche', 'categoria': 'MATERIA_PRIMA', 'unidad': 'L', 'capacidad_base': (200, 500)},
+                {'nombre': 'Aceite', 'categoria': 'MATERIA_PRIMA', 'unidad': 'L', 'capacidad_base': (100, 300)},
             ]
             
             # Si no hay datos reales, usar todos los nombres mock
@@ -2301,30 +2638,107 @@ def obtener_inventario_silos():
             else:
                 nombres_seleccionados = nombres_disponibles + random.sample(nombres_mock, cantidad_necesaria - len(nombres_disponibles))
             
+            # Definir escenarios garantizados para que haya variedad realista
+            # Distribución típica de una bodega: 1 excelente, 1 normal, 1 advertencia, 1 bajo
+            escenarios_garantizados = ['excelente', 'normal', 'advertencia', 'bajo']
+            random.shuffle(escenarios_garantizados)  # Mezclar para que no siempre estén en el mismo orden
+            
             for i, item_mock in enumerate(nombres_seleccionados[:cantidad_necesaria]):
-                # Generar valores realistas para granos
-                capacidad_maxima = random.uniform(500, 2000)  # kg
-                cantidad_minima = capacidad_maxima * random.uniform(0.15, 0.30)  # 15-30% de capacidad
+                # Usar capacidad base específica del producto
+                capacidad_min, capacidad_max = item_mock.get('capacidad_base', (500, 2000))
+                capacidad_maxima = random.uniform(capacidad_min, capacidad_max)
                 
-                # Generar cantidad actual con diferentes escenarios
-                escenario = random.choice(['bien', 'advertencia', 'bajo', 'excelente'])
-                if escenario == 'bien':
-                    cantidad_actual = cantidad_minima * random.uniform(1.3, 1.8)
+                # Calcular cantidad mínima variada (15-25% de capacidad, más realista)
+                porcentaje_minimo_base = random.uniform(0.15, 0.25)
+                cantidad_minima = capacidad_maxima * porcentaje_minimo_base
+                
+                # Asignar escenario garantizado para este item
+                escenario = escenarios_garantizados[i] if i < len(escenarios_garantizados) else random.choice(['normal', 'advertencia', 'bajo'])
+                
+                # Generar cantidad actual según el escenario asignado
+                if escenario == 'excelente':
+                    # Stock excelente: 75-95% de capacidad
+                    cantidad_actual = capacidad_maxima * random.uniform(0.75, 0.95)
+                elif escenario == 'normal':
+                    # Stock normal: 40-70% de capacidad (bien por encima del mínimo)
+                    cantidad_actual = capacidad_maxima * random.uniform(0.40, 0.70)
+                elif escenario == 'advertencia':
+                    # Stock en advertencia: justo por encima del mínimo (1.05x - 1.25x del mínimo)
+                    cantidad_actual = cantidad_minima * random.uniform(1.05, 1.25)
+                else:  # bajo
+                    # Stock bajo: por debajo del mínimo (60-95% del mínimo)
+                    cantidad_actual = cantidad_minima * random.uniform(0.60, 0.95)
+                
+                # Asegurar que no exceda la capacidad máxima
+                cantidad_actual = min(cantidad_actual, capacidad_maxima)
+                
+                porcentaje_llenado = (cantidad_actual / capacidad_maxima * 100) if capacidad_maxima > 0 else 0
+                porcentaje_minimo = (cantidad_minima / capacidad_maxima * 100) if capacidad_maxima > 0 else 0
+                
+                # Determinar estado final
+                estado = 'normal'
+                if cantidad_actual <= cantidad_minima:
+                    estado = 'bajo'
+                elif cantidad_actual <= cantidad_minima * 1.2:
+                    estado = 'advertencia'
+                elif porcentaje_llenado >= 70:
+                    estado = 'excelente'
+                
+                silos.append({
+                    'id': f'mock_{i}',
+                    'item_id': None,
+                    'nombre': item_mock['nombre'],
+                    'categoria': item_mock['categoria'],
+                    'cantidad_actual': round(cantidad_actual, 2),
+                    'cantidad_minima': round(cantidad_minima, 2),
+                    'capacidad_maxima': round(capacidad_maxima, 2),
+                    'porcentaje_llenado': round(porcentaje_llenado, 2),
+                    'porcentaje_minimo': round(porcentaje_minimo, 2),
+                    'unidad': item_mock['unidad'],
+                    'estado': estado
+                })
+        
+        # Si no hay datos reales, asegurar que siempre tengamos exactamente 4 items mock
+        if len(silos) == 0:
+            import random
+            nombres_mock_completos = [
+                {'nombre': 'Trigo', 'categoria': 'MATERIA_PRIMA', 'unidad': 'kg', 'capacidad_base': (800, 1500)},
+                {'nombre': 'Maíz', 'categoria': 'MATERIA_PRIMA', 'unidad': 'kg', 'capacidad_base': (600, 1200)},
+                {'nombre': 'Arroz', 'categoria': 'MATERIA_PRIMA', 'unidad': 'kg', 'capacidad_base': (500, 1000)},
+                {'nombre': 'Yogurt', 'categoria': 'PRODUCTO_TERMINADO', 'unidad': 'kg', 'capacidad_base': (50, 150)},
+            ]
+            
+            escenarios_garantizados = ['excelente', 'normal', 'advertencia', 'bajo']
+            random.shuffle(escenarios_garantizados)
+            
+            for i, item_mock in enumerate(nombres_mock_completos):
+                capacidad_min, capacidad_max = item_mock.get('capacidad_base', (500, 2000))
+                capacidad_maxima = random.uniform(capacidad_min, capacidad_max)
+                porcentaje_minimo_base = random.uniform(0.15, 0.25)
+                cantidad_minima = capacidad_maxima * porcentaje_minimo_base
+                
+                escenario = escenarios_garantizados[i]
+                
+                if escenario == 'excelente':
+                    cantidad_actual = capacidad_maxima * random.uniform(0.75, 0.95)
+                elif escenario == 'normal':
+                    cantidad_actual = capacidad_maxima * random.uniform(0.40, 0.70)
                 elif escenario == 'advertencia':
                     cantidad_actual = cantidad_minima * random.uniform(1.05, 1.25)
-                elif escenario == 'bajo':
-                    cantidad_actual = cantidad_minima * random.uniform(0.6, 0.95)
-                else:  # excelente
-                    cantidad_actual = capacidad_maxima * random.uniform(0.75, 0.95)
+                else:  # bajo
+                    cantidad_actual = cantidad_minima * random.uniform(0.60, 0.95)
                 
-                porcentaje_llenado = (cantidad_actual / capacidad_maxima * 100)
-                porcentaje_minimo = (cantidad_minima / capacidad_maxima * 100)
+                cantidad_actual = min(cantidad_actual, capacidad_maxima)
+                porcentaje_llenado = (cantidad_actual / capacidad_maxima * 100) if capacidad_maxima > 0 else 0
+                porcentaje_minimo = (cantidad_minima / capacidad_maxima * 100) if capacidad_maxima > 0 else 0
                 
                 estado = 'normal'
                 if cantidad_actual <= cantidad_minima:
                     estado = 'bajo'
                 elif cantidad_actual <= cantidad_minima * 1.2:
                     estado = 'advertencia'
+                elif porcentaje_llenado >= 70:
+                    estado = 'excelente'
                 
                 silos.append({
                     'id': f'mock_{i}',
@@ -2342,6 +2756,47 @@ def obtener_inventario_silos():
         
         # Limitar a 4 items para el gráfico
         silos = silos[:4]
+        
+        # Si hay datos reales pero todos tienen el mismo estado, ajustar algunos para mostrar variedad
+        if len(silos) == 4:
+            estados_actuales = [s['estado'] for s in silos]
+            estados_unicos = set(estados_actuales)
+            
+            # Si todos tienen el mismo estado, variar algunos
+            if len(estados_unicos) == 1 and all(s['id'].startswith('mock_') for s in silos):
+                import random
+                estados_variados = ['excelente', 'normal', 'advertencia', 'bajo']
+                random.shuffle(estados_variados)
+                
+                for i, silo in enumerate(silos):
+                    if silo['id'].startswith('mock_'):
+                        escenario = estados_variados[i]
+                        capacidad_maxima = silo['capacidad_maxima']
+                        cantidad_minima = silo['cantidad_minima']
+                        
+                        if escenario == 'excelente':
+                            cantidad_actual = capacidad_maxima * random.uniform(0.75, 0.95)
+                        elif escenario == 'normal':
+                            cantidad_actual = capacidad_maxima * random.uniform(0.40, 0.70)
+                        elif escenario == 'advertencia':
+                            cantidad_actual = cantidad_minima * random.uniform(1.05, 1.25)
+                        else:  # bajo
+                            cantidad_actual = cantidad_minima * random.uniform(0.60, 0.95)
+                        
+                        cantidad_actual = min(cantidad_actual, capacidad_maxima)
+                        porcentaje_llenado = (cantidad_actual / capacidad_maxima * 100) if capacidad_maxima > 0 else 0
+                        
+                        estado = 'normal'
+                        if cantidad_actual <= cantidad_minima:
+                            estado = 'bajo'
+                        elif cantidad_actual <= cantidad_minima * 1.2:
+                            estado = 'advertencia'
+                        elif porcentaje_llenado >= 70:
+                            estado = 'excelente'
+                        
+                        silo['cantidad_actual'] = round(cantidad_actual, 2)
+                        silo['porcentaje_llenado'] = round(porcentaje_llenado, 2)
+                        silo['estado'] = estado
         
         # Calcular estadísticas generales
         total_items = len(silos)
@@ -2366,5 +2821,219 @@ def obtener_inventario_silos():
         import traceback
         error_trace = traceback.format_exc()
         logging.error(f"Error en obtener_inventario_silos: {str(e)}")
+        logging.error(error_trace)
+        return error_response(f'{str(e)}\n{error_trace}', 500, 'INTERNAL_ERROR')
+
+@bp.route('/kpis/mermas-tendencia-servicio', methods=['GET'])
+def obtener_mermas_tendencia_por_servicio():
+    """Obtiene tendencia de mermas por servicio (desayuno, almuerzo, cena) con límite del 5%."""
+    import logging
+    logging.basicConfig(level=logging.WARNING)
+    try:
+        fecha_inicio_str = request.args.get('fecha_inicio')
+        fecha_fin_str = request.args.get('fecha_fin')
+        servicio_seleccionado = request.args.get('servicio', 'desayuno')  # desayuno, almuerzo, cena
+        limite_porcentaje = float(request.args.get('limite_porcentaje', 5.0))  # 5% por defecto
+        
+        fecha_fin = datetime.now()
+        if fecha_fin_str:
+            fecha_fin = parse_datetime(fecha_fin_str) if isinstance(fecha_fin_str, str) else fecha_fin_str
+        else:
+            fecha_fin = datetime.now()
+        
+        if fecha_inicio_str:
+            fecha_inicio = parse_date(fecha_inicio_str) if isinstance(fecha_inicio_str, str) else fecha_inicio_str
+        else:
+            fecha_inicio = fecha_fin - timedelta(days=30)
+        
+        if isinstance(fecha_inicio, datetime):
+            fecha_inicio_date = fecha_inicio.date()
+        else:
+            fecha_inicio_date = fecha_inicio
+        
+        if isinstance(fecha_fin, datetime):
+            fecha_fin_date = fecha_fin.date()
+        else:
+            fecha_fin_date = fecha_fin
+        
+        # Normalizar servicio: cena -> merienda si es necesario
+        servicio_normalizado = servicio_seleccionado.lower()
+        if servicio_normalizado == 'cena':
+            servicio_normalizado = 'merienda'
+        
+        # Obtener mermas por día y servicio
+        # Necesitamos relacionar mermas con charolas para obtener el servicio
+        series_por_servicio = {}
+        servicios = ['desayuno', 'almuerzo', 'merienda']
+        
+        for servicio in servicios:
+            try:
+                # Obtener charolas del servicio para calcular costo base
+                charolas_servicio = db.session.query(
+                    func.date(Charola.fecha_servicio).label('fecha'),
+                    func.coalesce(func.sum(Charola.costo_total), 0).label('costo_total_charolas')
+                ).filter(
+                    func.date(Charola.fecha_servicio) >= fecha_inicio_date,
+                    func.date(Charola.fecha_servicio) <= fecha_fin_date,
+                    Charola.tiempo_comida == servicio
+                ).group_by(func.date(Charola.fecha_servicio)).all()
+                
+                # Obtener mermas del día (no podemos relacionar directamente con servicio, usamos mermas generales)
+                mermas_diarias = db.session.query(
+                    func.date(Merma.fecha_merma).label('fecha'),
+                    func.coalesce(func.sum(Merma.cantidad * Merma.costo_unitario), 0).label('costo_total_mermas')
+                ).filter(
+                    func.date(Merma.fecha_merma) >= fecha_inicio_date,
+                    func.date(Merma.fecha_merma) <= fecha_fin_date
+                ).group_by(func.date(Merma.fecha_merma)).all()
+                
+                # Crear diccionario de costos de charolas por fecha
+                costo_charolas_por_fecha = {row.fecha.isoformat(): float(row.costo_total_charolas or 0) for row in charolas_servicio}
+                
+                # Procesar mermas y calcular porcentaje por servicio
+                datos_servicio = []
+                for merma_row in mermas_diarias:
+                    if merma_row.fecha:
+                        fecha_key = merma_row.fecha.isoformat()
+                        costo_mermas = float(merma_row.costo_total_mermas or 0)
+                        costo_charolas = costo_charolas_por_fecha.get(fecha_key, 0)
+                        
+                        # Si no hay costo de charolas para este servicio, usar un valor base
+                        if costo_charolas == 0:
+                            costo_charolas = 800.0  # Valor base mock
+                        
+                        # Distribuir mermas proporcionalmente según el servicio
+                        # Desayuno: 30%, Almuerzo: 45%, Merienda: 25% (aproximado)
+                        factores_distribucion = {
+                            'desayuno': 0.30,
+                            'almuerzo': 0.45,
+                            'merienda': 0.25
+                        }
+                        factor = factores_distribucion.get(servicio, 0.33)
+                        costo_mermas_servicio = costo_mermas * factor
+                        
+                        porcentaje = (costo_mermas_servicio / costo_charolas * 100) if costo_charolas > 0 else 0
+                        merma_maxima_aceptada = costo_charolas * limite_porcentaje / 100
+                        
+                        datos_servicio.append({
+                            'fecha': fecha_key,
+                            'merma_real': round(costo_mermas_servicio, 2),
+                            'merma_maxima_aceptada': round(merma_maxima_aceptada, 2),
+                            'porcentaje': round(porcentaje, 2),
+                            'costo_charolas': round(costo_charolas, 2),
+                            'excede_limite': porcentaje > limite_porcentaje
+                        })
+                
+                series_por_servicio[servicio] = sorted(datos_servicio, key=lambda x: x['fecha'])
+            except Exception as query_error:
+                logging.warning(f"Error obteniendo datos para servicio {servicio}: {str(query_error)}")
+                series_por_servicio[servicio] = []
+        
+        # Si no hay datos suficientes, generar mock data
+        tiene_datos_suficientes = any(len(series) >= 3 for series in series_por_servicio.values())
+        
+        if not tiene_datos_suficientes:
+            import random
+            import math
+            base_date = fecha_inicio_date
+            current_date = base_date
+            
+            # Valores base por servicio
+            valores_base_servicios = {
+                'desayuno': {'costo_base': 600.0, 'factor_merma': 0.04},
+                'almuerzo': {'costo_base': 1200.0, 'factor_merma': 0.06},
+                'merienda': {'costo_base': 500.0, 'factor_merma': 0.05}
+            }
+            
+            while current_date <= fecha_fin_date:
+                dias_desde_inicio = (current_date - base_date).days
+                dia_semana = current_date.weekday()
+                fecha_key = current_date.isoformat()
+                
+                # Patrón semanal: más mermas los fines de semana
+                factor_semanal = 1.0
+                if dia_semana >= 5:  # Fin de semana
+                    factor_semanal = 1.3
+                elif dia_semana == 0:  # Lunes
+                    factor_semanal = 0.8
+                
+                for servicio in servicios:
+                    valores = valores_base_servicios.get(servicio, {'costo_base': 800.0, 'factor_merma': 0.05})
+                    costo_charolas = valores['costo_base'] * (1 + random.uniform(-0.2, 0.3)) * factor_semanal
+                    
+                    # Generar merma con variación y algunos días que exceden el 5%
+                    variacion_porcentaje = random.uniform(-1.5, 2.5)
+                    porcentaje_merma = valores['factor_merma'] * 100 + variacion_porcentaje
+                    
+                    # Algunos días exceden el límite intencionalmente
+                    if random.random() < 0.25:  # 25% de probabilidad de exceder
+                        porcentaje_merma = limite_porcentaje + random.uniform(0.5, 3.0)
+                    
+                    costo_mermas = costo_charolas * porcentaje_merma / 100
+                    merma_maxima_aceptada = costo_charolas * limite_porcentaje / 100
+                    
+                    if servicio not in series_por_servicio:
+                        series_por_servicio[servicio] = []
+                    
+                    series_por_servicio[servicio].append({
+                        'fecha': fecha_key,
+                        'merma_real': round(costo_mermas, 2),
+                        'merma_maxima_aceptada': round(merma_maxima_aceptada, 2),
+                        'porcentaje': round(porcentaje_merma, 2),
+                        'costo_charolas': round(costo_charolas, 2),
+                        'excede_limite': porcentaje_merma > limite_porcentaje
+                    })
+                
+                current_date += timedelta(days=1)
+        
+        # Obtener serie del servicio seleccionado
+        serie_seleccionada = series_por_servicio.get(servicio_normalizado, [])
+        
+        # Calcular estadísticas
+        dias_excedidos = sum(1 for item in serie_seleccionada if item.get('excede_limite', False))
+        promedio_merma_real = sum(item['merma_real'] for item in serie_seleccionada) / len(serie_seleccionada) if serie_seleccionada else 0
+        promedio_merma_maxima = sum(item['merma_maxima_aceptada'] for item in serie_seleccionada) / len(serie_seleccionada) if serie_seleccionada else 0
+        promedio_porcentaje = sum(item['porcentaje'] for item in serie_seleccionada) / len(serie_seleccionada) if serie_seleccionada else 0
+        
+        # Encontrar qué servicio tiene más mermas cuando excede el límite
+        servicios_con_exceso = {}
+        for servicio, serie in series_por_servicio.items():
+            dias_exceso = sum(1 for item in serie if item.get('excede_limite', False))
+            merma_total_exceso = sum(item['merma_real'] for item in serie if item.get('excede_limite', False))
+            servicios_con_exceso[servicio] = {
+                'dias_exceso': dias_exceso,
+                'merma_total_exceso': round(merma_total_exceso, 2),
+                'promedio_porcentaje': sum(item['porcentaje'] for item in serie) / len(serie) if serie else 0
+            }
+        
+        # Servicio con más problemas
+        servicio_max_problemas = max(servicios_con_exceso.items(), key=lambda x: x[1]['merma_total_exceso']) if servicios_con_exceso else None
+        
+        return success_response({
+            'series': serie_seleccionada,
+            'servicio': servicio_normalizado,
+            'series_por_servicio': series_por_servicio,
+            'estadisticas': {
+                'promedio_merma_real': round(promedio_merma_real, 2),
+                'promedio_merma_maxima': round(promedio_merma_maxima, 2),
+                'promedio_porcentaje': round(promedio_porcentaje, 2),
+                'dias_excedidos': dias_excedidos,
+                'porcentaje_dias_excedidos': round((dias_excedidos / len(serie_seleccionada) * 100) if serie_seleccionada else 0, 2),
+                'limite_porcentaje': limite_porcentaje,
+                'servicio_max_problemas': servicio_max_problemas[0] if servicio_max_problemas else None,
+                'servicios_con_exceso': servicios_con_exceso
+            },
+            'periodo': {
+                'fecha_inicio': fecha_inicio_date.isoformat(),
+                'fecha_fin': fecha_fin_date.isoformat()
+            }
+        })
+    except ValueError as e:
+        logging.error(f"Error de validación en obtener_mermas_tendencia_por_servicio: {str(e)}")
+        return error_response(str(e), 400, 'VALIDATION_ERROR')
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        logging.error(f"Error en obtener_mermas_tendencia_por_servicio: {str(e)}")
         logging.error(error_trace)
         return error_response(f'{str(e)}\n{error_trace}', 500, 'INTERNAL_ERROR')

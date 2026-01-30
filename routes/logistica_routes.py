@@ -850,16 +850,17 @@ def listar_facturas():
         
         # Filtrar facturas pendientes de confirmación (con items sin cantidad_aprobada)
         if pendiente_confirmacion:
-            # Usar exists y and_ que ya están importados al inicio del archivo
-            query = query.filter(
-                Factura.estado == EstadoFactura.PENDIENTE,
-                exists().where(
-                    and_(
-                        FacturaItem.factura_id == Factura.id,
-                        FacturaItem.cantidad_aprobada.is_(None)
-                    )
+            # Usar exists con subconsulta correcta
+            # exists() ya está importado al inicio del archivo
+            subquery = db.session.query(FacturaItem).filter(
+                and_(
+                    FacturaItem.factura_id == Factura.id,
+                    FacturaItem.cantidad_aprobada.is_(None)
                 )
-            )
+            ).exists()
+            query = query.filter(
+                Factura.estado == EstadoFactura.PENDIENTE
+            ).filter(subquery)
         
         facturas = query.order_by(Factura.fecha_recepcion.desc()).offset(skip).limit(limit).all()
         
@@ -1050,6 +1051,143 @@ def enviar_a_revision(factura_id):
     db.session.commit()
     
     return success_response(factura.to_dict(), message='Factura enviada a revisión correctamente')
+
+@bp.route('/facturas/ejemplo-ocr', methods=['POST'])
+@handle_db_transaction
+def crear_factura_ejemplo_ocr():
+    """
+    Crea un ejemplo realista de factura procesada con OCR.
+    Simula el procesamiento OCR y crea una factura completa que cumple reglas de negocio.
+    """
+    import logging
+    from datetime import datetime, timedelta
+    from random import choice
+    
+    try:
+        # Obtener proveedores activos
+        proveedores = db.session.query(Proveedor).filter(Proveedor.activo == True).all()
+        if not proveedores:
+            return error_response('No hay proveedores activos. Ejecuta primero: python scripts/init_mock_data.py', 400, 'VALIDATION_ERROR')
+        
+        # Obtener items activos
+        items = db.session.query(Item).filter(Item.activo == True).all()
+        if not items:
+            return error_response('No hay items activos. Ejecuta primero: python scripts/init_items.py', 400, 'VALIDATION_ERROR')
+        
+        # Seleccionar proveedor aleatorio
+        proveedor = choice(proveedores)
+        
+        # Seleccionar 3-5 items aleatorios del proveedor o items generales
+        items_proveedor = [item for item in items if item.proveedor_autorizado_id == proveedor.id]
+        if not items_proveedor:
+            items_proveedor = items[:5]
+        
+        items_seleccionados = []
+        num_items = min(5, len(items_proveedor))
+        for i in range(num_items):
+            item = choice(items_proveedor)
+            if item not in items_seleccionados:
+                items_seleccionados.append(item)
+        
+        # Generar número de factura realista
+        fecha_actual = datetime.now()
+        numero_factura = f'FAC-{fecha_actual.year}-{fecha_actual.month:02d}-{fecha_actual.day:02d}-{fecha_actual.hour:02d}{fecha_actual.minute:02d}'
+        
+        # Verificar que no exista
+        factura_existente = db.session.query(Factura).filter(
+            Factura.numero_factura == numero_factura
+        ).first()
+        if factura_existente:
+            numero_factura = f'{numero_factura}-{fecha_actual.second}'
+        
+        # Generar items con datos realistas
+        items_factura = []
+        subtotal = 0.0
+        
+        for item in items_seleccionados:
+            # Cantidades realistas según tipo de item
+            if 'kg' in item.unidad.lower():
+                cantidad = round(10.0 + (len(items_seleccionados) * 5.0), 2)
+            elif 'litro' in item.unidad.lower() or 'l' == item.unidad.lower():
+                cantidad = round(5.0 + (len(items_seleccionados) * 2.0), 2)
+            elif 'unidad' in item.unidad.lower():
+                cantidad = round(12.0 + (len(items_seleccionados) * 3.0), 2)
+            else:
+                cantidad = round(10.0, 2)
+            
+            # Precio unitario basado en costo actual o precio realista
+            precio_unitario = float(item.costo_unitario_actual) if item.costo_unitario_actual else 2.50
+            # Ajustar precio según tipo de item
+            if 'carne' in item.nombre.lower() or 'pollo' in item.nombre.lower():
+                precio_unitario = round(8.50 + (len(items_seleccionados) * 0.50), 2)
+            elif 'verdura' in item.nombre.lower() or 'hortaliza' in item.nombre.lower():
+                precio_unitario = round(1.20 + (len(items_seleccionados) * 0.10), 2)
+            elif 'lacteo' in item.nombre.lower() or 'leche' in item.nombre.lower():
+                precio_unitario = round(3.50 + (len(items_seleccionados) * 0.20), 2)
+            
+            subtotal_item = round(cantidad * precio_unitario, 2)
+            subtotal += subtotal_item
+            
+            items_factura.append({
+                'item_id': item.id,
+                'cantidad': cantidad,
+                'precio_unitario': precio_unitario,
+                'subtotal': subtotal_item,
+                'unidad': item.unidad,
+                'descripcion': item.nombre
+            })
+        
+        # Calcular IVA (12% en Ecuador)
+        iva = round(subtotal * 0.12, 2)
+        total = round(subtotal + iva, 2)
+        
+        # Crear factura simulando datos OCR
+        factura = Factura(
+            numero_factura=numero_factura,
+            tipo=TipoFactura.PROVEEDOR,
+            proveedor_id=proveedor.id,
+            fecha_emision=fecha_actual - timedelta(days=1),
+            fecha_recepcion=fecha_actual,
+            subtotal=subtotal,
+            iva=iva,
+            total=total,
+            estado=EstadoFactura.PENDIENTE,
+            imagen_url=None,  # No hay imagen real en el ejemplo
+            items_json=items_factura,  # Datos simulados del OCR
+            remitente_nombre='Ejemplo OCR - Sistema',
+            remitente_telefono='+593999999999',
+            recibida_por_whatsapp=False,
+            observaciones='Factura de ejemplo generada automáticamente para demostración del sistema OCR'
+        )
+        
+        db.session.add(factura)
+        db.session.flush()  # Para obtener el ID
+        
+        # Crear items de factura
+        for item_data in items_factura:
+            factura_item = FacturaItem(
+                factura_id=factura.id,
+                item_id=item_data['item_id'],
+                cantidad_facturada=item_data['cantidad'],
+                precio_unitario=item_data['precio_unitario'],
+                subtotal=item_data['subtotal'],
+                unidad=item_data['unidad'],
+                descripcion=item_data['descripcion']
+            )
+            db.session.add(factura_item)
+        
+        db.session.commit()
+        db.session.refresh(factura)
+        
+        logging.info(f"Factura ejemplo OCR creada: {factura.numero_factura} - {proveedor.nombre} - ${total:.2f}")
+        
+        return success_response(factura.to_dict(), 201, 'Factura ejemplo OCR creada correctamente')
+        
+    except Exception as e:
+        import traceback
+        logging.error(f"Error creando factura ejemplo OCR: {str(e)}")
+        logging.error(traceback.format_exc())
+        return error_response(f'Error al crear factura ejemplo: {str(e)}', 500, 'INTERNAL_ERROR')
 
 # ========== RUTAS DE PEDIDOS ==========
 
@@ -1543,7 +1681,13 @@ def listar_costos_recetas():
                 import logging
                 logging.warning(f"Error calculando totales de receta {receta.id}: {str(e)}")
         
-        db.session.commit()
+        # Intentar commit solo si hay cambios, con manejo de errores
+        try:
+            db.session.commit()
+        except Exception as commit_error:
+            import logging
+            logging.warning(f"Error en commit de recetas (continuando sin commit): {str(commit_error)}")
+            db.session.rollback()
         
         resultado = []
         for receta in recetas:

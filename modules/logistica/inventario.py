@@ -316,11 +316,58 @@ class InventarioService:
     def obtener_resumen_dashboard(db: Session) -> Dict:
         """
         Obtiene un resumen tipo dashboard para el inventario.
+        Si no hay datos en la BD, calcula los KPIs basándose en datos mock.
         
         Returns:
             Diccionario con métricas del inventario
         """
         total_items = db.query(Inventario).count()
+        
+        # Si no hay datos en la BD, usar datos mock
+        if total_items == 0:
+            try:
+                from modules.mock_data.mock_data_service import MockDataService
+                mock_inventario = MockDataService.obtener_mock_inventario()
+                
+                # Calcular KPIs basándose en datos mock
+                total_items = len(mock_inventario)
+                items_stock_bajo = 0
+                items_criticos = 0
+                valor_total = 0.0
+                
+                for item in mock_inventario:
+                    cantidad_actual = float(item.get('cantidad_actual', 0))
+                    cantidad_minima = float(item.get('cantidad_minima', 0))
+                    ultimo_costo = float(item.get('ultimo_costo_unitario', 0))
+                    
+                    # Calcular valor total
+                    valor_total += cantidad_actual * ultimo_costo
+                    
+                    # Contar items con stock bajo
+                    if cantidad_actual < cantidad_minima:
+                        items_stock_bajo += 1
+                        
+                        # Contar items críticos (< 50% del mínimo)
+                        if cantidad_actual < (cantidad_minima * 0.5):
+                            items_criticos += 1
+                
+                items_stock_ok = total_items - items_stock_bajo
+                porcentaje_stock_bajo = round((items_stock_bajo / total_items * 100) if total_items > 0 else 0, 2)
+                
+                return {
+                    'total_items': total_items,
+                    'items_stock_bajo': items_stock_bajo,
+                    'items_criticos': items_criticos,
+                    'items_stock_ok': items_stock_ok,
+                    'valor_total_inventario': valor_total,
+                    'porcentaje_stock_bajo': porcentaje_stock_bajo,
+                }
+            except Exception as e:
+                import logging
+                logging.warning(f"Error calculando KPIs desde mock data: {str(e)}")
+                # Continuar con cálculo normal (retornará ceros)
+        
+        # Calcular KPIs desde datos reales de la BD
         items_stock_bajo = db.query(Inventario).filter(
             Inventario.cantidad_actual < Inventario.cantidad_minima
         ).count()

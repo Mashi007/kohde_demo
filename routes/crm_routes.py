@@ -371,9 +371,13 @@ def listar_conversaciones():
         # Si no hay conversaciones y no hay filtros específicos, generar datos mock
         if not conversaciones and not contacto_id and not tipo_mensaje:
             try:
-                from scripts.init_notificaciones import generar_notificaciones_mock
                 logging.info("No hay conversaciones, generando datos mock...")
+                # Generar notificaciones generales primero
+                from scripts.init_notificaciones import generar_notificaciones_mock
                 generar_notificaciones_mock()
+                # Generar conversaciones operativas (facturas OCR, salidas de bodega)
+                from scripts.init_conversaciones_operativas import generar_conversaciones_operativas
+                generar_conversaciones_operativas()
                 # Volver a consultar después de crear los mock
                 conversaciones = conversacion_service.listar_conversaciones(
                     db.session,

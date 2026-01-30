@@ -81,14 +81,14 @@ export default function ComprasDashboard() {
       </div>
 
       {/* Resumen General */}
-      {resumen && (
+      {resumen && resumen.resumen && resumen.periodo && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-slate-800 p-6 rounded-lg border border-slate-700">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm text-slate-400">Total Gastado</h3>
               <ShoppingCart className="text-purple-500" size={24} />
             </div>
-            <p className="text-2xl font-bold">{formatearMoneda(resumen.resumen.total_gastado)}</p>
+            <p className="text-2xl font-bold">{formatearMoneda(resumen.resumen.total_gastado || 0)}</p>
             <p className="text-xs text-slate-500 mt-1">
               {formatearFecha(resumen.periodo.fecha_desde)} - {formatearFecha(resumen.periodo.fecha_hasta)}
             </p>
@@ -99,9 +99,9 @@ export default function ComprasDashboard() {
               <h3 className="text-sm text-slate-400">Total Pedidos</h3>
               <Package className="text-blue-500" size={24} />
             </div>
-            <p className="text-2xl font-bold">{resumen.resumen.total_pedidos}</p>
+            <p className="text-2xl font-bold">{resumen.resumen.total_pedidos || 0}</p>
             <p className="text-xs text-slate-500 mt-1">
-              {resumen.resumen.pedidos_pendientes} pendientes
+              {resumen.resumen.pedidos_pendientes || 0} pendientes
             </p>
           </div>
 
@@ -110,9 +110,9 @@ export default function ComprasDashboard() {
               <h3 className="text-sm text-slate-400">Total Facturas</h3>
               <Truck className="text-green-500" size={24} />
             </div>
-            <p className="text-2xl font-bold">{resumen.resumen.total_facturas}</p>
+            <p className="text-2xl font-bold">{resumen.resumen.total_facturas || 0}</p>
             <p className="text-xs text-slate-500 mt-1">
-              {formatearMoneda(resumen.resumen.total_gastado_facturas)} en facturas
+              {formatearMoneda(resumen.resumen.total_gastado_facturas || 0)} en facturas
             </p>
           </div>
 
@@ -121,7 +121,7 @@ export default function ComprasDashboard() {
               <h3 className="text-sm text-slate-400">Pedidos Pendientes</h3>
               <AlertTriangle className="text-yellow-500" size={24} />
             </div>
-            <p className="text-2xl font-bold">{resumen.resumen.pedidos_pendientes}</p>
+            <p className="text-2xl font-bold">{resumen.resumen.pedidos_pendientes || 0}</p>
             <p className="text-xs text-slate-500 mt-1">Requieren aprobación</p>
           </div>
         </div>
