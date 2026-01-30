@@ -20,7 +20,7 @@ class AIConfigService:
     @classmethod
     def obtener_modelo(cls) -> str:
         """Obtiene el modelo, priorizando el de memoria sobre el de entorno."""
-        return cls._modelo_en_memoria or Config.OPENAI_MODEL
+        return cls._modelo_en_memoria or Config.OPENAI_MODEL or 'openai/gpt-3.5-turbo'
     
     @classmethod
     def obtener_base_url(cls) -> str:
