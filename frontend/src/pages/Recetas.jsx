@@ -4,6 +4,7 @@ import api, { extractData } from '../config/api'
 import { ChefHat, Plus, Filter } from 'lucide-react'
 import RecetaForm from '../components/RecetaForm'
 import Modal from '../components/Modal'
+import { TIEMPO_COMIDA_OPTIONS, getTiempoComidaColor, getTiempoComidaLabel } from '../constants/tiempoComida'
 
 export default function Recetas() {
   const [tipoFiltro, setTipoFiltro] = useState('')
@@ -23,27 +24,15 @@ export default function Recetas() {
 
   const tiposReceta = [
     { value: '', label: 'Todas' },
-    { value: 'desayuno', label: 'Desayuno' },
-    { value: 'almuerzo', label: 'Almuerzo' },
-    { value: 'cena', label: 'Cena' },
+    ...TIEMPO_COMIDA_OPTIONS,
   ]
 
   const getTipoBadge = (tipo) => {
-    const badges = {
-      desayuno: 'bg-yellow-600/20 text-yellow-300 border-yellow-500/50',
-      almuerzo: 'bg-orange-600/20 text-orange-300 border-orange-500/50',
-      cena: 'bg-blue-600/20 text-blue-300 border-blue-500/50',
-    }
-    return badges[tipo] || 'bg-slate-600/20 text-slate-300 border-slate-500/50'
+    return getTiempoComidaColor(tipo)
   }
 
   const getTipoLabel = (tipo) => {
-    const labels = {
-      desayuno: 'Desayuno',
-      almuerzo: 'Almuerzo',
-      cena: 'Cena',
-    }
-    return labels[tipo] || tipo
+    return getTiempoComidaLabel(tipo)
   }
 
   return (

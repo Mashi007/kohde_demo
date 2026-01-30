@@ -7,6 +7,7 @@ import ProgramacionForm from '../components/ProgramacionForm'
 import NecesidadesProgramacion from '../components/NecesidadesProgramacion'
 import { format, parseISO, isSameDay } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { TIEMPO_COMIDA_OPTIONS, getTiempoComidaColor, getTiempoComidaLabel } from '../constants/tiempoComida'
 
 export default function Programacion() {
   const [fechaSeleccionada, setFechaSeleccionada] = useState(new Date())
@@ -33,27 +34,15 @@ export default function Programacion() {
   
   const servicios = [
     { value: '', label: 'Todos' },
-    { value: 'desayuno', label: 'Desayuno' },
-    { value: 'almuerzo', label: 'Almuerzo' },
-    { value: 'cena', label: 'Cena' },
+    ...TIEMPO_COMIDA_OPTIONS,
   ]
   
   const getServicioBadge = (servicio) => {
-    const badges = {
-      desayuno: 'bg-yellow-600/20 text-yellow-300 border-yellow-500/50',
-      almuerzo: 'bg-orange-600/20 text-orange-300 border-orange-500/50',
-      cena: 'bg-blue-600/20 text-blue-300 border-blue-500/50',
-    }
-    return badges[servicio] || 'bg-slate-600/20 text-slate-300 border-slate-500/50'
+    return getTiempoComidaColor(servicio)
   }
   
   const getServicioLabel = (servicio) => {
-    const labels = {
-      desayuno: 'Desayuno',
-      almuerzo: 'Almuerzo',
-      cena: 'Cena',
-    }
-    return labels[servicio] || servicio
+    return getTiempoComidaLabel(servicio)
   }
   
   const programacionesArray = Array.isArray(programaciones) ? programaciones : []

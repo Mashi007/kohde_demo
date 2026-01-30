@@ -328,9 +328,11 @@ export default function Costos() {
                 className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:border-purple-500"
               >
                 <option value="">Todos los tipos</option>
-                <option value="desayuno">Desayuno</option>
-                <option value="almuerzo">Almuerzo</option>
-                <option value="cena">Cena</option>
+                {TIEMPO_COMIDA_OPTIONS.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -371,11 +373,11 @@ export default function Costos() {
                   {costosRecetasFiltrados.map((receta) => {
                     const costoInfo = receta.costo_info || {}
                     const tipoLabels = {
-                      'desayuno': { label: 'Desayuno', color: 'bg-yellow-600/20 text-yellow-300 border-yellow-500/50' },
-                      'almuerzo': { label: 'Almuerzo', color: 'bg-orange-600/20 text-orange-300 border-orange-500/50' },
-                      'cena': { label: 'Cena', color: 'bg-blue-600/20 text-blue-300 border-blue-500/50' }
+                      [TIEMPO_COMIDA_VALUES.DESAYUNO]: { label: getTiempoComidaLabel(TIEMPO_COMIDA_VALUES.DESAYUNO), color: getTiempoComidaColor(TIEMPO_COMIDA_VALUES.DESAYUNO) },
+                      [TIEMPO_COMIDA_VALUES.ALMUERZO]: { label: getTiempoComidaLabel(TIEMPO_COMIDA_VALUES.ALMUERZO), color: getTiempoComidaColor(TIEMPO_COMIDA_VALUES.ALMUERZO) },
+                      [TIEMPO_COMIDA_VALUES.CENA]: { label: getTiempoComidaLabel(TIEMPO_COMIDA_VALUES.CENA), color: getTiempoComidaColor(TIEMPO_COMIDA_VALUES.CENA) }
                     }
-                    const tipoInfo = tipoLabels[receta.tipo?.toLowerCase()] || { label: receta.tipo || 'N/A', color: 'bg-slate-600/20 text-slate-300 border-slate-500/50' }
+                    const tipoInfo = tipoLabels[receta.tipo?.toLowerCase()] || { label: getTiempoComidaLabel(receta.tipo) || 'N/A', color: 'bg-slate-600/20 text-slate-300 border-slate-500/50' }
                     
                     return (
                       <tr key={receta.id} className="hover:bg-slate-700/50">

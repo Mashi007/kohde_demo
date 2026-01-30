@@ -3,13 +3,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api, { extractData } from '../config/api'
 import toast from 'react-hot-toast'
 import { X, Plus, Trash2, Calculator } from 'lucide-react'
+import { TIEMPO_COMIDA_VALUES, TIEMPO_COMIDA_OPTIONS, TIEMPO_COMIDA_DEFAULT } from '../constants/tiempoComida'
 
 export default function ProgramacionForm({ programacion, fecha, tiempoComida, onClose, onSuccess }) {
   const queryClient = useQueryClient()
   
   const [formData, setFormData] = useState({
     fecha: fecha || new Date().toISOString().split('T')[0],
-    tiempo_comida: tiempoComida || 'desayuno',
+    tiempo_comida: tiempoComida || TIEMPO_COMIDA_VALUES.DESAYUNO,
     ubicacion: programacion?.ubicacion || 'restaurante_A',
     personas_estimadas: programacion?.personas_estimadas || 0,
     charolas_planificadas: programacion?.charolas_planificadas || 0,
@@ -25,11 +26,11 @@ export default function ProgramacionForm({ programacion, fecha, tiempoComida, on
     queryFn: () => {
       // Mapear tiempo_comida a tipo de receta
       const tipoMap = {
-        'desayuno': 'desayuno',
-        'almuerzo': 'almuerzo',
-        'cena': 'almuerzo', // Las cenas usan recetas de tipo almuerzo
+        [TIEMPO_COMIDA_VALUES.DESAYUNO]: TIEMPO_COMIDA_VALUES.DESAYUNO,
+        [TIEMPO_COMIDA_VALUES.ALMUERZO]: TIEMPO_COMIDA_VALUES.ALMUERZO,
+        [TIEMPO_COMIDA_VALUES.CENA]: TIEMPO_COMIDA_VALUES.ALMUERZO, // Las cenas usan recetas de tipo almuerzo
       }
-      const tipo = tipoMap[formData.tiempo_comida] || 'almuerzo'
+      const tipo = tipoMap[formData.tiempo_comida] || TIEMPO_COMIDA_DEFAULT
       return api.get(`/planificacion/recetas?tipo=${tipo}&activa=true`).then(extractData)
     },
   })
@@ -191,9 +192,11 @@ export default function ProgramacionForm({ programacion, fecha, tiempoComida, on
                 onChange={(e) => setFormData({ ...formData, tiempo_comida: e.target.value })}
                 className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:border-purple-500"
               >
-                <option value="desayuno">Desayuno</option>
-                <option value="almuerzo">Almuerzo</option>
-                <option value="cena">Cena</option>
+                {TIEMPO_COMIDA_OPTIONS.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
             </div>
           </div>

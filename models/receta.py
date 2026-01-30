@@ -20,7 +20,14 @@ class TipoRecetaEnum(TypeDecorator):
     cache_ok = True
     
     def __init__(self):
-        super().__init__(TipoReceta, native_enum=True, name='tiporeceta', create_constraint=True)
+        # Usar native_enum=False para que SQLAlchemy use los valores del enum directamente
+        # y no valide contra los nombres del enum
+        super().__init__(
+            TipoReceta, 
+            native_enum=False,  # False = usar valores del enum, no nombres
+            name='tiporeceta', 
+            create_constraint=True
+        )
     
     def process_bind_param(self, value, dialect):
         """Convierte el enum a su valor string antes de insertar."""
@@ -29,9 +36,19 @@ class TipoRecetaEnum(TypeDecorator):
         # Si es un objeto Enum, retornar su valor
         if isinstance(value, TipoReceta):
             return value.value
-        # Si es un string, retornarlo directamente (ya debería ser el valor correcto)
+        # Si es un string, convertir a minúsculas y validar
         if isinstance(value, str):
-            return value.lower()
+            valor_lower = value.lower().strip()
+            # Validar que el valor existe en el enum
+            valores_validos = [e.value for e in TipoReceta]
+            if valor_lower in valores_validos:
+                return valor_lower
+            # Si no está en valores, intentar buscar por nombre del enum (fallback)
+            try:
+                tipo_enum = TipoReceta[value.upper()]
+                return tipo_enum.value
+            except KeyError:
+                raise ValueError(f"'{value}' no es un valor válido para TipoReceta. Valores válidos: {valores_validos}")
         return value
     
     def process_result_value(self, value, dialect):

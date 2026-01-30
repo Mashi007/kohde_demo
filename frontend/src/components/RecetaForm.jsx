@@ -3,12 +3,13 @@ import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import api, { extractData } from '../config/api'
 import toast from 'react-hot-toast'
 import { X, Plus, Calculator } from 'lucide-react'
+import { TIEMPO_COMIDA_VALUES, TIEMPO_COMIDA_OPTIONS, TIEMPO_COMIDA_DEFAULT } from '../constants/tiempoComida'
 
 export default function RecetaForm({ receta, onClose, onSuccess }) {
   const [formData, setFormData] = useState({
     nombre: receta?.nombre || '',
     descripcion: receta?.descripcion || '', // Mantener descripcion para el backend, pero mostrar como "Instrucciones"
-    tipo: receta?.tipo || 'almuerzo',
+    tipo: receta?.tipo?.toLowerCase() || TIEMPO_COMIDA_DEFAULT, // Convertir a minúsculas para el formulario
     porciones: receta?.porciones || 1, // Por defecto 1 porción
     tiempo_preparacion: receta?.tiempo_preparacion || null,
     ingredientes: receta?.ingredientes?.map(ing => ({
@@ -223,6 +224,7 @@ export default function RecetaForm({ receta, onClose, onSuccess }) {
     
     const datosEnvio = {
       ...formData,
+      tipo: formData.tipo.toUpperCase(), // Convertir a mayúsculas para el backend (DESAYUNO, ALMUERZO, CENA)
       ingredientes: formData.ingredientes.map(ing => ({
         item_id: ing.item_id,
         cantidad: parseFloat(ing.cantidad) || 0,
@@ -307,9 +309,11 @@ export default function RecetaForm({ receta, onClose, onSuccess }) {
             onChange={(e) => setFormData({ ...formData, tipo: e.target.value })}
             className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:border-purple-500"
           >
-            <option value="desayuno">Desayuno</option>
-            <option value="almuerzo">Almuerzo</option>
-            <option value="cena">Cena</option>
+            {TIEMPO_COMIDA_OPTIONS.map(option => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
           </select>
         </div>
       </div>

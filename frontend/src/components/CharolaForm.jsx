@@ -3,13 +3,14 @@ import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query'
 import api, { extractData } from '../config/api'
 import toast from 'react-hot-toast'
 import { Plus, Trash2 } from 'lucide-react'
+import { TIEMPO_COMIDA_VALUES, TIEMPO_COMIDA_OPTIONS, TIEMPO_COMIDA_DEFAULT } from '../constants/tiempoComida'
 
 export default function CharolaForm({ charola, onClose, onSuccess }) {
   const [formData, setFormData] = useState({
     numero_charola: charola?.numero_charola || '',
     fecha_servicio: charola?.fecha_servicio ? new Date(charola.fecha_servicio).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16),
     ubicacion: charola?.ubicacion || '',
-    tiempo_comida: charola?.tiempo_comida || 'almuerzo',
+    tiempo_comida: charola?.tiempo_comida || TIEMPO_COMIDA_DEFAULT,
     personas_servidas: charola?.personas_servidas || 0,
     observaciones: charola?.observaciones || '',
     items: charola?.items || []
@@ -167,9 +168,11 @@ export default function CharolaForm({ charola, onClose, onSuccess }) {
             onChange={(e) => setFormData({ ...formData, tiempo_comida: e.target.value })}
             className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:border-purple-500"
           >
-            <option value="desayuno">Desayuno</option>
-            <option value="almuerzo">Almuerzo</option>
-            <option value="cena">Cena</option>
+            {TIEMPO_COMIDA_OPTIONS.map(option => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
           </select>
         </div>
         <div>

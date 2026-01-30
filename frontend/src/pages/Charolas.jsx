@@ -7,6 +7,7 @@ import { es } from 'date-fns/locale'
 import toast from 'react-hot-toast'
 import Modal from '../components/Modal'
 import CharolaForm from '../components/CharolaForm'
+import { TIEMPO_COMIDA_OPTIONS } from '../constants/tiempoComida'
 
 export default function Charolas() {
   const [fechaInicio, setFechaInicio] = useState('')
@@ -100,9 +101,11 @@ export default function Charolas() {
             className="w-full px-4 py-2 bg-slate-800 border border-slate-700 rounded-lg focus:outline-none focus:border-purple-500"
           >
             <option value="">Todos</option>
-            <option value="desayuno">Desayuno</option>
-            <option value="almuerzo">Almuerzo</option>
-            <option value="cena">Cena</option>
+            {TIEMPO_COMIDA_OPTIONS.map(option => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
           </select>
         </div>
       </div>
