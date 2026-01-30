@@ -211,10 +211,24 @@ class ItemService:
         """
         from sqlalchemy.orm import selectinload
         
+        # Verificar que la sesión esté activa
+        if not db.is_active:
+            import logging
+            logging.warning("Sesión de base de datos inactiva en listar_items")
+            try:
+                db.rollback()
+            except:
+                pass
+        
         query = db.query(Item)
         
         # Usar eager loading para labels para evitar problemas de lazy loading
-        query = query.options(selectinload(Item.labels))
+        try:
+            query = query.options(selectinload(Item.labels))
+        except Exception as e:
+            import logging
+            logging.warning(f"Error configurando eager loading: {str(e)}")
+            # Continuar sin eager loading si falla
         
         if categoria:
             # Convertir categoria a formato PostgreSQL (valores mixtos)
@@ -355,19 +369,48 @@ class ItemService:
                 logging.warning(f"Sesión de base de datos inactiva para item {item_id}")
                 return None
             
+            # Verificar que las tablas necesarias existan antes de hacer la query
+            # Si las tablas no existen o están vacías, retornar None sin error
+            try:
+                from sqlalchemy import inspect
+                inspector = inspect(db.bind)
+                tables = inspector.get_table_names()
+                
+                if 'factura_items' not in tables or 'facturas' not in tables:
+                    import logging
+                    logging.debug(f"Tablas de facturas no existen para calcular costo promedio del item {item_id}")
+                    return None
+            except Exception as table_check_error:
+                # Si no se puede verificar, continuar (puede ser que inspect no funcione en algunos casos)
+                import logging
+                logging.debug(f"No se pudo verificar existencia de tablas: {str(table_check_error)}")
+            
             # Obtener las últimas 3 facturas aprobadas que contengan este item
             # Usar with_entities para seleccionar solo las columnas necesarias y evitar problemas con columnas faltantes
-            facturas_items = db.query(
-                FacturaItem.precio_unitario,
-                FacturaItem.cantidad_aprobada
-            ).join(Factura).filter(
-                FacturaItem.item_id == item_id,
-                Factura.estado == EstadoFactura.APROBADA,
-                FacturaItem.cantidad_aprobada.isnot(None),
-                FacturaItem.cantidad_aprobada > 0,
-                FacturaItem.precio_unitario.isnot(None),
-                FacturaItem.precio_unitario > 0
-            ).order_by(desc(Factura.fecha_aprobacion)).limit(3).all()
+            try:
+                facturas_items = db.query(
+                    FacturaItem.precio_unitario,
+                    FacturaItem.cantidad_aprobada
+                ).join(Factura).filter(
+                    FacturaItem.item_id == item_id,
+                    Factura.estado == EstadoFactura.APROBADA,
+                    FacturaItem.cantidad_aprobada.isnot(None),
+                    FacturaItem.cantidad_aprobada > 0,
+                    FacturaItem.precio_unitario.isnot(None),
+                    FacturaItem.precio_unitario > 0
+                ).order_by(desc(Factura.fecha_aprobacion)).limit(3).all()
+            except Exception as query_error:
+                # Si hay error en la query (tablas no existen, columnas faltantes, etc.)
+                import logging
+                import traceback
+                logging.warning(f"Error en query de facturas para item {item_id}: {str(query_error)}")
+                logging.debug(traceback.format_exc())
+                try:
+                    if db.is_active:
+                        db.rollback()
+                except:
+                    pass
+                return None
             
             if not facturas_items:
                 return None

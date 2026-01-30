@@ -60,15 +60,58 @@ class Item(db.Model):
     def to_dict(self):
         """Convierte el modelo a diccionario."""
         # Cargar labels de forma segura para evitar errores SQL
+        # Si la tabla item_labels o item_label no existe, retornar lista vacía
         labels_list = []
         try:
-            # Con lazy='select', labels ya es una lista, no un query
-            if self.labels:
-                labels_list = [label.to_dict() for label in self.labels]
+            # Verificar que exista la relación antes de acceder
+            if hasattr(self, 'labels'):
+                try:
+                    # Con lazy='select', labels debería ser una lista, pero verificar
+                    if self.labels is not None:
+                        # Verificar si labels es una lista o un query object
+                        if hasattr(self.labels, '__iter__'):
+                            # Procesar cada label individualmente para manejar errores
+                            for label in self.labels:
+                                try:
+                                    if label is not None:
+                                        # Verificar que el label tenga el método to_dict
+                                        if hasattr(label, 'to_dict'):
+                                            labels_list.append(label.to_dict())
+                                        else:
+                                            # Si no tiene to_dict, crear dict básico
+                                            labels_list.append({
+                                                'id': label.id if hasattr(label, 'id') else None,
+                                                'codigo': label.codigo if hasattr(label, 'codigo') else None,
+                                                'nombre_es': label.nombre_es if hasattr(label, 'nombre_es') else None,
+                                            })
+                                except Exception as label_error:
+                                    import logging
+                                    import traceback
+                                    logging.warning(f"Error serializando label del item {self.id}: {str(label_error)}")
+                                    logging.debug(traceback.format_exc())
+                                    # Continuar con el siguiente label
+                                    continue
+                except Exception as iter_error:
+                    import logging
+                    import traceback
+                    # Verificar si el error es porque la tabla no existe
+                    error_msg = str(iter_error).lower()
+                    if 'does not exist' in error_msg or 'no such table' in error_msg:
+                        logging.debug(f"Tabla de labels no existe para item {self.id}, usando lista vacía")
+                    else:
+                        logging.warning(f"Error iterando labels del item {self.id}: {str(iter_error)}")
+                        logging.debug(traceback.format_exc())
+                    labels_list = []
         except Exception as e:
             # Si hay un error cargando labels, simplemente retornar lista vacía
             import logging
-            logging.warning(f"Error cargando labels para item {self.id}: {str(e)}")
+            import traceback
+            error_msg = str(e).lower()
+            if 'does not exist' in error_msg or 'no such table' in error_msg:
+                logging.debug(f"Tabla de labels no existe para item {self.id}, usando lista vacía")
+            else:
+                logging.warning(f"Error cargando labels para item {self.id}: {str(e)}")
+                logging.debug(traceback.format_exc())
             labels_list = []
         
         # Convertir categoria desde PostgreSQL (valores mixtos) a valor Python (minúsculas)

@@ -1,11 +1,22 @@
+const removeProblematicPrefixes = require('./postcss-remove-problematic-prefixes');
+
 module.exports = {
   plugins: {
     tailwindcss: {},
     autoprefixer: {
-      // Evitar agregar propiedades webkit-text-size-adjust que causan errores
-      overrideBrowserslist: ['> 1%', 'last 2 versions'],
+      // Configurar browserslist para evitar prefijos problemáticos
+      overrideBrowserslist: [
+        '> 1%',
+        'last 2 versions',
+        'not dead',
+        'not ie <= 11', // Excluir IE que requiere prefijos problemáticos
+      ],
       // Deshabilitar propiedades específicas problemáticas
       grid: false,
+      // Evitar agregar prefijos para propiedades problemáticas
+      flexbox: 'no-2009', // Solo prefijos necesarios, no los antiguos
     },
+    // Eliminar prefijos y pseudo-clases problemáticas después de autoprefixer
+    'postcss-remove-problematic-prefixes': removeProblematicPrefixes,
   },
 }

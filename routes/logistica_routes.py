@@ -45,8 +45,14 @@ def listar_items():
         
         activo_bool = None if activo is None else activo.lower() == 'true'
         
+        # Verificar que la sesión esté activa antes de hacer queries
+        if not db.session.is_active:
+            try:
+                db.session.rollback()
+            except:
+                pass
+        
         # Obtener items con eager loading de labels para evitar problemas de lazy loading
-        from sqlalchemy.orm import selectinload
         items = ItemService.listar_items(
             db.session,
             categoria=categoria,
@@ -60,26 +66,44 @@ def listar_items():
         items_con_costo = []
         for item in items:
             try:
+                # Asegurar que la sesión esté activa antes de procesar cada item
+                if not db.session.is_active:
+                    try:
+                        db.session.rollback()
+                    except:
+                        pass
+                
                 # Asegurar que las relaciones estén cargadas antes de serializar
                 # Esto evita problemas con sesiones cerradas
                 try:
-                    _ = item.labels  # Forzar carga de labels si es necesario
-                except Exception:
-                    pass  # Si falla, continuar sin labels
+                    # Verificar si labels está cargado (con eager loading debería estar)
+                    if hasattr(item, 'labels'):
+                        _ = item.labels  # Forzar carga de labels si es necesario
+                except Exception as label_error:
+                    import logging
+                    logging.warning(f"Error accediendo labels del item {item.id}: {str(label_error)}")
+                    # Si falla, continuar sin labels
                 
                 # Intentar serializar el item primero
                 item_dict = item.to_dict()
                 
                 # Calcular costo promedio (puede retornar None si hay error)
                 try:
-                    costo_promedio = ItemService.calcular_costo_unitario_promedio(db.session, item.id)
-                    item_dict['costo_unitario_promedio'] = costo_promedio
+                    # Verificar que la sesión esté activa antes de calcular costo
+                    if db.session.is_active:
+                        costo_promedio = ItemService.calcular_costo_unitario_promedio(db.session, item.id)
+                        item_dict['costo_unitario_promedio'] = costo_promedio
+                    else:
+                        item_dict['costo_unitario_promedio'] = None
                 except Exception as costo_error:
                     import logging
+                    import traceback
                     logging.warning(f"Error calculando costo promedio para item {item.id}: {str(costo_error)}")
+                    logging.debug(traceback.format_exc())
                     # Hacer rollback y continuar sin costo promedio
                     try:
-                        db.session.rollback()
+                        if db.session.is_active:
+                            db.session.rollback()
                     except:
                         pass
                     item_dict['costo_unitario_promedio'] = None
@@ -128,19 +152,28 @@ def listar_items():
                     # Continuar con el siguiente item sin agregar este
                     continue
         
+        # Si no hay items, retornar lista vacía en lugar de error
+        if not items_con_costo and items:
+            # Si hay items pero no se pudieron serializar, retornar error más descriptivo
+            import logging
+            logging.error("No se pudieron serializar items aunque existen en la base de datos")
+            return error_response("Error al procesar items. Verifique los logs del servidor.", 500, 'INTERNAL_ERROR')
+        
         return paginated_response(items_con_costo, skip=skip, limit=limit)
     except ValueError as e:
         return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
         import traceback
         import logging
+        error_trace = traceback.format_exc()
         logging.error(f"Error en listar_items: {str(e)}")
-        logging.error(traceback.format_exc())
+        logging.error(error_trace)
         # Asegurar rollback en caso de error
         try:
-            db.session.rollback()
-        except:
-            pass
+            if db.session.is_active:
+                db.session.rollback()
+        except Exception as rollback_error:
+            logging.error(f"Error al hacer rollback: {str(rollback_error)}")
         return error_response(f"Error interno del servidor: {str(e)}", 500, 'INTERNAL_ERROR')
 
 @bp.route('/items', methods=['POST'])
