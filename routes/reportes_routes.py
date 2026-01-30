@@ -231,6 +231,7 @@ def obtener_kpis():
     """Obtiene KPIs principales del dashboard."""
     import logging
     import traceback
+    logging.basicConfig(level=logging.WARNING)
     try:
         # Obtener parámetros de fecha (opcionales)
         fecha_inicio_str = request.args.get('fecha_inicio')
@@ -266,26 +267,33 @@ def obtener_kpis():
         kpis = {}
         
         # 1. Facturas
-        facturas_totales = db.session.query(func.count(Factura.id)).filter(
-            Factura.fecha_recepcion >= fecha_inicio_dt,
-            Factura.fecha_recepcion <= fecha_fin_dt
-        ).scalar() or 0
-        
-        facturas_pendientes = db.session.query(func.count(Factura.id)).filter(
-            Factura.estado == EstadoFactura.PENDIENTE
-        ).scalar() or 0
-        
-        facturas_aprobadas = db.session.query(func.count(Factura.id)).filter(
-            Factura.estado == EstadoFactura.APROBADA,
-            Factura.fecha_recepcion >= fecha_inicio_dt,
-            Factura.fecha_recepcion <= fecha_fin_dt
-        ).scalar() or 0
-        
-        total_facturado = db.session.query(func.coalesce(func.sum(Factura.total), 0)).filter(
-            Factura.estado == EstadoFactura.APROBADA,
-            Factura.fecha_recepcion >= fecha_inicio_dt,
-            Factura.fecha_recepcion <= fecha_fin_dt
-        ).scalar() or 0
+        try:
+            facturas_totales = db.session.query(func.count(Factura.id)).filter(
+                Factura.fecha_recepcion >= fecha_inicio_dt,
+                Factura.fecha_recepcion <= fecha_fin_dt
+            ).scalar() or 0
+            
+            facturas_pendientes = db.session.query(func.count(Factura.id)).filter(
+                Factura.estado == EstadoFactura.PENDIENTE
+            ).scalar() or 0
+            
+            facturas_aprobadas = db.session.query(func.count(Factura.id)).filter(
+                Factura.estado == EstadoFactura.APROBADA,
+                Factura.fecha_recepcion >= fecha_inicio_dt,
+                Factura.fecha_recepcion <= fecha_fin_dt
+            ).scalar() or 0
+            
+            total_facturado = db.session.query(func.coalesce(func.sum(Factura.total), 0)).filter(
+                Factura.estado == EstadoFactura.APROBADA,
+                Factura.fecha_recepcion >= fecha_inicio_dt,
+                Factura.fecha_recepcion <= fecha_fin_dt
+            ).scalar() or 0
+        except Exception as facturas_error:
+            logging.warning(f"Error en consulta de facturas: {str(facturas_error)}")
+            facturas_totales = 0
+            facturas_pendientes = 0
+            facturas_aprobadas = 0
+            total_facturado = 0.0
         
         # 2. Pedidos
         pedidos_totales = db.session.query(func.count(PedidoCompra.id)).filter(
@@ -445,6 +453,7 @@ def obtener_datos_graficos():
     """Obtiene datos para gráficos del dashboard."""
     import logging
     import traceback
+    logging.basicConfig(level=logging.WARNING)
     try:
         fecha_inicio_str = request.args.get('fecha_inicio')
         fecha_fin_str = request.args.get('fecha_fin')
@@ -478,15 +487,19 @@ def obtener_datos_graficos():
         
         if tipo_grafico == 'facturas':
             # Gráfico de facturas por día
-            facturas_diarias = db.session.query(
-                func.date(Factura.fecha_recepcion).label('fecha'),
-                func.count(Factura.id).label('cantidad'),
-                func.coalesce(func.sum(Factura.total), 0).label('total')
-            ).filter(
-                Factura.fecha_recepcion >= fecha_inicio_dt,
-                Factura.fecha_recepcion <= fecha_fin_dt,
-                Factura.estado == EstadoFactura.APROBADA
-            ).group_by(func.date(Factura.fecha_recepcion)).order_by('fecha').all()
+            try:
+                facturas_diarias = db.session.query(
+                    func.date(Factura.fecha_recepcion).label('fecha'),
+                    func.count(Factura.id).label('cantidad'),
+                    func.coalesce(func.sum(Factura.total), 0).label('total')
+                ).filter(
+                    Factura.fecha_recepcion >= fecha_inicio_dt,
+                    Factura.fecha_recepcion <= fecha_fin_dt,
+                    Factura.estado == EstadoFactura.APROBADA
+                ).group_by(func.date(Factura.fecha_recepcion)).order_by('fecha').all()
+            except Exception as query_error:
+                logging.warning(f"Error en consulta de facturas diarias: {str(query_error)}")
+                facturas_diarias = []
             
             datos['series'] = [
                 {
@@ -498,13 +511,17 @@ def obtener_datos_graficos():
             ]
             
             # Facturas por estado
-            facturas_por_estado = db.session.query(
-                Factura.estado,
-                func.count(Factura.id).label('cantidad')
-            ).filter(
-                Factura.fecha_recepcion >= fecha_inicio_dt,
-                Factura.fecha_recepcion <= fecha_fin_dt
-            ).group_by(Factura.estado).all()
+            try:
+                facturas_por_estado = db.session.query(
+                    Factura.estado,
+                    func.count(Factura.id).label('cantidad')
+                ).filter(
+                    Factura.fecha_recepcion >= fecha_inicio_dt,
+                    Factura.fecha_recepcion <= fecha_fin_dt
+                ).group_by(Factura.estado).all()
+            except Exception as query_error:
+                logging.warning(f"Error en consulta de facturas por estado: {str(query_error)}")
+                facturas_por_estado = []
             
             datos['por_estado'] = []
             for row in facturas_por_estado:
@@ -1232,22 +1249,30 @@ def obtener_mermas_por_dia_tolerable():
             fecha_fin_date = fecha_fin
         
         # Obtener mermas por día
-        mermas_diarias = db.session.query(
-            func.date(Merma.fecha_merma).label('fecha'),
-            func.count(Merma.id).label('cantidad'),
-            func.coalesce(func.sum(Merma.cantidad * Merma.costo_unitario), 0).label('total_costo')
-        ).filter(
-            func.date(Merma.fecha_merma) >= fecha_inicio_date,
-            func.date(Merma.fecha_merma) <= fecha_fin_date
-        ).group_by(func.date(Merma.fecha_merma)).order_by('fecha').all()
+        try:
+            mermas_diarias = db.session.query(
+                func.date(Merma.fecha_merma).label('fecha'),
+                func.count(Merma.id).label('cantidad'),
+                func.coalesce(func.sum(Merma.cantidad * Merma.costo_unitario), 0).label('total_costo')
+            ).filter(
+                func.date(Merma.fecha_merma) >= fecha_inicio_date,
+                func.date(Merma.fecha_merma) <= fecha_fin_date
+            ).group_by(func.date(Merma.fecha_merma)).order_by('fecha').all()
+        except Exception as mermas_error:
+            logging.warning(f"Error en consulta de mermas diarias: {str(mermas_error)}")
+            mermas_diarias = []
         
         # Obtener costo total de charolas en el mismo período para calcular porcentaje
-        costo_total_charolas = db.session.query(
-            func.coalesce(func.sum(Charola.costo_total), 0)
-        ).filter(
-            func.date(Charola.fecha_servicio) >= fecha_inicio_date,
-            func.date(Charola.fecha_servicio) <= fecha_fin_date
-        ).scalar() or 0
+        try:
+            costo_total_charolas = db.session.query(
+                func.coalesce(func.sum(Charola.costo_total), 0)
+            ).filter(
+                func.date(Charola.fecha_servicio) >= fecha_inicio_date,
+                func.date(Charola.fecha_servicio) <= fecha_fin_date
+            ).scalar() or 0
+        except Exception as charolas_error:
+            logging.warning(f"Error en consulta de costo total charolas: {str(charolas_error)}")
+            costo_total_charolas = 0
         
         # Procesar datos reales
         series = []
@@ -1259,11 +1284,15 @@ def obtener_mermas_por_dia_tolerable():
                 costo_total_periodo += costo_dia
                 
                 # Obtener costo de charolas del día para calcular porcentaje
-                costo_charolas_dia = db.session.query(
-                    func.coalesce(func.sum(Charola.costo_total), 0)
-                ).filter(
-                    func.date(Charola.fecha_servicio) == row.fecha
-                ).scalar() or 0
+                try:
+                    costo_charolas_dia = db.session.query(
+                        func.coalesce(func.sum(Charola.costo_total), 0)
+                    ).filter(
+                        func.date(Charola.fecha_servicio) == row.fecha
+                    ).scalar() or 0
+                except Exception as charolas_dia_error:
+                    logging.warning(f"Error en consulta de costo charolas día {row.fecha}: {str(charolas_dia_error)}")
+                    costo_charolas_dia = 0
                 
                 porcentaje_dia = (costo_dia / costo_charolas_dia * 100) if costo_charolas_dia > 0 else 0
                 
