@@ -20,7 +20,7 @@ from modules.logistica.pedidos import PedidoCompraService
 from modules.logistica.pedidos_internos import PedidoInternoService
 from modules.logistica.compras_stats import ComprasStatsService
 from modules.logistica.costos import CostoService
-from models import ItemLabel, Factura, FacturaItem, Receta
+from models import ItemLabel, Factura, FacturaItem, Receta, Proveedor
 from models.item import Item
 from models.factura import EstadoFactura, TipoFactura
 from models.requerimiento import EstadoRequerimiento
@@ -75,6 +75,7 @@ def health_check_items():
 @bp.route('/items', methods=['GET'])
 def listar_items():
     """Lista items con filtros opcionales."""
+    import logging
     try:
         categoria = request.args.get('categoria')
         activo = request.args.get('activo')
@@ -89,13 +90,36 @@ def listar_items():
             if not db.session.is_active:
                 db.session.rollback()
         except Exception as session_error:
-            import logging
             logging.warning(f"Error verificando sesión: {str(session_error)}")
             # Intentar crear nueva sesión si es necesario
             try:
                 db.session.expire_all()
             except:
                 pass
+        
+        # Verificar si hay items, si no hay y no hay filtros, generar datos mock
+        total_items = db.session.query(Item).count()
+        if total_items == 0 and not categoria and not busqueda:
+            try:
+                logging.info("No hay items, generando datos mock...")
+                # Verificar y crear proveedores si no existen
+                proveedores = db.session.query(Proveedor).all()
+                if not proveedores:
+                    from scripts.init_mock_data import init_proveedores
+                    proveedores = init_proveedores()
+                # Verificar y crear labels si no existen
+                from models.item import ItemLabel
+                labels = db.session.query(ItemLabel).all()
+                if not labels:
+                    from scripts.init_food_labels import init_food_labels
+                    init_food_labels()
+                    labels = db.session.query(ItemLabel).all()
+                # Crear items usando el script independiente que maneja sus propias dependencias
+                if proveedores and labels:
+                    from scripts.init_items import init_items
+                    init_items()
+            except Exception as mock_error:
+                logging.warning(f"Error generando items mock: {str(mock_error)}")
         
         # Obtener items con eager loading de labels para evitar problemas de lazy loading
         try:
@@ -329,9 +353,20 @@ def toggle_activo_item(item_id):
 @bp.route('/labels', methods=['GET'])
 def listar_labels():
     """Lista todas las labels disponibles."""
+    import logging
     try:
         categoria = request.args.get('categoria_principal')
         activo = request.args.get('activo', 'true')
+        
+        # Verificar si hay labels, si no hay y no hay filtros específicos, generar datos mock
+        total_labels = db.session.query(ItemLabel).count()
+        if total_labels == 0 and not categoria:
+            try:
+                logging.info("No hay labels, generando datos mock...")
+                from scripts.init_food_labels import init_food_labels
+                init_food_labels()
+            except Exception as mock_error:
+                logging.warning(f"Error generando labels mock: {str(mock_error)}")
         
         query = db.session.query(ItemLabel)
         
@@ -344,6 +379,7 @@ def listar_labels():
         labels = query.order_by(ItemLabel.categoria_principal, ItemLabel.nombre_es).all()
         return jsonify([l.to_dict() for l in labels]), 200
     except Exception as e:
+        logging.error(f"Error en listar_labels: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 400
 
 @bp.route('/labels/categorias', methods=['GET'])
@@ -461,15 +497,30 @@ def calcular_requerimientos_quincenales():
 @bp.route('/inventario', methods=['GET'])
 def listar_inventario():
     """Lista el inventario completo o de un item específico."""
+    import logging
     try:
         item_id = request.args.get('item_id', type=int)
         if item_id:
             validate_positive_int(item_id, 'item_id')
+        
         inventario = InventarioService.obtener_inventario(db.session, item_id=item_id)
+        
+        # Si no hay inventario y no hay filtro específico, generar datos mock
+        if not inventario and not item_id:
+            try:
+                logging.info("No hay inventario, generando datos mock...")
+                from scripts.init_inventario import init_inventario
+                init_inventario()
+                # Volver a consultar después de crear los mock
+                inventario = InventarioService.obtener_inventario(db.session, item_id=item_id)
+            except Exception as mock_error:
+                logging.warning(f"Error generando inventario mock: {str(mock_error)}")
+        
         return success_response([inv.to_dict() for inv in inventario])
     except ValueError as e:
         return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
+        logging.error(f"Error en listar_inventario: {str(e)}", exc_info=True)
         return error_response(str(e), 500, 'INTERNAL_ERROR')
 
 @bp.route('/inventario/stock-bajo', methods=['GET'])
@@ -616,10 +667,22 @@ def obtener_silos_inventario():
 @bp.route('/requerimientos', methods=['GET'])
 def listar_requerimientos():
     """Lista requerimientos con filtros opcionales."""
+    import logging
     try:
         estado = request.args.get('estado')
         skip = validate_positive_int(request.args.get('skip', 0), 'skip')
         limit = validate_positive_int(request.args.get('limit', 100), 'limit')
+        
+        # Verificar si hay requerimientos, si no hay y no hay filtros específicos, generar datos mock
+        from models.requerimiento import Requerimiento
+        total_requerimientos = db.session.query(Requerimiento).count()
+        if total_requerimientos == 0 and not estado:
+            try:
+                logging.info("No hay requerimientos, generando datos mock...")
+                from scripts.init_requerimientos import init_requerimientos
+                init_requerimientos()
+            except Exception as mock_error:
+                logging.warning(f"Error generando requerimientos mock: {str(mock_error)}")
         
         requerimientos = RequerimientoService.listar_requerimientos(
             db.session,
@@ -632,6 +695,7 @@ def listar_requerimientos():
     except ValueError as e:
         return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
+        logging.error(f"Error en listar_requerimientos: {str(e)}", exc_info=True)
         return error_response(str(e), 500, 'INTERNAL_ERROR')
 
 @bp.route('/requerimientos', methods=['POST'])
@@ -663,6 +727,7 @@ def procesar_requerimiento(requerimiento_id):
 @bp.route('/facturas', methods=['GET'])
 def listar_facturas():
     """Lista facturas con filtros opcionales."""
+    import logging
     try:
         proveedor_id = request.args.get('proveedor_id', type=int)
         cliente_id = request.args.get('cliente_id', type=int)
@@ -675,6 +740,19 @@ def listar_facturas():
             validate_positive_int(proveedor_id, 'proveedor_id')
         if cliente_id:
             validate_positive_int(cliente_id, 'cliente_id')
+        
+        # Verificar si hay facturas, si no hay y no hay filtros específicos, generar datos mock
+        total_facturas = db.session.query(Factura).count()
+        if total_facturas == 0 and not proveedor_id and not cliente_id and not estado:
+            try:
+                logging.info("No hay facturas, generando datos mock...")
+                proveedores = db.session.query(Proveedor).all()
+                items = db.session.query(Item).filter(Item.activo == True).all()
+                if proveedores and items:
+                    from scripts.init_facturas import init_facturas
+                    init_facturas(proveedores, items)
+            except Exception as mock_error:
+                logging.warning(f"Error generando facturas mock: {str(mock_error)}")
         
         query = db.session.query(Factura)
         
@@ -904,6 +982,7 @@ def enviar_a_revision(factura_id):
 @bp.route('/pedidos', methods=['GET'])
 def listar_pedidos():
     """Lista pedidos con filtros opcionales."""
+    import logging
     try:
         proveedor_id = request.args.get('proveedor_id', type=int)
         estado = request.args.get('estado')
@@ -912,6 +991,17 @@ def listar_pedidos():
         
         if proveedor_id:
             validate_positive_int(proveedor_id, 'proveedor_id')
+        
+        # Verificar si hay pedidos, si no hay y no hay filtros específicos, generar datos mock
+        from models.pedido import PedidoCompra
+        total_pedidos = db.session.query(PedidoCompra).count()
+        if total_pedidos == 0 and not proveedor_id and not estado:
+            try:
+                logging.info("No hay pedidos, generando datos mock...")
+                from scripts.init_pedidos import init_pedidos
+                init_pedidos()
+            except Exception as mock_error:
+                logging.warning(f"Error generando pedidos mock: {str(mock_error)}")
         
         pedidos = PedidoCompraService.listar_pedidos(
             db.session,
@@ -973,12 +1063,31 @@ def enviar_pedido(pedido_id):
 @bp.route('/compras/resumen', methods=['GET'])
 def resumen_compras():
     """Obtiene resumen general de compras."""
+    import logging
     try:
         fecha_desde = request.args.get('fecha_desde')
         fecha_hasta = request.args.get('fecha_hasta')
         
         fecha_desde_obj = parse_date(fecha_desde) if fecha_desde else None
         fecha_hasta_obj = parse_date(fecha_hasta) if fecha_hasta else None
+        
+        # Verificar si hay datos de compras (facturas o pedidos)
+        total_facturas = db.session.query(Factura).count()
+        from models.pedido import PedidoCompra
+        total_pedidos = db.session.query(PedidoCompra).count()
+        
+        if total_facturas == 0 and total_pedidos == 0:
+            try:
+                logging.info("No hay datos de compras, generando datos mock...")
+                proveedores = db.session.query(Proveedor).all()
+                items = db.session.query(Item).filter(Item.activo == True).all()
+                if proveedores and items:
+                    from scripts.init_facturas import init_facturas
+                    from scripts.init_pedidos import init_pedidos
+                    init_facturas(proveedores, items)
+                    init_pedidos()
+            except Exception as mock_error:
+                logging.warning(f"Error generando datos de compras mock: {str(mock_error)}")
         
         resumen = ComprasStatsService.obtener_resumen_general(
             db.session,
@@ -1256,6 +1365,7 @@ def listar_costos_recetas():
 @bp.route('/pedidos-internos', methods=['GET'])
 def listar_pedidos_internos():
     """Lista pedidos internos con filtros opcionales."""
+    import logging
     try:
         estado = request.args.get('estado')
         fecha_desde = request.args.get('fecha_desde')
@@ -1265,6 +1375,17 @@ def listar_pedidos_internos():
         
         fecha_desde_dt = parse_datetime(fecha_desde) if fecha_desde else None
         fecha_hasta_dt = parse_datetime(fecha_hasta) if fecha_hasta else None
+        
+        # Verificar si hay pedidos internos, si no hay y no hay filtros específicos, generar datos mock
+        from models.pedido_interno import PedidoInterno
+        total_pedidos_internos = db.session.query(PedidoInterno).count()
+        if total_pedidos_internos == 0 and not estado and not fecha_desde and not fecha_hasta:
+            try:
+                logging.info("No hay pedidos internos, generando datos mock...")
+                from scripts.init_pedidos_internos import init_pedidos_internos
+                init_pedidos_internos()
+            except Exception as mock_error:
+                logging.warning(f"Error generando pedidos internos mock: {str(mock_error)}")
         
         pedidos = PedidoInternoService.listar_pedidos_internos(
             db.session,
@@ -1279,6 +1400,7 @@ def listar_pedidos_internos():
     except ValueError as e:
         return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
+        logging.error(f"Error en listar_pedidos_internos: {str(e)}", exc_info=True)
         return error_response(str(e), 500, 'INTERNAL_ERROR')
 
 @bp.route('/pedidos-internos', methods=['POST'])

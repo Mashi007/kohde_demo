@@ -73,6 +73,216 @@ def init_proveedores():
             'nombre_contacto': 'Luis Fernández',
             'productos_que_provee': 'Pan, masas, productos de panadería',
             'activo': True
+        },
+        {
+            'nombre': 'Pescados y Mariscos del Pacífico',
+            'ruc': '2223334440001',
+            'telefono': '+593 4 234-5678',
+            'email': 'ventas@pescados-pacifico.com',
+            'direccion': 'Av. Costanera 789, Guayaquil',
+            'nombre_contacto': 'Roberto Sánchez',
+            'productos_que_provee': 'Pescados frescos, mariscos, productos del mar',
+            'activo': True
+        },
+        {
+            'nombre': 'Granos y Cereales Andinos',
+            'ruc': '3334445550001',
+            'telefono': '+593 2 345-6789',
+            'email': 'pedidos@granos-andinos.com',
+            'direccion': 'Calle Graneros 234, Quito',
+            'nombre_contacto': 'Laura Fernández',
+            'productos_que_provee': 'Arroz, quinua, trigo, avena, legumbres',
+            'activo': True
+        },
+        {
+            'nombre': 'Especias y Condimentos Premium',
+            'ruc': '4445556660002',
+            'telefono': '+593 2 456-7890',
+            'email': 'info@especias-premium.com',
+            'direccion': 'Av. Especias 567, Quito',
+            'nombre_contacto': 'Miguel Torres',
+            'productos_que_provee': 'Especias, condimentos, hierbas aromáticas',
+            'activo': True
+        },
+        {
+            'nombre': 'Lácteos Frescos del Valle',
+            'ruc': '5556667770001',
+            'telefono': '+593 2 567-8901',
+            'email': 'ventas@lacteos-valle.com',
+            'direccion': 'Av. Lácteos 890, Quito',
+            'nombre_contacto': 'Patricia López',
+            'productos_que_provee': 'Leche, queso, mantequilla, yogurt, crema',
+            'activo': True
+        },
+        {
+            'nombre': 'Aceites y Vinagres Selectos',
+            'ruc': '6667778880001',
+            'telefono': '+593 2 678-9012',
+            'email': 'pedidos@aceites-selectos.com',
+            'direccion': 'Calle Aceites 123, Quito',
+            'nombre_contacto': 'Diego Morales',
+            'productos_que_provee': 'Aceites vegetales, oliva, vinagres especiales',
+            'activo': True
+        },
+        {
+            'nombre': 'Huevos y Aves del Campo',
+            'ruc': '7778889990002',
+            'telefono': '+593 2 789-0123',
+            'email': 'ventas@aves-campo.com',
+            'direccion': 'Av. Aves 456, Quito',
+            'nombre_contacto': 'Sofía Ramírez',
+            'productos_que_provee': 'Huevos frescos, pollo de campo, pavo',
+            'activo': True
+        },
+        {
+            'nombre': 'Verduras Orgánicas Frescas',
+            'ruc': '8889990000001',
+            'telefono': '+593 2 890-1234',
+            'email': 'pedidos@verduras-organicas.com',
+            'direccion': 'Calle Orgánicos 789, Quito',
+            'nombre_contacto': 'Andrés Herrera',
+            'productos_que_provee': 'Verduras orgánicas, hortalizas frescas',
+            'activo': True
+        },
+        {
+            'nombre': 'Frutas Tropicales Premium',
+            'ruc': '9990001110001',
+            'telefono': '+593 2 901-2345',
+            'email': 'info@frutas-tropicales.com',
+            'direccion': 'Av. Frutas 012, Quito',
+            'nombre_contacto': 'Valentina Castro',
+            'productos_que_provee': 'Frutas tropicales, exóticas, frutas de temporada',
+            'activo': True
+        },
+        {
+            'nombre': 'Embutidos y Charcutería Artesanal',
+            'ruc': '0001112220001',
+            'telefono': '+593 2 012-3456',
+            'email': 'ventas@embutidos-artesanales.com',
+            'direccion': 'Calle Charcutería 345, Quito',
+            'nombre_contacto': 'Fernando Jiménez',
+            'productos_que_provee': 'Embutidos, jamones, salchichas, chorizos',
+            'activo': True
+        },
+        {
+            'nombre': 'Harinas y Productos de Molinería',
+            'ruc': '1112223330002',
+            'telefono': '+593 2 123-4567',
+            'email': 'pedidos@harinas-molino.com',
+            'direccion': 'Av. Molinos 678, Quito',
+            'nombre_contacto': 'Carmen Vega',
+            'productos_que_provee': 'Harinas, maíz, trigo, productos de molinería',
+            'activo': True
+        },
+        {
+            'nombre': 'Café y Té de Especialidad',
+            'ruc': '2223334440002',
+            'telefono': '+593 2 234-5678',
+            'email': 'ventas@cafe-especialidad.com',
+            'direccion': 'Calle Café 901, Quito',
+            'nombre_contacto': 'Ricardo Méndez',
+            'productos_que_provee': 'Café gourmet, té especial, infusiones',
+            'activo': True
+        },
+        {
+            'nombre': 'Azúcares y Endulzantes',
+            'ruc': '3334445550002',
+            'telefono': '+593 2 345-6789',
+            'email': 'info@azucares-endulzantes.com',
+            'direccion': 'Av. Azúcar 234, Quito',
+            'nombre_contacto': 'Isabel Ruiz',
+            'productos_que_provee': 'Azúcar, miel, endulzantes naturales y artificiales',
+            'activo': True
+        },
+        {
+            'nombre': 'Conservas y Enlatados Premium',
+            'ruc': '4445556660003',
+            'telefono': '+593 2 456-7890',
+            'email': 'pedidos@conservas-premium.com',
+            'direccion': 'Calle Conservas 567, Quito',
+            'nombre_contacto': 'Jorge Silva',
+            'productos_que_provee': 'Conservas, enlatados, productos envasados',
+            'activo': True
+        },
+        {
+            'nombre': 'Salsas y Aderezos Gourmet',
+            'ruc': '5556667770002',
+            'telefono': '+593 2 567-8901',
+            'email': 'ventas@salsas-gourmet.com',
+            'direccion': 'Av. Salsas 890, Quito',
+            'nombre_contacto': 'Mónica Díaz',
+            'productos_que_provee': 'Salsas, aderezos, mayonesas, mostazas',
+            'activo': True
+        },
+        {
+            'nombre': 'Congelados y Ultracongelados',
+            'ruc': '6667778880002',
+            'telefono': '+593 2 678-9012',
+            'email': 'pedidos@congelados-ultra.com',
+            'direccion': 'Calle Congelados 123, Quito',
+            'nombre_contacto': 'Gustavo Rojas',
+            'productos_que_provee': 'Productos congelados, ultracongelados, helados',
+            'activo': True
+        },
+        {
+            'nombre': 'Equipamiento y Utensilios de Cocina',
+            'ruc': '7778889990003',
+            'telefono': '+593 2 789-0123',
+            'email': 'ventas@equipos-cocina.com',
+            'direccion': 'Av. Equipos 456, Quito',
+            'nombre_contacto': 'Natalia Vargas',
+            'productos_que_provee': 'Equipos de cocina, utensilios, herramientas',
+            'activo': True
+        },
+        {
+            'nombre': 'Vinos y Licores Importados',
+            'ruc': '8889990000002',
+            'telefono': '+593 2 890-1234',
+            'email': 'info@vinos-importados.com',
+            'direccion': 'Calle Vinos 789, Quito',
+            'nombre_contacto': 'Oscar Mendoza',
+            'productos_que_provee': 'Vinos, licores, bebidas alcohólicas importadas',
+            'activo': True
+        },
+        {
+            'nombre': 'Snacks y Botanas Premium',
+            'ruc': '9990001110002',
+            'telefono': '+593 2 901-2345',
+            'email': 'pedidos@snacks-premium.com',
+            'direccion': 'Av. Snacks 012, Quito',
+            'nombre_contacto': 'Lucía Moreno',
+            'productos_que_provee': 'Snacks, botanas, frutos secos, chips',
+            'activo': True
+        },
+        {
+            'nombre': 'Productos Sin Gluten y Especiales',
+            'ruc': '0001112220002',
+            'telefono': '+593 2 012-3456',
+            'email': 'ventas@sin-gluten.com',
+            'direccion': 'Calle Especiales 345, Quito',
+            'nombre_contacto': 'Daniela Paredes',
+            'productos_que_provee': 'Productos sin gluten, veganos, orgánicos',
+            'activo': True
+        },
+        {
+            'nombre': 'Carnes Premium y Wagyu',
+            'ruc': '1112223330003',
+            'telefono': '+593 2 123-4567',
+            'email': 'pedidos@carnes-premium.com',
+            'direccion': 'Av. Carnes Premium 678, Quito',
+            'nombre_contacto': 'Alejandro Cruz',
+            'productos_que_provee': 'Carnes premium, wagyu, cortes especiales',
+            'activo': True
+        },
+        {
+            'nombre': 'Servicios de Catering y Eventos',
+            'ruc': '2223334440003',
+            'telefono': '+593 2 234-5678',
+            'email': 'info@catering-eventos.com',
+            'direccion': 'Calle Catering 901, Quito',
+            'nombre_contacto': 'Paola Salazar',
+            'productos_que_provee': 'Servicios de catering, banquetes, eventos',
+            'activo': True
         }
     ]
     

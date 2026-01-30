@@ -176,6 +176,7 @@ def obtener_pedidos_proveedor(proveedor_id):
 @bp.route('/notificaciones', methods=['GET'])
 def listar_notificaciones():
     """Lista notificaciones enviadas con filtros opcionales (usa conversaciones)."""
+    import logging
     try:
         tipo = request.args.get('tipo')  # 'whatsapp' o 'email'
         skip = validate_positive_int(request.args.get('skip', 0), 'skip')
@@ -188,22 +189,44 @@ def listar_notificaciones():
             limit=limit
         )
         
+        # Si no hay conversaciones y no hay filtros específicos, generar datos mock
+        if not conversaciones and not tipo:
+            try:
+                from scripts.init_notificaciones import generar_notificaciones_mock
+                logging.info("No hay notificaciones, generando datos mock...")
+                generar_notificaciones_mock()
+                # Volver a consultar después de crear los mock
+                conversaciones = conversacion_service.listar_conversaciones(
+                    db.session,
+                    tipo_mensaje=tipo,
+                    skip=skip,
+                    limit=limit
+                )
+            except Exception as mock_error:
+                logging.warning(f"Error generando notificaciones mock: {str(mock_error)}")
+                # Continuar con lista vacía si falla la generación mock
+        
         # Formatear como notificaciones para compatibilidad
         notificaciones = []
         for conv in conversaciones:
-            notificaciones.append({
-                'tipo': conv.tipo_mensaje.value if conv.tipo_mensaje else None,
-                'destinatario': conv.contacto.email if conv.tipo_mensaje == TipoMensajeContacto.EMAIL else conv.contacto.whatsapp,
-                'mensaje': conv.contenido,
-                'asunto': conv.asunto,
-                'fecha': conv.fecha_envio.isoformat() if conv.fecha_envio else None,
-                'estado': conv.estado
-            })
+            try:
+                notificaciones.append({
+                    'tipo': conv.tipo_mensaje.value if conv.tipo_mensaje else None,
+                    'destinatario': conv.contacto.email if conv.tipo_mensaje == TipoMensajeContacto.EMAIL else conv.contacto.whatsapp if conv.contacto else None,
+                    'mensaje': conv.contenido,
+                    'asunto': conv.asunto,
+                    'fecha': conv.fecha_envio.isoformat() if conv.fecha_envio else None,
+                    'estado': conv.estado
+                })
+            except Exception as conv_error:
+                logging.warning(f"Error procesando conversación {conv.id}: {str(conv_error)}")
+                continue
         
         return paginated_response({'notificaciones': notificaciones}, skip=skip, limit=limit)
     except ValueError as e:
         return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
+        logging.error(f"Error en listar_notificaciones: {str(e)}", exc_info=True)
         return error_response(str(e), 500, 'INTERNAL_ERROR')
 
 @bp.route('/notificaciones/enviar', methods=['POST'])
@@ -327,6 +350,7 @@ def obtener_estadisticas():
 @bp.route('/notificaciones/conversaciones', methods=['GET'])
 def listar_conversaciones():
     """Lista conversaciones con filtros opcionales."""
+    import logging
     try:
         contacto_id = request.args.get('contacto_id', type=int)
         tipo_mensaje = request.args.get('tipo_mensaje')
@@ -344,10 +368,29 @@ def listar_conversaciones():
             limit=limit
         )
         
+        # Si no hay conversaciones y no hay filtros específicos, generar datos mock
+        if not conversaciones and not contacto_id and not tipo_mensaje:
+            try:
+                from scripts.init_notificaciones import generar_notificaciones_mock
+                logging.info("No hay conversaciones, generando datos mock...")
+                generar_notificaciones_mock()
+                # Volver a consultar después de crear los mock
+                conversaciones = conversacion_service.listar_conversaciones(
+                    db.session,
+                    contacto_id=contacto_id,
+                    tipo_mensaje=tipo_mensaje,
+                    skip=skip,
+                    limit=limit
+                )
+            except Exception as mock_error:
+                logging.warning(f"Error generando conversaciones mock: {str(mock_error)}")
+                # Continuar con lista vacía si falla la generación mock
+        
         return paginated_response([c.to_dict() for c in conversaciones], skip=skip, limit=limit)
     except ValueError as e:
         return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
+        logging.error(f"Error en listar_conversaciones: {str(e)}", exc_info=True)
         return error_response(str(e), 500, 'INTERNAL_ERROR')
 
 @bp.route('/notificaciones/conversaciones/<int:conversacion_id>', methods=['GET'])
@@ -370,10 +413,13 @@ def obtener_conversacion(conversacion_id):
 @bp.route('/tickets', methods=['GET'])
 def listar_tickets():
     """Lista tickets con filtros opcionales."""
+    import logging
     try:
         cliente_id = request.args.get('cliente_id', type=int)
         estado = request.args.get('estado')
         tipo = request.args.get('tipo')
+        prioridad = request.args.get('prioridad')
+        busqueda = request.args.get('busqueda')
         asignado_a = request.args.get('asignado_a', type=int)
         skip = validate_positive_int(request.args.get('skip', 0), 'skip')
         limit = validate_positive_int(request.args.get('limit', 100), 'limit')
@@ -393,13 +439,56 @@ def listar_tickets():
             limit=limit
         )
         
+        # Aplicar filtros adicionales si es necesario
+        if prioridad:
+            tickets = [t for t in tickets if t.prioridad and t.prioridad.value.lower() == prioridad.lower()]
+        
+        if busqueda:
+            busqueda_lower = busqueda.lower()
+            tickets = [
+                t for t in tickets 
+                if (t.asunto and busqueda_lower in t.asunto.lower()) or 
+                   (t.descripcion and busqueda_lower in t.descripcion.lower())
+            ]
+        
+        # Si no hay tickets y no hay filtros específicos, generar datos mock
+        if not tickets and not estado and not tipo and not prioridad and not busqueda and not cliente_id:
+            try:
+                from scripts.init_tickets import generar_tickets_mock
+                logging.info("No hay tickets, generando datos mock...")
+                generar_tickets_mock()
+                # Volver a consultar después de crear los mock
+                tickets = TicketService.listar_tickets(
+                    db.session,
+                    cliente_id=cliente_id,
+                    estado=estado,
+                    tipo=tipo,
+                    asignado_a=asignado_a,
+                    skip=skip,
+                    limit=limit
+                )
+                
+                # Aplicar filtros nuevamente
+                if prioridad:
+                    tickets = [t for t in tickets if t.prioridad and t.prioridad.value.lower() == prioridad.lower()]
+                
+                if busqueda:
+                    busqueda_lower = busqueda.lower()
+                    tickets = [
+                        t for t in tickets 
+                        if (t.asunto and busqueda_lower in t.asunto.lower()) or 
+                           (t.descripcion and busqueda_lower in t.descripcion.lower())
+                    ]
+            except Exception as mock_error:
+                logging.warning(f"Error generando tickets mock: {str(mock_error)}")
+                # Continuar con lista vacía si falla la generación mock
+        
         # Serializar tickets con manejo de errores
         tickets_dict = []
         for t in tickets:
             try:
                 tickets_dict.append(t.to_dict())
             except Exception as e:
-                import logging
                 logging.error(f"Error serializando ticket {t.id}: {str(e)}")
                 # Continuar con el siguiente ticket
                 continue
@@ -409,7 +498,6 @@ def listar_tickets():
         return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
         import traceback
-        import logging
         logging.error(f"Error en listar_tickets: {str(e)}")
         logging.error(traceback.format_exc())
         return error_response(str(e), 500, 'INTERNAL_ERROR')
@@ -630,6 +718,7 @@ def verificar_reportes():
 @bp.route('/contactos', methods=['GET'])
 def listar_contactos():
     """Lista contactos con filtros opcionales."""
+    import logging
     try:
         tipo = request.args.get('tipo')
         proveedor_id = request.args.get('proveedor_id', type=int)
@@ -655,10 +744,32 @@ def listar_contactos():
             limit=limit
         )
         
+        # Si no hay contactos y no hay filtros específicos, generar datos mock
+        if not contactos and not tipo and not proveedor_id and not proyecto and not busqueda:
+            try:
+                from scripts.init_contactos import generar_contactos_mock
+                logging.info("No hay contactos, generando datos mock...")
+                contactos_mock = generar_contactos_mock()
+                # Volver a consultar después de crear los mock
+                contactos = contacto_service.listar_contactos(
+                    db.session,
+                    tipo=tipo,
+                    proveedor_id=proveedor_id,
+                    proyecto=proyecto,
+                    activo=activo_bool,
+                    busqueda=busqueda,
+                    skip=skip,
+                    limit=limit
+                )
+            except Exception as mock_error:
+                logging.warning(f"Error generando contactos mock: {str(mock_error)}")
+                # Continuar con lista vacía si falla la generación mock
+        
         return paginated_response([c.to_dict() for c in contactos], skip=skip, limit=limit)
     except ValueError as e:
         return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
+        logging.error(f"Error en listar_contactos: {str(e)}", exc_info=True)
         return error_response(str(e), 500, 'INTERNAL_ERROR')
 
 @bp.route('/contactos', methods=['POST'])

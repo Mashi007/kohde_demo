@@ -186,6 +186,7 @@ class ChatService:
     def _ejecutar_consulta_db(self, db: Session, query: str) -> Dict:
         """
         Ejecuta una consulta SQL de forma segura (solo SELECT).
+        Si falla o no hay datos, intenta usar mock data si está habilitado.
         
         Args:
             db: Sesión de base de datos
@@ -215,6 +216,22 @@ class ChatService:
                     'error': f'Comando no permitido: {cmd}. Solo se permiten consultas SELECT.',
                     'resultados': None
                 }
+        
+        # Intentar usar mock data primero si está habilitado (más rápido para bocetos)
+        if Config.USE_MOCK_DATA:
+            try:
+                from modules.mock_data.mock_data_service import MockDataService
+                mock_result = MockDataService.consultar_mock_data(query, db)
+                if mock_result:
+                    # Agregar indicador de que son datos mock
+                    mock_result['is_mock'] = True
+                    mock_result['mensaje_mock'] = '📊 Datos de demostración (mock data)'
+                    return mock_result
+            except Exception as e:
+                # Si falla mock data, continuar con BD real
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.debug(f"No se pudo usar mock data: {e}")
         
         try:
             from sqlalchemy import text
@@ -305,6 +322,17 @@ class ChatService:
                     'usa_indices': any(campo in query_upper for campo in ['id', 'activo', 'estado', 'fecha_', 'proveedor_id', 'item_id'])
                 }
                 
+                # Si la consulta retorna 0 resultados y mock data está habilitado, intentar mock
+                if len(resultados) == 0 and Config.USE_MOCK_DATA:
+                    try:
+                        from modules.mock_data.mock_data_service import MockDataService
+                        mock_result = MockDataService.consultar_mock_data(query, db)
+                        if mock_result:
+                            mock_result['mensaje_mock'] = '📊 No se encontraron datos reales. Mostrando datos de demostración (mock data)'
+                            return mock_result
+                    except Exception:
+                        pass  # Continuar con resultado vacío si mock falla
+                
                 return {
                     'error': None,
                     'resultados': resultados,
@@ -328,6 +356,17 @@ class ChatService:
                         sugerencia = "\n\n💡 Sugerencia: Los valores válidos para facturas.estado son: 'pendiente', 'aprobada', 'rechazada' (en minúsculas)"
                     else:
                         sugerencia = "\n\n💡 Sugerencia: Verifica que los valores de estado sean válidos. Consulta: SELECT DISTINCT estado FROM tabla LIMIT 10"
+                
+                # Si hay error y mock data está habilitado, intentar usar mock
+                if Config.USE_MOCK_DATA:
+                    try:
+                        from modules.mock_data.mock_data_service import MockDataService
+                        mock_result = MockDataService.consultar_mock_data(query, db)
+                        if mock_result:
+                            mock_result['mensaje_mock'] = f'⚠️ Error en consulta real: {error_msg}. Mostrando datos de demostración (mock data)'
+                            return mock_result
+                    except Exception:
+                        pass  # Continuar con error si mock falla
                 
                 return {
                     'error': f'Error al ejecutar consulta SQL: {error_msg}{sugerencia}',
@@ -403,21 +442,27 @@ class ChatService:
                         info_opt = resultado_db.get('info_optimizacion', {})
                         tiempo_ms = info_opt.get('tiempo_ejecucion_ms', 0)
                         consulta_upper = consulta_sql.upper()
+                        is_mock = resultado_db.get('is_mock', False)
+                        mensaje_mock = resultado_db.get('mensaje_mock', '')
                         
                         # Formatear resultados de manera más legible
                         if resultados:
                             columnas = list(resultados[0].keys())
                             
                             # Crear mensaje estructurado con información de rendimiento
-                            mensaje_db = f"✅ Consulta ejecutada exitosamente. Total de filas: {total}"
-                            if tiempo_ms > 0:
-                                if tiempo_ms < 100:
-                                    mensaje_db += f" ⚡ ({tiempo_ms}ms - rápida)"
-                                elif tiempo_ms < 1000:
-                                    mensaje_db += f" ⏱️ ({tiempo_ms}ms)"
-                                else:
-                                    mensaje_db += f" 🐌 ({tiempo_ms}ms - lenta, considera optimizar)"
-                            mensaje_db += "\n\n"
+                            if is_mock:
+                                mensaje_db = f"📊 {mensaje_mock}\n\n"
+                                mensaje_db += f"✅ Consulta ejecutada (datos mock). Total de filas: {total}\n\n"
+                            else:
+                                mensaje_db = f"✅ Consulta ejecutada exitosamente. Total de filas: {total}"
+                                if tiempo_ms > 0:
+                                    if tiempo_ms < 100:
+                                        mensaje_db += f" ⚡ ({tiempo_ms}ms - rápida)"
+                                    elif tiempo_ms < 1000:
+                                        mensaje_db += f" ⏱️ ({tiempo_ms}ms)"
+                                    else:
+                                        mensaje_db += f" 🐌 ({tiempo_ms}ms - lenta, considera optimizar)"
+                                mensaje_db += "\n\n"
                             
                             # Mostrar columnas
                             mensaje_db += f"📋 Columnas ({len(columnas)}): {', '.join(columnas)}\n\n"
@@ -559,6 +604,12 @@ ACCESO COMPLETO A BASE DE DATOS POSTGRESQL - TODAS LAS TABLAS DISPONIBLES
 
 IMPORTANTE: Tienes acceso COMPLETO a la base de datos PostgreSQL del sistema ERP. 
 Puedes consultar información directamente de TODAS las tablas del sistema usando consultas SQL.
+
+📊 MODO DEMOSTRACIÓN (BOCETO):
+Si la base de datos está vacía o la consulta no encuentra datos, el sistema automáticamente 
+usará datos de demostración (mock data) para que puedas responder rápidamente.
+Los datos mock incluyen ejemplos realistas de charolas, facturas, items, inventario y proveedores.
+Cuando uses datos mock, se indicará claramente en los resultados.
 
 🗺️ MAPA DE NAVEGACIÓN - DÓNDE ENCONTRAR INFORMACIÓN:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

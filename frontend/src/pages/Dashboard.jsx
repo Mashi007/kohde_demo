@@ -142,6 +142,28 @@ export default function Dashboard() {
     staleTime: 30000,
   })
 
+  // Distribución de servicios (desayuno, almuerzo, merienda)
+  const { data: serviciosDistribucion, isLoading: serviciosDistribucionLoading } = useQuery({
+    queryKey: ['servicios-distribucion', fechaInicio, fechaFin],
+    queryFn: () => api.get(`/reportes/kpis/servicios-distribucion?fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}`).then(extractData),
+    staleTime: 30000,
+  })
+
+  // Distribución por categorías de alimentos
+  const [tipoMetricaCategorias, setTipoMetricaCategorias] = useState('cantidad')
+  const { data: categoriasAlimentosDistribucion, isLoading: categoriasAlimentosLoading } = useQuery({
+    queryKey: ['categorias-alimentos-distribucion', fechaInicio, fechaFin, tipoMetricaCategorias],
+    queryFn: () => api.get(`/reportes/kpis/categorias-alimentos-distribucion?fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}&tipo=${tipoMetricaCategorias}`).then(extractData),
+    staleTime: 30000,
+  })
+
+  // Tendencia de costo por charola (estándar vs real)
+  const { data: costoCharolaTendencia, isLoading: costoCharolaTendenciaLoading } = useQuery({
+    queryKey: ['costo-charola-tendencia', fechaInicio, fechaFin],
+    queryFn: () => api.get(`/reportes/kpis/costo-charola-tendencia?fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}`).then(extractData),
+    staleTime: 30000,
+  })
+
   // Datos legacy para compatibilidad
   const { data: stockBajoResponse } = useQuery({
     queryKey: ['stock-bajo'],
@@ -168,6 +190,26 @@ export default function Dashboard() {
   const mermasTendenciaCategoriaSeries = mermasTendenciaCategoria?.series || []
   const mermasTendenciaCategoriaEstadisticas = mermasTendenciaCategoria?.estadisticas || {}
   const categoriaActual = mermasTendenciaCategoria?.categoria || categoriaSeleccionada
+  const serviciosDistribucionData = serviciosDistribucion?.distribucion || []
+  const serviciosTotales = serviciosDistribucion?.totales || {}
+  const categoriasAlimentosData = categoriasAlimentosDistribucion?.distribucion || []
+  const categoriasAlimentosTotales = categoriasAlimentosDistribucion?.totales || {}
+  const costoCharolaTendenciaSeries = costoCharolaTendencia?.series || []
+  const costoCharolaTendenciaEstadisticas = costoCharolaTendencia?.estadisticas || {}
+
+  // Colores para categorías de alimentos
+  const coloresCategorias = {
+    'lacteos_y_huevos': '#fbbf24',  // amarillo
+    'carnes_rojas': '#ef4444',      // rojo
+    'carnes_blancas': '#f97316',    // naranja
+    'frutas': '#10b981',            // verde
+    'verduras': '#22c55e',          // verde claro
+    'cereales_y_granos': '#eab308', // amarillo oscuro
+    'aceites_y_grasas': '#f59e0b',  // ámbar
+    'bebidas': '#3b82f6',           // azul
+    'condimentos_y_especias': '#8b5cf6', // púrpura
+    'otros': '#6b7280'              // gris
+  }
 
   // Categorías disponibles
   const categoriasAlimentos = [
@@ -178,6 +220,13 @@ export default function Dashboard() {
     { value: 'LIMPIEZA', label: 'Limpieza' },
     { value: 'OTROS', label: 'Otros' }
   ]
+
+  // Colores para servicios
+  const coloresServicios = {
+    'desayuno': COLORS.yellow,
+    'almuerzo': COLORS.blue,
+    'merienda': COLORS.purple
+  }
 
   // Datos para gráficos de donut
   const facturasPorEstado = facturasChart?.por_estado || []
@@ -561,6 +610,242 @@ export default function Dashboard() {
         )}
       </div>
 
+      {/* Gráfico de Mermas - Destacado */}
+      <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-6 rounded-xl border border-slate-700 shadow-xl">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-2xl font-bold flex items-center gap-3 mb-2">
+              <AlertTriangle size={28} className="text-yellow-400" />
+              Análisis de Mermas
+            </h2>
+            {mermasDetalleEstadisticas.total_cantidad !== undefined && (
+              <p className="text-slate-400 text-sm">
+                Total Mermas: <span className="font-bold text-yellow-400">{mermasDetalleEstadisticas.total_cantidad || 0}</span>
+                {' | '}
+                Costo Total: <span className="font-semibold">${(mermasDetalleEstadisticas.total_costo || 0).toLocaleString('es-ES', { minimumFractionDigits: 2 })}</span>
+                {' | '}
+                Promedio Diario: <span className="font-semibold">{mermasDetalleEstadisticas.promedio_diario?.toFixed(1) || 0}</span>
+                {mermasDetalleEstadisticas.dia_max_mermas && (
+                  <>
+                    {' | '}
+                    Día Máximo: <span className="font-semibold text-red-400">{mermasDetalleEstadisticas.cantidad_max}</span>
+                  </>
+                )}
+              </p>
+            )}
+          </div>
+        </div>
+        {mermasDetalleLoading ? (
+          <div className="h-96 flex items-center justify-center">
+            <LoadingSpinner />
+          </div>
+        ) : mermasDetalleSeries.length > 0 ? (
+          <div className="space-y-6">
+            {/* Gráfico principal: Cantidad y Costo */}
+            <ResponsiveContainer width="100%" height={450}>
+              <ComposedChart 
+                data={mermasDetalleSeries}
+                margin={{ top: 20, right: 30, left: 20, bottom: 80 }}
+              >
+                <defs>
+                  <linearGradient id="colorMermasCantidad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={COLORS.yellow} stopOpacity={0.9} />
+                    <stop offset="50%" stopColor={COLORS.yellow} stopOpacity={0.6} />
+                    <stop offset="95%" stopColor={COLORS.yellow} stopOpacity={0.1} />
+                  </linearGradient>
+                  <linearGradient id="colorMermasCosto" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={COLORS.red} stopOpacity={0.9} />
+                    <stop offset="50%" stopColor={COLORS.red} stopOpacity={0.6} />
+                    <stop offset="95%" stopColor={COLORS.red} stopOpacity={0.1} />
+                  </linearGradient>
+                  <filter id="mermasShadow">
+                    <feDropShadow dx="0" dy="3" stdDeviation="4" floodOpacity="0.25"/>
+                  </filter>
+                </defs>
+                <CartesianGrid 
+                  strokeDasharray="3 3" 
+                  stroke="#374151" 
+                  opacity={0.2}
+                  vertical={false}
+                />
+                <XAxis
+                  dataKey="fecha"
+                  stroke="#9ca3af"
+                  tick={{ fill: '#9ca3af', fontSize: 11 }}
+                  tickFormatter={(value) => format(new Date(value), 'dd/MM', { locale: es })}
+                  tickLine={{ stroke: '#4b5563' }}
+                  axisLine={{ stroke: '#4b5563' }}
+                />
+                <YAxis 
+                  yAxisId="left" 
+                  stroke="#9ca3af"
+                  tick={{ fill: '#9ca3af', fontSize: 11 }}
+                  tickLine={{ stroke: '#4b5563' }}
+                  axisLine={{ stroke: '#4b5563' }}
+                />
+                <YAxis 
+                  yAxisId="right" 
+                  orientation="right" 
+                  stroke="#9ca3af"
+                  tick={{ fill: '#9ca3af', fontSize: 11 }}
+                  tickLine={{ stroke: '#4b5563' }}
+                  axisLine={{ stroke: '#4b5563' }}
+                  tickFormatter={(value) => `$${value.toFixed(0)}`}
+                />
+                <Tooltip
+                  content={({ active, payload, label }) => {
+                    if (active && payload && payload.length) {
+                      const cantidad = payload.find(p => p.dataKey === 'cantidad')?.value || 0
+                      const costo = payload.find(p => p.dataKey === 'total_costo')?.value || 0
+                      const costo_unitario = cantidad > 0 ? (costo / cantidad).toFixed(2) : 0
+                      
+                      return (
+                        <div className="bg-gradient-to-br from-slate-800 via-slate-800 to-slate-900 border-2 border-slate-600 rounded-xl p-5 shadow-2xl backdrop-blur-md min-w-[260px]">
+                          <div className="border-b-2 border-slate-600 pb-3 mb-3">
+                            <p className="text-slate-100 font-bold text-base">
+                              {label ? format(new Date(label), 'EEEE, dd MMM yyyy', { locale: es }) : ''}
+                            </p>
+                          </div>
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between gap-4 p-2 rounded-lg bg-yellow-500/10">
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-3.5 h-3.5 rounded-full bg-yellow-500 shadow-lg" />
+                                <span className="text-sm font-semibold text-slate-300">Cantidad</span>
+                              </div>
+                              <span className="text-lg font-bold text-yellow-400">{cantidad}</span>
+                            </div>
+                            <div className="flex items-center justify-between gap-4 p-2 rounded-lg bg-red-500/10">
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-3.5 h-3.5 rounded-full bg-red-500 shadow-lg" />
+                                <span className="text-sm font-semibold text-slate-300">Costo Total</span>
+                              </div>
+                              <span className="text-lg font-bold text-red-400">
+                                ${typeof costo === 'number' ? costo.toLocaleString('es-ES', { minimumFractionDigits: 2 }) : costo}
+                              </span>
+                            </div>
+                            <div className="border-t-2 border-slate-600 pt-3 mt-3">
+                              <div className="flex items-center justify-between gap-4">
+                                <span className="text-xs text-slate-400 font-medium">Costo Unitario:</span>
+                                <span className="font-bold text-sm text-cyan-400">${costo_unitario}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    }
+                    return null
+                  }}
+                  cursor={{ stroke: COLORS.yellow, strokeWidth: 2, strokeDasharray: '5 5' }}
+                  animationDuration={200}
+                />
+                <Legend
+                  wrapperStyle={{ paddingTop: '30px', paddingBottom: '10px' }}
+                  iconType="circle"
+                  iconSize={12}
+                  formatter={(value) => (
+                    <span className="text-slate-300 text-sm font-semibold">
+                      {value === 'cantidad' ? 'Cantidad de Mermas' : 'Costo Total ($)'}
+                    </span>
+                  )}
+                />
+                <Area
+                  yAxisId="left"
+                  type="monotone"
+                  dataKey="cantidad"
+                  stroke={COLORS.yellow}
+                  strokeWidth={4}
+                  fillOpacity={1}
+                  fill="url(#colorMermasCantidad)"
+                  name="cantidad"
+                  dot={{ fill: COLORS.yellow, r: 5, strokeWidth: 2, stroke: '#fff' }}
+                  activeDot={{ r: 8, strokeWidth: 3, stroke: '#fff', fill: COLORS.yellow }}
+                  animationDuration={1200}
+                  animationEasing="ease-out"
+                  filter="url(#mermasShadow)"
+                />
+                <Area
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="total_costo"
+                  stroke={COLORS.red}
+                  strokeWidth={4}
+                  fillOpacity={1}
+                  fill="url(#colorMermasCosto)"
+                  name="total_costo"
+                  dot={{ fill: COLORS.red, r: 5, strokeWidth: 2, stroke: '#fff' }}
+                  activeDot={{ r: 8, strokeWidth: 3, stroke: '#fff', fill: COLORS.red }}
+                  animationDuration={1200}
+                  animationEasing="ease-out"
+                  animationBegin={200}
+                  filter="url(#mermasShadow)"
+                />
+                <Brush 
+                  dataKey="fecha"
+                  height={40}
+                  stroke={COLORS.yellow}
+                  fill="#1e293b"
+                  tickFormatter={(value) => format(new Date(value), 'dd/MM', { locale: es })}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+
+            {/* Gráfico de distribución por tipo */}
+            {mermasPorTipoDetalle.length > 0 && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                <div className="bg-slate-800/50 p-4 rounded-lg border border-slate-700">
+                  <h3 className="text-lg font-bold mb-4 text-slate-300">Mermas por Tipo (Cantidad)</h3>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <PieChart>
+                      <Pie
+                        data={mermasPorTipoDetalle}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ tipo, cantidad }) => `${tipo}: ${cantidad}`}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="cantidad"
+                      >
+                        {mermasPorTipoDetalle.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="bg-slate-800/50 p-4 rounded-lg border border-slate-700">
+                  <h3 className="text-lg font-bold mb-4 text-slate-300">Mermas por Tipo (Costo)</h3>
+                  <ResponsiveContainer width="100%" height={250}>
+                    <PieChart>
+                      <Pie
+                        data={mermasPorTipoDetalle}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ tipo, total_costo }) => `${tipo}: $${total_costo.toFixed(0)}`}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="total_costo"
+                      >
+                        {mermasPorTipoDetalle.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value) => `$${Number(value).toLocaleString('es-ES', { minimumFractionDigits: 2 })}`} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="h-96 flex items-center justify-center text-slate-400">
+            No hay datos disponibles
+          </div>
+        )}
+      </div>
+
       {/* Gráficos principales */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Gráfico de Facturas - Área */}
@@ -922,242 +1207,6 @@ export default function Dashboard() {
             </div>
           )}
         </div>
-      </div>
-
-      {/* Gráfico de Mermas - Destacado */}
-      <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-6 rounded-xl border border-slate-700 shadow-xl">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-2xl font-bold flex items-center gap-3 mb-2">
-              <AlertTriangle size={28} className="text-yellow-400" />
-              Análisis de Mermas
-            </h2>
-            {mermasDetalleEstadisticas.total_cantidad !== undefined && (
-              <p className="text-slate-400 text-sm">
-                Total Mermas: <span className="font-bold text-yellow-400">{mermasDetalleEstadisticas.total_cantidad || 0}</span>
-                {' | '}
-                Costo Total: <span className="font-semibold">${(mermasDetalleEstadisticas.total_costo || 0).toLocaleString('es-ES', { minimumFractionDigits: 2 })}</span>
-                {' | '}
-                Promedio Diario: <span className="font-semibold">{mermasDetalleEstadisticas.promedio_diario?.toFixed(1) || 0}</span>
-                {mermasDetalleEstadisticas.dia_max_mermas && (
-                  <>
-                    {' | '}
-                    Día Máximo: <span className="font-semibold text-red-400">{mermasDetalleEstadisticas.cantidad_max}</span>
-                  </>
-                )}
-              </p>
-            )}
-          </div>
-        </div>
-        {mermasDetalleLoading ? (
-          <div className="h-96 flex items-center justify-center">
-            <LoadingSpinner />
-          </div>
-        ) : mermasDetalleSeries.length > 0 ? (
-          <div className="space-y-6">
-            {/* Gráfico principal: Cantidad y Costo */}
-            <ResponsiveContainer width="100%" height={450}>
-              <ComposedChart 
-                data={mermasDetalleSeries}
-                margin={{ top: 20, right: 30, left: 20, bottom: 80 }}
-              >
-                <defs>
-                  <linearGradient id="colorMermasCantidad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={COLORS.yellow} stopOpacity={0.9} />
-                    <stop offset="50%" stopColor={COLORS.yellow} stopOpacity={0.6} />
-                    <stop offset="95%" stopColor={COLORS.yellow} stopOpacity={0.1} />
-                  </linearGradient>
-                  <linearGradient id="colorMermasCosto" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor={COLORS.red} stopOpacity={0.9} />
-                    <stop offset="50%" stopColor={COLORS.red} stopOpacity={0.6} />
-                    <stop offset="95%" stopColor={COLORS.red} stopOpacity={0.1} />
-                  </linearGradient>
-                  <filter id="mermasShadow">
-                    <feDropShadow dx="0" dy="3" stdDeviation="4" floodOpacity="0.25"/>
-                  </filter>
-                </defs>
-                <CartesianGrid 
-                  strokeDasharray="3 3" 
-                  stroke="#374151" 
-                  opacity={0.2}
-                  vertical={false}
-                />
-                <XAxis
-                  dataKey="fecha"
-                  stroke="#9ca3af"
-                  tick={{ fill: '#9ca3af', fontSize: 11 }}
-                  tickFormatter={(value) => format(new Date(value), 'dd/MM', { locale: es })}
-                  tickLine={{ stroke: '#4b5563' }}
-                  axisLine={{ stroke: '#4b5563' }}
-                />
-                <YAxis 
-                  yAxisId="left" 
-                  stroke="#9ca3af"
-                  tick={{ fill: '#9ca3af', fontSize: 11 }}
-                  tickLine={{ stroke: '#4b5563' }}
-                  axisLine={{ stroke: '#4b5563' }}
-                />
-                <YAxis 
-                  yAxisId="right" 
-                  orientation="right" 
-                  stroke="#9ca3af"
-                  tick={{ fill: '#9ca3af', fontSize: 11 }}
-                  tickLine={{ stroke: '#4b5563' }}
-                  axisLine={{ stroke: '#4b5563' }}
-                  tickFormatter={(value) => `$${value.toFixed(0)}`}
-                />
-                <Tooltip
-                  content={({ active, payload, label }) => {
-                    if (active && payload && payload.length) {
-                      const cantidad = payload.find(p => p.dataKey === 'cantidad')?.value || 0
-                      const costo = payload.find(p => p.dataKey === 'total_costo')?.value || 0
-                      const costo_unitario = cantidad > 0 ? (costo / cantidad).toFixed(2) : 0
-                      
-                      return (
-                        <div className="bg-gradient-to-br from-slate-800 via-slate-800 to-slate-900 border-2 border-slate-600 rounded-xl p-5 shadow-2xl backdrop-blur-md min-w-[260px]">
-                          <div className="border-b-2 border-slate-600 pb-3 mb-3">
-                            <p className="text-slate-100 font-bold text-base">
-                              {label ? format(new Date(label), 'EEEE, dd MMM yyyy', { locale: es }) : ''}
-                            </p>
-                          </div>
-                          <div className="space-y-3">
-                            <div className="flex items-center justify-between gap-4 p-2 rounded-lg bg-yellow-500/10">
-                              <div className="flex items-center gap-2.5">
-                                <div className="w-3.5 h-3.5 rounded-full bg-yellow-500 shadow-lg" />
-                                <span className="text-sm font-semibold text-slate-300">Cantidad</span>
-                              </div>
-                              <span className="text-lg font-bold text-yellow-400">{cantidad}</span>
-                            </div>
-                            <div className="flex items-center justify-between gap-4 p-2 rounded-lg bg-red-500/10">
-                              <div className="flex items-center gap-2.5">
-                                <div className="w-3.5 h-3.5 rounded-full bg-red-500 shadow-lg" />
-                                <span className="text-sm font-semibold text-slate-300">Costo Total</span>
-                              </div>
-                              <span className="text-lg font-bold text-red-400">
-                                ${typeof costo === 'number' ? costo.toLocaleString('es-ES', { minimumFractionDigits: 2 }) : costo}
-                              </span>
-                            </div>
-                            <div className="border-t-2 border-slate-600 pt-3 mt-3">
-                              <div className="flex items-center justify-between gap-4">
-                                <span className="text-xs text-slate-400 font-medium">Costo Unitario:</span>
-                                <span className="font-bold text-sm text-cyan-400">${costo_unitario}</span>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )
-                    }
-                    return null
-                  }}
-                  cursor={{ stroke: COLORS.yellow, strokeWidth: 2, strokeDasharray: '5 5' }}
-                  animationDuration={200}
-                />
-                <Legend
-                  wrapperStyle={{ paddingTop: '30px', paddingBottom: '10px' }}
-                  iconType="circle"
-                  iconSize={12}
-                  formatter={(value) => (
-                    <span className="text-slate-300 text-sm font-semibold">
-                      {value === 'cantidad' ? 'Cantidad de Mermas' : 'Costo Total ($)'}
-                    </span>
-                  )}
-                />
-                <Area
-                  yAxisId="left"
-                  type="monotone"
-                  dataKey="cantidad"
-                  stroke={COLORS.yellow}
-                  strokeWidth={4}
-                  fillOpacity={1}
-                  fill="url(#colorMermasCantidad)"
-                  name="cantidad"
-                  dot={{ fill: COLORS.yellow, r: 5, strokeWidth: 2, stroke: '#fff' }}
-                  activeDot={{ r: 8, strokeWidth: 3, stroke: '#fff', fill: COLORS.yellow }}
-                  animationDuration={1200}
-                  animationEasing="ease-out"
-                  filter="url(#mermasShadow)"
-                />
-                <Area
-                  yAxisId="right"
-                  type="monotone"
-                  dataKey="total_costo"
-                  stroke={COLORS.red}
-                  strokeWidth={4}
-                  fillOpacity={1}
-                  fill="url(#colorMermasCosto)"
-                  name="total_costo"
-                  dot={{ fill: COLORS.red, r: 5, strokeWidth: 2, stroke: '#fff' }}
-                  activeDot={{ r: 8, strokeWidth: 3, stroke: '#fff', fill: COLORS.red }}
-                  animationDuration={1200}
-                  animationEasing="ease-out"
-                  animationBegin={200}
-                  filter="url(#mermasShadow)"
-                />
-                <Brush 
-                  dataKey="fecha"
-                  height={40}
-                  stroke={COLORS.yellow}
-                  fill="#1e293b"
-                  tickFormatter={(value) => format(new Date(value), 'dd/MM', { locale: es })}
-                />
-              </ComposedChart>
-            </ResponsiveContainer>
-
-            {/* Gráfico de distribución por tipo */}
-            {mermasPorTipoDetalle.length > 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-                <div className="bg-slate-800/50 p-4 rounded-lg border border-slate-700">
-                  <h3 className="text-lg font-bold mb-4 text-slate-300">Mermas por Tipo (Cantidad)</h3>
-                  <ResponsiveContainer width="100%" height={250}>
-                    <PieChart>
-                      <Pie
-                        data={mermasPorTipoDetalle}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ tipo, cantidad }) => `${tipo}: ${cantidad}`}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="cantidad"
-                      >
-                        {mermasPorTipoDetalle.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="bg-slate-800/50 p-4 rounded-lg border border-slate-700">
-                  <h3 className="text-lg font-bold mb-4 text-slate-300">Mermas por Tipo (Costo)</h3>
-                  <ResponsiveContainer width="100%" height={250}>
-                    <PieChart>
-                      <Pie
-                        data={mermasPorTipoDetalle}
-                        cx="50%"
-                        cy="50%"
-                        labelLine={false}
-                        label={({ tipo, total_costo }) => `${tipo}: $${total_costo.toFixed(0)}`}
-                        outerRadius={80}
-                        fill="#8884d8"
-                        dataKey="total_costo"
-                      >
-                        {mermasPorTipoDetalle.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                        ))}
-                      </Pie>
-                      <Tooltip formatter={(value) => `$${Number(value).toLocaleString('es-ES', { minimumFractionDigits: 2 })}`} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="h-96 flex items-center justify-center text-slate-400">
-            No hay datos disponibles
-          </div>
-        )}
       </div>
 
       {/* Gráfico de Costo por Charola por Servicio - Destacado */}
@@ -1816,6 +1865,611 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+
+      {/* Gráfico de Distribución de Servicios */}
+      {serviciosDistribucionData.length > 0 && (
+        <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-6 rounded-xl border border-slate-700 shadow-xl">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-2xl font-bold flex items-center gap-3 mb-2">
+                <BarChart3 size={28} className="text-cyan-400" />
+                Distribución de Servicios
+              </h2>
+              {serviciosTotales.total_cantidad && (
+                <p className="text-slate-400 text-sm">
+                  Total Charolas: <span className="font-bold text-cyan-400">{serviciosTotales.total_cantidad || 0}</span>
+                  {' | '}
+                  Costo Total: <span className="font-semibold">${(serviciosTotales.total_costo || 0).toLocaleString('es-ES', { minimumFractionDigits: 2 })}</span>
+                  {' | '}
+                  Personas Servidas: <span className="font-semibold">{serviciosTotales.total_personas || 0}</span>
+                </p>
+              )}
+            </div>
+          </div>
+          {serviciosDistribucionLoading ? (
+            <div className="h-96 flex items-center justify-center">
+              <LoadingSpinner />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Gráfico de pastel por cantidad */}
+              <div className="bg-slate-800/50 p-6 rounded-lg border border-slate-700">
+                <h3 className="text-lg font-bold mb-4 text-slate-300">Distribución por Cantidad</h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <defs>
+                      <filter id="pieServiciosShadow">
+                        <feDropShadow dx="0" dy="2" stdDeviation="3" floodOpacity="0.3"/>
+                      </filter>
+                    </defs>
+                    <Pie
+                      data={serviciosDistribucionData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ servicio, cantidad, porcentaje }) => `${servicio}: ${cantidad} (${porcentaje.toFixed(1)}%)`}
+                      outerRadius={100}
+                      innerRadius={30}
+                      fill="#8884d8"
+                      dataKey="cantidad"
+                      animationDuration={800}
+                      animationEasing="ease-out"
+                    >
+                      {serviciosDistribucionData.map((entry, index) => (
+                        <Cell 
+                          key={`cell-${index}`} 
+                          fill={coloresServicios[entry.servicio] || CHART_COLORS[index % CHART_COLORS.length]}
+                          stroke="#1e293b"
+                          strokeWidth={2}
+                          filter="url(#pieServiciosShadow)"
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0]
+                          const servicio = data.payload.servicio
+                          const cantidad = data.value
+                          const porcentaje = data.payload.porcentaje
+                          const total = serviciosTotales.total_cantidad || 1
+                          
+                          return (
+                            <div className="bg-gradient-to-br from-slate-800 to-slate-900 border-2 border-slate-600 rounded-lg p-4 shadow-xl">
+                              <p className="text-slate-200 font-bold text-sm mb-2 capitalize">
+                                {servicio}
+                              </p>
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between gap-4">
+                                  <span className="text-xs text-slate-400">Cantidad:</span>
+                                  <span className="text-sm font-bold text-slate-200">{cantidad}</span>
+                                </div>
+                                <div className="flex items-center justify-between gap-4">
+                                  <span className="text-xs text-slate-400">Porcentaje:</span>
+                                  <span className="text-sm font-bold" style={{ color: coloresServicios[servicio] || COLORS.cyan }}>
+                                    {porcentaje.toFixed(1)}%
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between gap-4">
+                                  <span className="text-xs text-slate-400">Del total:</span>
+                                  <span className="text-xs text-slate-400">{cantidad} de {total}</span>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        }
+                        return null
+                      }}
+                      animationDuration={200}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Gráfico de pastel por costo */}
+              <div className="bg-slate-800/50 p-6 rounded-lg border border-slate-700">
+                <h3 className="text-lg font-bold mb-4 text-slate-300">Distribución por Costo</h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={serviciosDistribucionData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ servicio, costo_total, porcentaje_costo }) => `${servicio}: $${costo_total.toFixed(0)} (${porcentaje_costo.toFixed(1)}%)`}
+                      outerRadius={100}
+                      innerRadius={30}
+                      fill="#8884d8"
+                      dataKey="costo_total"
+                      animationDuration={800}
+                      animationEasing="ease-out"
+                    >
+                      {serviciosDistribucionData.map((entry, index) => (
+                        <Cell 
+                          key={`cell-costo-${index}`} 
+                          fill={coloresServicios[entry.servicio] || CHART_COLORS[index % CHART_COLORS.length]}
+                          stroke="#1e293b"
+                          strokeWidth={2}
+                          filter="url(#pieServiciosShadow)"
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0]
+                          const servicio = data.payload.servicio
+                          const costo = data.value
+                          const porcentaje = data.payload.porcentaje_costo
+                          const total = serviciosTotales.total_costo || 1
+                          
+                          return (
+                            <div className="bg-gradient-to-br from-slate-800 to-slate-900 border-2 border-slate-600 rounded-lg p-4 shadow-xl">
+                              <p className="text-slate-200 font-bold text-sm mb-2 capitalize">
+                                {servicio}
+                              </p>
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between gap-4">
+                                  <span className="text-xs text-slate-400">Costo Total:</span>
+                                  <span className="text-sm font-bold text-slate-200">
+                                    ${typeof costo === 'number' ? costo.toLocaleString('es-ES', { minimumFractionDigits: 2 }) : costo}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between gap-4">
+                                  <span className="text-xs text-slate-400">Porcentaje:</span>
+                                  <span className="text-sm font-bold" style={{ color: coloresServicios[servicio] || COLORS.cyan }}>
+                                    {porcentaje.toFixed(1)}%
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between gap-4">
+                                  <span className="text-xs text-slate-400">Del total:</span>
+                                  <span className="text-xs text-slate-400">
+                                    ${typeof costo === 'number' ? costo.toFixed(2) : costo} de ${typeof total === 'number' ? total.toFixed(2) : total}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        }
+                        return null
+                      }}
+                      formatter={(value) => `$${Number(value).toLocaleString('es-ES', { minimumFractionDigits: 2 })}`}
+                      animationDuration={200}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Gráfico de Tendencia de Costo por Charola */}
+      {costoCharolaTendenciaSeries.length > 0 && (
+        <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-6 rounded-xl border border-slate-700 shadow-xl">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-2xl font-bold flex items-center gap-3 mb-2">
+                <TrendingUp size={28} className="text-green-400" />
+                Tendencia de Costo por Charola
+              </h2>
+              {costoCharolaTendenciaEstadisticas.promedio_costo_real !== undefined && (
+                <p className="text-slate-400 text-sm">
+                  Promedio Real: <span className="font-bold text-red-400">${costoCharolaTendenciaEstadisticas.promedio_costo_real?.toFixed(2) || 0}</span>
+                  {' | '}
+                  Promedio Estándar: <span className="font-semibold text-cyan-400">${costoCharolaTendenciaEstadisticas.promedio_costo_estandar?.toFixed(2) || 0}</span>
+                  {' | '}
+                  Días Eficientes: <span className={`font-semibold ${costoCharolaTendenciaEstadisticas.dias_eficientes > 0 ? 'text-green-400' : 'text-yellow-400'}`}>
+                    {costoCharolaTendenciaEstadisticas.dias_eficientes || 0} ({(costoCharolaTendenciaEstadisticas.porcentaje_dias_eficientes || 0).toFixed(1)}%)
+                  </span>
+                  {' | '}
+                  Ahorro Potencial: <span className="font-semibold text-yellow-400">${(costoCharolaTendenciaEstadisticas.ahorro_potencial || 0).toLocaleString('es-ES', { minimumFractionDigits: 2 })}</span>
+                </p>
+              )}
+            </div>
+          </div>
+          {costoCharolaTendenciaLoading ? (
+            <div className="h-96 flex items-center justify-center">
+              <LoadingSpinner />
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={450}>
+              <LineChart 
+                data={costoCharolaTendenciaSeries}
+                margin={{ top: 20, right: 30, left: 20, bottom: 80 }}
+              >
+                <defs>
+                  <linearGradient id="colorCostoReal" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={COLORS.red} stopOpacity={0.9} />
+                    <stop offset="50%" stopColor={COLORS.red} stopOpacity={0.6} />
+                    <stop offset="95%" stopColor={COLORS.red} stopOpacity={0.1} />
+                  </linearGradient>
+                  <linearGradient id="colorCostoEstandar" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor={COLORS.cyan} stopOpacity={0.9} />
+                    <stop offset="50%" stopColor={COLORS.cyan} stopOpacity={0.6} />
+                    <stop offset="95%" stopColor={COLORS.cyan} stopOpacity={0.1} />
+                  </linearGradient>
+                  <filter id="lineTendenciaShadow">
+                    <feDropShadow dx="0" dy="3" stdDeviation="4" floodOpacity="0.25"/>
+                  </filter>
+                </defs>
+                <CartesianGrid 
+                  strokeDasharray="3 3" 
+                  stroke="#374151" 
+                  opacity={0.2}
+                  vertical={false}
+                />
+                <XAxis
+                  dataKey="fecha"
+                  stroke="#9ca3af"
+                  tick={{ fill: '#9ca3af', fontSize: 11 }}
+                  tickFormatter={(value) => format(new Date(value), 'dd/MM', { locale: es })}
+                  tickLine={{ stroke: '#4b5563' }}
+                  axisLine={{ stroke: '#4b5563' }}
+                />
+                <YAxis 
+                  stroke="#9ca3af"
+                  tick={{ fill: '#9ca3af', fontSize: 11 }}
+                  tickLine={{ stroke: '#4b5563' }}
+                  axisLine={{ stroke: '#4b5563' }}
+                  tickFormatter={(value) => `$${value.toFixed(0)}`}
+                  label={{ value: 'Costo ($)', angle: -90, position: 'insideLeft', fill: '#9ca3af', fontSize: 12 }}
+                />
+                <Tooltip
+                  content={({ active, payload, label }) => {
+                    if (active && payload && payload.length) {
+                      const costoReal = payload.find(p => p.dataKey === 'costo_promedio_real')?.value || 0
+                      const costoEstandar = payload.find(p => p.dataKey === 'costo_estandar')?.value || 0
+                      const diferencia = costoReal - costoEstandar
+                      const porcentaje_diferencia = costoEstandar > 0 ? ((diferencia / costoEstandar) * 100).toFixed(1) : 0
+                      const es_eficiente = costoReal <= costoEstandar
+                      const cantidadCharolas = payload[0]?.payload?.cantidad_charolas || 0
+                      
+                      return (
+                        <div className="bg-gradient-to-br from-slate-800 via-slate-800 to-slate-900 border-2 border-slate-600 rounded-xl p-5 shadow-2xl backdrop-blur-md min-w-[280px]">
+                          <div className="border-b-2 border-slate-600 pb-3 mb-3">
+                            <p className="text-slate-100 font-bold text-base">
+                              {label ? format(new Date(label), 'EEEE, dd MMM yyyy', { locale: es }) : ''}
+                            </p>
+                          </div>
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between gap-4 p-2 rounded-lg bg-red-500/10">
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-3.5 h-3.5 rounded-full bg-red-500 shadow-lg" />
+                                <span className="text-sm font-semibold text-slate-300">Costo Real</span>
+                              </div>
+                              <span className="text-lg font-bold text-red-400">
+                                ${typeof costoReal === 'number' ? costoReal.toFixed(2) : costoReal}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between gap-4 p-2 rounded-lg bg-cyan-500/10">
+                              <div className="flex items-center gap-2.5">
+                                <div className="w-3.5 h-3.5 rounded-full bg-cyan-500 shadow-lg" />
+                                <span className="text-sm font-semibold text-slate-300">Costo Estándar</span>
+                              </div>
+                              <span className="text-lg font-bold text-cyan-400">
+                                ${typeof costoEstandar === 'number' ? costoEstandar.toFixed(2) : costoEstandar}
+                              </span>
+                            </div>
+                            <div className="border-t-2 border-slate-600 pt-3 mt-3 space-y-2">
+                              <div className="flex items-center justify-between gap-4">
+                                <span className="text-xs text-slate-400 font-medium">Diferencia:</span>
+                                <span className={`font-bold text-sm ${es_eficiente ? 'text-green-400' : 'text-red-400'}`}>
+                                  {es_eficiente ? '-' : '+'}${Math.abs(diferencia).toFixed(2)}
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between gap-4">
+                                <span className="text-xs text-slate-400 font-medium">% Diferencia:</span>
+                                <span className={`font-bold text-sm ${es_eficiente ? 'text-green-400' : 'text-red-400'}`}>
+                                  {es_eficiente ? '-' : '+'}{Math.abs(porcentaje_diferencia)}%
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between gap-4">
+                                <span className="text-xs text-slate-400 font-medium">Charolas:</span>
+                                <span className="font-bold text-sm text-slate-300">{cantidadCharolas}</span>
+                              </div>
+                              {es_eficiente && (
+                                <div className="mt-2 p-2 bg-green-500/20 border border-green-500/50 rounded-lg">
+                                  <p className="text-xs text-green-400 font-semibold flex items-center gap-1">
+                                    <TrendingUp size={12} />
+                                    Día eficiente - Por debajo del estándar
+                                  </p>
+                                </div>
+                              )}
+                              {!es_eficiente && diferencia > costoEstandar * 0.15 && (
+                                <div className="mt-2 p-2 bg-red-500/20 border border-red-500/50 rounded-lg">
+                                  <p className="text-xs text-red-400 font-semibold flex items-center gap-1">
+                                    <AlertTriangle size={12} />
+                                    Costo excede estándar significativamente
+                                  </p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    }
+                    return null
+                  }}
+                  cursor={{ stroke: COLORS.red, strokeWidth: 2, strokeDasharray: '5 5' }}
+                  animationDuration={200}
+                />
+                <Legend
+                  wrapperStyle={{ paddingTop: '30px', paddingBottom: '10px' }}
+                  iconType="line"
+                  iconSize={16}
+                  formatter={(value) => (
+                    <span className="text-slate-300 text-sm font-semibold">
+                      {value === 'costo_promedio_real' ? 'Costo Real' : 'Costo Estándar'}
+                    </span>
+                  )}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="costo_promedio_real"
+                  stroke={COLORS.red}
+                  strokeWidth={4}
+                  dot={{ fill: COLORS.red, r: 5, strokeWidth: 2, stroke: '#fff' }}
+                  activeDot={{ r: 8, strokeWidth: 3, stroke: '#fff', fill: COLORS.red }}
+                  name="costo_promedio_real"
+                  animationDuration={1200}
+                  animationEasing="ease-out"
+                  filter="url(#lineTendenciaShadow)"
+                />
+                <Line
+                  type="monotone"
+                  dataKey="costo_estandar"
+                  stroke={COLORS.cyan}
+                  strokeWidth={3}
+                  strokeDasharray="8 4"
+                  dot={{ fill: COLORS.cyan, r: 4, strokeWidth: 2, stroke: '#fff' }}
+                  activeDot={{ r: 7, strokeWidth: 3, stroke: '#fff', fill: COLORS.cyan }}
+                  name="costo_estandar"
+                  animationDuration={1200}
+                  animationEasing="ease-out"
+                  animationBegin={200}
+                  filter="url(#lineTendenciaShadow)"
+                />
+                <ReferenceArea
+                  y1={0}
+                  y2={costoCharolaTendenciaSeries.reduce((max, item) => Math.max(max, item.costo_estandar || 0), 0)}
+                  fill={COLORS.cyan}
+                  fillOpacity={0.05}
+                  stroke={COLORS.cyan}
+                  strokeDasharray="3 3"
+                  strokeOpacity={0.3}
+                />
+                <ReferenceLine 
+                  y={costoCharolaTendenciaEstadisticas.promedio_costo_estandar || 0} 
+                  stroke={COLORS.cyan} 
+                  strokeDasharray="5 5" 
+                  strokeOpacity={0.5}
+                  label={{ value: "Promedio Estándar", position: "right", fill: COLORS.cyan, fontSize: 10 }}
+                />
+                <ReferenceLine 
+                  y={costoCharolaTendenciaEstadisticas.promedio_costo_real || 0} 
+                  stroke={COLORS.red} 
+                  strokeDasharray="5 5" 
+                  strokeOpacity={0.5}
+                  label={{ value: "Promedio Real", position: "right", fill: COLORS.red, fontSize: 10 }}
+                />
+                <Brush 
+                  dataKey="fecha"
+                  height={40}
+                  stroke={COLORS.green}
+                  fill="#1e293b"
+                  tickFormatter={(value) => format(new Date(value), 'dd/MM', { locale: es })}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      )}
+
+      {/* Gráfico de Distribución por Categorías de Alimentos */}
+      {categoriasAlimentosData.length > 0 && (
+        <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-6 rounded-xl border border-slate-700 shadow-xl">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-2xl font-bold flex items-center gap-3 mb-2">
+                <Package size={28} className="text-green-400" />
+                Distribución por Categorías de Alimentos
+              </h2>
+              {categoriasAlimentosTotales.total_cantidad && (
+                <p className="text-slate-400 text-sm">
+                  Total Cantidad: <span className="font-bold text-green-400">{categoriasAlimentosTotales.total_cantidad || 0}</span>
+                  {' | '}
+                  Costo Total: <span className="font-semibold">${(categoriasAlimentosTotales.total_costo || 0).toLocaleString('es-ES', { minimumFractionDigits: 2 })}</span>
+                </p>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              <label className="text-sm text-slate-300 font-semibold">Métrica:</label>
+              <select
+                value={tipoMetricaCategorias}
+                onChange={(e) => setTipoMetricaCategorias(e.target.value)}
+                className="bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-slate-200 font-medium focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent transition-all"
+              >
+                <option value="cantidad">Por Cantidad</option>
+                <option value="costo">Por Costo</option>
+              </select>
+            </div>
+          </div>
+          {categoriasAlimentosLoading ? (
+            <div className="h-96 flex items-center justify-center">
+              <LoadingSpinner />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Gráfico de pastel por cantidad */}
+              <div className="bg-slate-800/50 p-6 rounded-lg border border-slate-700">
+                <h3 className="text-lg font-bold mb-4 text-slate-300">Distribución por Cantidad</h3>
+                <ResponsiveContainer width="100%" height={400}>
+                  <PieChart>
+                    <defs>
+                      <filter id="pieCategoriasShadow">
+                        <feDropShadow dx="0" dy="2" stdDeviation="3" floodOpacity="0.3"/>
+                      </filter>
+                    </defs>
+                    <Pie
+                      data={categoriasAlimentosData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ nombre, cantidad, porcentaje_cantidad }) => `${nombre}: ${cantidad} (${porcentaje_cantidad.toFixed(1)}%)`}
+                      outerRadius={120}
+                      innerRadius={40}
+                      fill="#8884d8"
+                      dataKey="cantidad"
+                      animationDuration={800}
+                      animationEasing="ease-out"
+                    >
+                      {categoriasAlimentosData.map((entry, index) => (
+                        <Cell 
+                          key={`cell-cantidad-${index}`} 
+                          fill={coloresCategorias[entry.categoria] || CHART_COLORS[index % CHART_COLORS.length]}
+                          stroke="#1e293b"
+                          strokeWidth={2}
+                          filter="url(#pieCategoriasShadow)"
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0]
+                          const categoria = data.payload
+                          const cantidad = data.value
+                          const porcentaje = categoria.porcentaje_cantidad
+                          const costo = categoria.costo_total
+                          const total = categoriasAlimentosTotales.total_cantidad || 1
+                          
+                          return (
+                            <div className="bg-gradient-to-br from-slate-800 to-slate-900 border-2 border-slate-600 rounded-lg p-4 shadow-xl min-w-[220px]">
+                              <p className="text-slate-200 font-bold text-sm mb-2">
+                                {categoria.nombre}
+                              </p>
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between gap-4">
+                                  <span className="text-xs text-slate-400">Cantidad:</span>
+                                  <span className="text-sm font-bold text-slate-200">{cantidad}</span>
+                                </div>
+                                <div className="flex items-center justify-between gap-4">
+                                  <span className="text-xs text-slate-400">Porcentaje:</span>
+                                  <span className="text-sm font-bold" style={{ color: coloresCategorias[categoria.categoria] || COLORS.green }}>
+                                    {porcentaje.toFixed(1)}%
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between gap-4">
+                                  <span className="text-xs text-slate-400">Costo Total:</span>
+                                  <span className="text-xs font-semibold text-slate-300">
+                                    ${typeof costo === 'number' ? costo.toLocaleString('es-ES', { minimumFractionDigits: 2 }) : costo}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between gap-4">
+                                  <span className="text-xs text-slate-400">Del total:</span>
+                                  <span className="text-xs text-slate-400">{cantidad} de {total}</span>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        }
+                        return null
+                      }}
+                      animationDuration={200}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Gráfico de pastel por costo */}
+              <div className="bg-slate-800/50 p-6 rounded-lg border border-slate-700">
+                <h3 className="text-lg font-bold mb-4 text-slate-300">Distribución por Costo</h3>
+                <ResponsiveContainer width="100%" height={400}>
+                  <PieChart>
+                    <Pie
+                      data={categoriasAlimentosData}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ nombre, costo_total, porcentaje_costo }) => `${nombre}: $${costo_total.toFixed(0)} (${porcentaje_costo.toFixed(1)}%)`}
+                      outerRadius={120}
+                      innerRadius={40}
+                      fill="#8884d8"
+                      dataKey="costo_total"
+                      animationDuration={800}
+                      animationEasing="ease-out"
+                    >
+                      {categoriasAlimentosData.map((entry, index) => (
+                        <Cell 
+                          key={`cell-costo-${index}`} 
+                          fill={coloresCategorias[entry.categoria] || CHART_COLORS[index % CHART_COLORS.length]}
+                          stroke="#1e293b"
+                          strokeWidth={2}
+                          filter="url(#pieCategoriasShadow)"
+                        />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0]
+                          const categoria = data.payload
+                          const costo = data.value
+                          const porcentaje = categoria.porcentaje_costo
+                          const cantidad = categoria.cantidad
+                          const total = categoriasAlimentosTotales.total_costo || 1
+                          
+                          return (
+                            <div className="bg-gradient-to-br from-slate-800 to-slate-900 border-2 border-slate-600 rounded-lg p-4 shadow-xl min-w-[220px]">
+                              <p className="text-slate-200 font-bold text-sm mb-2">
+                                {categoria.nombre}
+                              </p>
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between gap-4">
+                                  <span className="text-xs text-slate-400">Costo Total:</span>
+                                  <span className="text-sm font-bold text-slate-200">
+                                    ${typeof costo === 'number' ? costo.toLocaleString('es-ES', { minimumFractionDigits: 2 }) : costo}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between gap-4">
+                                  <span className="text-xs text-slate-400">Porcentaje:</span>
+                                  <span className="text-sm font-bold" style={{ color: coloresCategorias[categoria.categoria] || COLORS.green }}>
+                                    {porcentaje.toFixed(1)}%
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between gap-4">
+                                  <span className="text-xs text-slate-400">Cantidad:</span>
+                                  <span className="text-xs font-semibold text-slate-300">{cantidad}</span>
+                                </div>
+                                <div className="flex items-center justify-between gap-4">
+                                  <span className="text-xs text-slate-400">Costo Unitario:</span>
+                                  <span className="text-xs text-slate-400">
+                                    ${cantidad > 0 ? (costo / cantidad).toFixed(2) : '0.00'}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between gap-4">
+                                  <span className="text-xs text-slate-400">Del total:</span>
+                                  <span className="text-xs text-slate-400">
+                                    ${typeof costo === 'number' ? costo.toFixed(2) : costo} de ${typeof total === 'number' ? total.toFixed(2) : total}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        }
+                        return null
+                      }}
+                      formatter={(value) => `$${Number(value).toLocaleString('es-ES', { minimumFractionDigits: 2 })}`}
+                      animationDuration={200}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Gráficos de distribución (Donut/Pie) */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

@@ -18,6 +18,10 @@ class Config:
     SECRET_KEY = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
     DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
     
+    # Modo Demo/Mock Data
+    # Si es True, usa mock data cuando la BD está vacía o falla la consulta
+    USE_MOCK_DATA = os.getenv('USE_MOCK_DATA', 'true').lower() == 'true'
+    
     # Base de datos PostgreSQL
     # Render proporciona DATABASE_URL automáticamente cuando conectas PostgreSQL
     DATABASE_URL = os.getenv('DATABASE_URL')
