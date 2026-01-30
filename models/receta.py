@@ -21,7 +21,9 @@ class TipoRecetaEnum(TypeDecorator):
     
     def __init__(self):
         # Usar native_enum=False para que SQLAlchemy use los valores del enum directamente
-        # y no valide contra los nombres del enum
+        # PostgreSQL espera valores en MAYÚSCULAS (DESAYUNO, ALMUERZO, CENA)
+        # pero nuestro enum Python usa minúsculas ('desayuno', 'almuerzo', 'cena')
+        # La conversión se hace en process_bind_param y process_result_value
         super().__init__(
             TipoReceta, 
             native_enum=False,  # False = usar valores del enum, no nombres
@@ -30,48 +32,57 @@ class TipoRecetaEnum(TypeDecorator):
         )
     
     def process_bind_param(self, value, dialect):
-        """Convierte el enum a su valor string antes de insertar."""
+        """Convierte el enum a su nombre (MAYÚSCULAS) antes de insertar en PostgreSQL."""
         if value is None:
             return None
-        # Si es un objeto Enum, retornar su valor
+        # Si es un objeto Enum, retornar su NOMBRE en mayúsculas (no el valor)
+        # PostgreSQL espera: DESAYUNO, ALMUERZO, CENA (nombres del enum)
         if isinstance(value, TipoReceta):
-            return value.value
-        # Si es un string, convertir a minúsculas y validar
+            return value.name  # Usar el nombre del enum (DESAYUNO, ALMUERZO, CENA)
+        # Si es un string, convertir a objeto Enum y luego obtener su nombre
         if isinstance(value, str):
             valor_lower = value.lower().strip()
-            # Validar que el valor existe en el enum
+            # Buscar el enum por su valor (minúsculas)
             valores_validos = [e.value for e in TipoReceta]
             if valor_lower in valores_validos:
-                return valor_lower
+                # Encontrar el enum correspondiente y retornar su nombre
+                for tipo in TipoReceta:
+                    if tipo.value == valor_lower:
+                        return tipo.name  # Retornar nombre del enum (DESAYUNO, ALMUERZO, CENA)
             # Si no está en valores, intentar buscar por nombre del enum (fallback)
             try:
                 tipo_enum = TipoReceta[value.upper()]
-                return tipo_enum.value
+                return tipo_enum.name  # Retornar nombre del enum
             except KeyError:
                 raise ValueError(f"'{value}' no es un valor válido para TipoReceta. Valores válidos: {valores_validos}")
         return value
     
     def process_result_value(self, value, dialect):
-        """Convierte el valor string del enum a objeto Enum."""
+        """Convierte el nombre del enum (MAYÚSCULAS) de PostgreSQL a objeto Enum."""
         if value is None:
             return None
         # Si ya es un objeto Enum, retornarlo directamente
         if isinstance(value, TipoReceta):
             return value
-        # Si es un string, buscar el enum correspondiente
+        # Si es un string, PostgreSQL devuelve el nombre del enum en mayúsculas (DESAYUNO, ALMUERZO, CENA)
         if isinstance(value, str):
-            valor_lower = value.lower().strip()
-            for tipo in TipoReceta:
-                if tipo.value == valor_lower:
-                    return tipo
-            # Si no se encuentra, retornar el string (será manejado en to_dict)
-            # Esto puede pasar si hay valores en la BD que no coinciden exactamente
-            import logging
-            logging.warning(f"Valor de enum no encontrado: '{valor_lower}', valores válidos: {[t.value for t in TipoReceta]}")
-            return valor_lower
+            valor_upper = value.upper().strip()
+            # Buscar el enum por su nombre (mayúsculas)
+            try:
+                return TipoReceta[valor_upper]  # Buscar por nombre del enum
+            except KeyError:
+                # Si no se encuentra por nombre, intentar buscar por valor (fallback)
+                valor_lower = value.lower().strip()
+                for tipo in TipoReceta:
+                    if tipo.value == valor_lower:
+                        return tipo
+                # Si no se encuentra, retornar el string (será manejado en to_dict)
+                import logging
+                logging.warning(f"Valor de enum no encontrado: '{value}' (upper: '{valor_upper}', lower: '{valor_lower}'), valores válidos: {[t.value for t in TipoReceta]}")
+                return valor_lower
         # Para cualquier otro tipo, intentar convertirlo a string
         try:
-            return str(value).lower().strip()
+            return str(value).upper().strip()
         except:
             return value
 
