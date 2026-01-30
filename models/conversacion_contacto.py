@@ -41,7 +41,8 @@ class ConversacionContacto(db.Model):
     fecha_creacion = Column(DateTime, default=datetime.utcnow, nullable=False)
     
     # Relaciones
-    contacto = relationship('Contacto', backref='conversaciones', lazy='joined')
+    # Relación con Contacto - usar lazy='select' para evitar problemas si la tabla no existe aún
+    contacto = relationship('Contacto', backref='conversaciones', lazy='select')
     
     def to_dict(self):
         """Convierte el modelo a diccionario."""

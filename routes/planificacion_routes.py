@@ -39,16 +39,32 @@ def listar_recetas():
             limit=limit
         )
         
-        # Convertir recetas a diccionarios con manejo de errores
+        # Convertir recetas a diccionarios con manejo de errores robusto
         recetas_dict = []
         for receta in recetas:
             try:
-                recetas_dict.append(receta.to_dict())
+                # Asegurar que la sesión esté activa antes de convertir
+                if receta not in db.session:
+                    db.session.add(receta)
+                
+                receta_dict = receta.to_dict()
+                recetas_dict.append(receta_dict)
             except Exception as e:
                 import logging
-                logging.error(f"Error al convertir receta {receta.id} a dict: {str(e)}", exc_info=True)
-                # Continuar con las demás recetas aunque una falle
-                continue
+                logging.error(f"Error al convertir receta {receta.id if hasattr(receta, 'id') else 'N/A'} a dict: {str(e)}", exc_info=True)
+                # Agregar receta básica sin ingredientes si falla la conversión completa
+                try:
+                    recetas_dict.append({
+                        'id': receta.id if hasattr(receta, 'id') else None,
+                        'nombre': receta.nombre if hasattr(receta, 'nombre') else 'Error',
+                        'tipo': str(receta.tipo) if hasattr(receta, 'tipo') else None,
+                        'activa': receta.activa if hasattr(receta, 'activa') else False,
+                        'ingredientes': [],
+                        'error': f'Error al cargar: {str(e)}'
+                    })
+                except:
+                    # Si incluso esto falla, continuar sin agregar esta receta
+                    continue
         
         return paginated_response(recetas_dict, skip=skip, limit=limit)
     except ValueError as e:

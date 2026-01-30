@@ -180,11 +180,23 @@ class Receta(db.Model):
         # Manejar ingredientes de manera segura
         ingredientes_list = []
         try:
-            if hasattr(self, 'ingredientes') and self.ingredientes:
-                ingredientes_list = [ing.to_dict() for ing in self.ingredientes]
+            if hasattr(self, 'ingredientes'):
+                # Verificar si ingredientes es una colección válida
+                ingredientes = self.ingredientes
+                if ingredientes is not None:
+                    # Si es una relación lazy, podría ser un objeto Query o una lista
+                    if hasattr(ingredientes, '__iter__'):
+                        try:
+                            # Intentar convertir a lista si es necesario
+                            ingredientes_iterable = list(ingredientes) if not isinstance(ingredientes, list) else ingredientes
+                            ingredientes_list = [ing.to_dict() for ing in ingredientes_iterable if ing is not None]
+                        except Exception as e:
+                            import logging
+                            logging.warning(f"Error iterando ingredientes de receta {self.id}: {str(e)}")
+                            ingredientes_list = []
         except Exception as e:
             import logging
-            logging.warning(f"Error procesando ingredientes de receta {self.id}: {str(e)}")
+            logging.warning(f"Error procesando ingredientes de receta {self.id}: {str(e)}", exc_info=True)
             ingredientes_list = []
         
         return {

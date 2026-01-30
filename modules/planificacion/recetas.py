@@ -105,9 +105,16 @@ class RecetaService:
         # Usar selectinload para cargar ingredientes y joinedload para items
         # Esto evita problemas de lazy loading cuando la sesión está cerrada
         # Nota: selectinload para ingredientes (uno a muchos) y joinedload para item (muchos a uno)
-        query = db.query(Receta).options(
-            selectinload(Receta.ingredientes).joinedload('item')
-        )
+        # IMPORTANTE: Usar referencia directa a la clase, no strings
+        try:
+            query = db.query(Receta).options(
+                selectinload(Receta.ingredientes).joinedload(RecetaIngrediente.item)
+            )
+        except Exception as e:
+            # Si hay un error con el eager loading, usar query básico
+            import logging
+            logging.warning(f"Error en eager loading, usando query básico: {str(e)}")
+            query = db.query(Receta)
         
         if activa is not None:
             query = query.filter(Receta.activa == activa)
