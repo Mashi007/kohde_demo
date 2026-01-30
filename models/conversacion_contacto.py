@@ -33,6 +33,11 @@ class TipoMensajeContactoEnum(TypeDecorator):
             )
         return dialect.type_descriptor(SQLString(20))
     
+    def bind_expression(self, bindvalue):
+        """Agregar cast explícito al tipo enum de PostgreSQL."""
+        from sqlalchemy import cast
+        return cast(bindvalue, PG_ENUM('tipomensajecontacto', name='tipomensajecontacto', create_type=False))
+    
     def process_bind_param(self, value, dialect):
         if value is None:
             return None
@@ -73,6 +78,11 @@ class DireccionMensajeEnum(TypeDecorator):
                 PG_ENUM('direccionmensaje', name='direccionmensaje', create_type=False)
             )
         return dialect.type_descriptor(SQLString(20))
+    
+    def bind_expression(self, bindvalue):
+        """Agregar cast explícito al tipo enum de PostgreSQL."""
+        from sqlalchemy import cast
+        return cast(bindvalue, PG_ENUM('direccionmensaje', name='direccionmensaje', create_type=False))
     
     def process_bind_param(self, value, dialect):
         if value is None:

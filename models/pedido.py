@@ -31,6 +31,11 @@ class EstadoPedidoEnum(TypeDecorator):
             )
         return dialect.type_descriptor(SQLString(20))
     
+    def bind_expression(self, bindvalue):
+        """Agregar cast explícito al tipo enum de PostgreSQL."""
+        from sqlalchemy import cast
+        return cast(bindvalue, PG_ENUM('estadopedido', name='estadopedido', create_type=False))
+    
     def process_bind_param(self, value, dialect):
         """Convierte el enum a su NOMBRE (mayúsculas) antes de insertar en PostgreSQL."""
         if value is None:

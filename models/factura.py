@@ -36,6 +36,11 @@ class TipoFacturaEnum(TypeDecorator):
             )
         return dialect.type_descriptor(SQLString(20))
     
+    def bind_expression(self, bindvalue):
+        """Agregar cast explícito al tipo enum de PostgreSQL."""
+        from sqlalchemy import cast
+        return cast(bindvalue, PG_ENUM('tipofactura', name='tipofactura', create_type=False))
+    
     def process_bind_param(self, value, dialect):
         """Convierte el enum a su NOMBRE (mayúsculas) antes de insertar en PostgreSQL."""
         if value is None:
@@ -81,6 +86,11 @@ class EstadoFacturaEnum(TypeDecorator):
                 PG_ENUM('estadofactura', name='estadofactura', create_type=False)
             )
         return dialect.type_descriptor(SQLString(20))
+    
+    def bind_expression(self, bindvalue):
+        """Agregar cast explícito al tipo enum de PostgreSQL."""
+        from sqlalchemy import cast
+        return cast(bindvalue, PG_ENUM('estadofactura', name='estadofactura', create_type=False))
     
     def process_bind_param(self, value, dialect):
         """Convierte el enum a su NOMBRE (mayúsculas) antes de insertar en PostgreSQL."""

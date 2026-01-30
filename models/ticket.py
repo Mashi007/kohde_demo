@@ -43,6 +43,11 @@ class TipoTicketEnum(TypeDecorator):
             )
         return dialect.type_descriptor(SQLString(20))
     
+    def bind_expression(self, bindvalue):
+        """Agregar cast explícito al tipo enum de PostgreSQL."""
+        from sqlalchemy import cast
+        return cast(bindvalue, PG_ENUM('tipoticket', name='tipoticket', create_type=False))
+    
     def process_bind_param(self, value, dialect):
         if value is None:
             return None
@@ -84,6 +89,11 @@ class EstadoTicketEnum(TypeDecorator):
             )
         return dialect.type_descriptor(SQLString(20))
     
+    def bind_expression(self, bindvalue):
+        """Agregar cast explícito al tipo enum de PostgreSQL."""
+        from sqlalchemy import cast
+        return cast(bindvalue, PG_ENUM('estadoticket', name='estadoticket', create_type=False))
+    
     def process_bind_param(self, value, dialect):
         if value is None:
             return None
@@ -124,6 +134,11 @@ class PrioridadTicketEnum(TypeDecorator):
                 PG_ENUM('prioridadticket', name='prioridadticket', create_type=False)
             )
         return dialect.type_descriptor(SQLString(20))
+    
+    def bind_expression(self, bindvalue):
+        """Agregar cast explícito al tipo enum de PostgreSQL."""
+        from sqlalchemy import cast
+        return cast(bindvalue, PG_ENUM('prioridadticket', name='prioridadticket', create_type=False))
     
     def process_bind_param(self, value, dialect):
         if value is None:
