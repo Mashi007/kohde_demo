@@ -251,59 +251,148 @@ class InventarioService:
         Returns:
             Lista de diccionarios con los top 10 items más comprados (silos)
         """
+        import logging
+        import traceback
         from models.factura import EstadoFactura, TipoFactura
         
-        # Consulta para obtener los items más comprados
-        # Sumamos cantidad_aprobada de facturas aprobadas de proveedores
-        resultado_query = db.query(
-            FacturaItem.item_id,
-            func.sum(FacturaItem.cantidad_aprobada).label('total_comprado'),
-            func.count(FacturaItem.id).label('frecuencia_compra'),
-            func.max(Factura.fecha_aprobacion).label('ultima_compra')
-        ).join(Factura).filter(
-            Factura.estado == EstadoFactura.APROBADA,
-            Factura.tipo == TipoFactura.PROVEEDOR,
-            FacturaItem.item_id.isnot(None),
-            FacturaItem.cantidad_aprobada.isnot(None)
-        ).group_by(FacturaItem.item_id).order_by(
-            func.sum(FacturaItem.cantidad_aprobada).desc()
-        ).limit(10).all()
-        
-        resultado = []
-        for row in resultado_query:
-            item_id = row.item_id
-            total_comprado = float(row.total_comprado) if row.total_comprado else 0
-            frecuencia_compra = row.frecuencia_compra or 0
-            ultima_compra = row.ultima_compra
+        try:
+            # Consulta para obtener los items más comprados
+            # Sumamos cantidad_aprobada de facturas aprobadas de proveedores
+            # Usar comparación de enums con manejo de errores
+            try:
+                resultado_query = db.query(
+                    FacturaItem.item_id,
+                    func.sum(FacturaItem.cantidad_aprobada).label('total_comprado'),
+                    func.count(FacturaItem.id).label('frecuencia_compra'),
+                    func.max(Factura.fecha_aprobacion).label('ultima_compra')
+                ).join(Factura).filter(
+                    Factura.estado == EstadoFactura.APROBADA,
+                    Factura.tipo == TipoFactura.PROVEEDOR,
+                    FacturaItem.item_id.isnot(None),
+                    FacturaItem.cantidad_aprobada.isnot(None),
+                    FacturaItem.cantidad_aprobada > 0
+                ).group_by(FacturaItem.item_id).order_by(
+                    func.sum(FacturaItem.cantidad_aprobada).desc()
+                ).limit(10).all()
+            except Exception as query_error:
+                # Si falla la consulta con enums, intentar con comparación de strings
+                logging.warning(f"Error en consulta con enums, intentando con strings: {str(query_error)}")
+                from sqlalchemy import cast, String
+                resultado_query = db.query(
+                    FacturaItem.item_id,
+                    func.sum(FacturaItem.cantidad_aprobada).label('total_comprado'),
+                    func.count(FacturaItem.id).label('frecuencia_compra'),
+                    func.max(Factura.fecha_aprobacion).label('ultima_compra')
+                ).join(Factura).filter(
+                    cast(Factura.estado, String) == EstadoFactura.APROBADA.name,
+                    cast(Factura.tipo, String) == TipoFactura.PROVEEDOR.name,
+                    FacturaItem.item_id.isnot(None),
+                    FacturaItem.cantidad_aprobada.isnot(None),
+                    FacturaItem.cantidad_aprobada > 0
+                ).group_by(FacturaItem.item_id).order_by(
+                    func.sum(FacturaItem.cantidad_aprobada).desc()
+                ).limit(10).all()
             
-            # Obtener información del inventario para este item
-            inventario = db.query(Inventario).filter(Inventario.item_id == item_id).first()
-            item = db.query(Item).filter(Item.id == item_id).first()
+            resultado = []
+            for row in resultado_query:
+                try:
+                    item_id = row.item_id
+                    if not item_id:
+                        continue
+                    
+                    # Manejar valores None de forma segura
+                    total_comprado = float(row.total_comprado) if row.total_comprado is not None else 0.0
+                    frecuencia_compra = int(row.frecuencia_compra) if row.frecuencia_compra is not None else 0
+                    ultima_compra = row.ultima_compra
+                    
+                    # Obtener información del inventario para este item
+                    try:
+                        inventario = db.query(Inventario).filter(Inventario.item_id == item_id).first()
+                        item = db.query(Item).filter(Item.id == item_id).first()
+                    except Exception as query_error:
+                        logging.warning(f"Error consultando inventario/item para item_id={item_id}: {str(query_error)}")
+                        continue
+                    
+                    if not item:
+                        logging.warning(f"Item {item_id} no encontrado, saltando")
+                        continue
+                    
+                    # Si no hay inventario, crear datos por defecto
+                    if not inventario:
+                        # Intentar obtener unidad del item
+                        unidad = item.unidad if item.unidad else 'unidad'
+                        stock_actual = 0.0
+                        stock_minimo = 0.0
+                    else:
+                        unidad = inventario.unidad if inventario.unidad else (item.unidad if item.unidad else 'unidad')
+                        # Manejar valores None de forma segura
+                        stock_actual = float(inventario.cantidad_actual) if inventario.cantidad_actual is not None else 0.0
+                        stock_minimo = float(inventario.cantidad_minima) if inventario.cantidad_minima is not None else 0.0
+                    
+                    # Validar que los valores sean números válidos
+                    if not isinstance(stock_actual, (int, float)) or not isinstance(stock_minimo, (int, float)):
+                        logging.warning(f"Valores inválidos para item_id={item_id}: stock_actual={stock_actual}, stock_minimo={stock_minimo}")
+                        stock_actual = 0.0
+                        stock_minimo = 0.0
+                    
+                    # Calcular porcentaje de llenado del silo
+                    # El "silo" se llena hasta el stock mínimo, luego el exceso
+                    # Usamos el stock mínimo como referencia base para el 100%
+                    if stock_minimo > 0:
+                        nivel_maximo = max(stock_minimo * 2, stock_actual)
+                    else:
+                        nivel_maximo = max(stock_actual, 1.0)
+                    
+                    nivel_llenado = (stock_actual / nivel_maximo * 100) if nivel_maximo > 0 else 0.0
+                    porcentaje_minimo = (stock_minimo / nivel_maximo * 100) if nivel_maximo > 0 else 0.0
+                    
+                    # Determinar estado
+                    if stock_minimo > 0:
+                        if stock_actual < stock_minimo * 0.5:
+                            estado = 'critico'
+                        elif stock_actual < stock_minimo:
+                            estado = 'bajo'
+                        else:
+                            estado = 'ok'
+                    else:
+                        estado = 'ok' if stock_actual > 0 else 'sin_stock'
+                    
+                    # Formatear fecha de última compra
+                    ultima_compra_str = None
+                    if ultima_compra:
+                        try:
+                            if hasattr(ultima_compra, 'isoformat'):
+                                ultima_compra_str = ultima_compra.isoformat()
+                            else:
+                                ultima_compra_str = str(ultima_compra)
+                        except Exception as date_error:
+                            logging.warning(f"Error formateando fecha de última compra: {str(date_error)}")
+                            ultima_compra_str = None
+                    
+                    resultado.append({
+                        'item_id': item_id,
+                        'item_nombre': item.nombre if item.nombre else f'Item {item_id}',
+                        'unidad': unidad,
+                        'stock_total': round(stock_actual, 2),
+                        'stock_minimo': round(stock_minimo, 2),
+                        'stock_disponible': round(max(0, stock_actual - stock_minimo), 2),
+                        'total_comprado': round(total_comprado, 2),
+                        'frecuencia_compra': frecuencia_compra,
+                        'ultima_compra': ultima_compra_str,
+                        'porcentaje_minimo': round(porcentaje_minimo, 1),
+                        'nivel_llenado': round(nivel_llenado, 1),
+                        'estado': estado,
+                    })
+                except Exception as row_error:
+                    logging.error(f"Error procesando fila en obtener_top_10_items_mas_comprados: {str(row_error)}")
+                    logging.error(traceback.format_exc())
+                    # Continuar con la siguiente fila
+                    continue
             
-            if inventario and item:
-                # Calcular porcentaje de llenado del silo
-                stock_actual = float(inventario.cantidad_actual)
-                stock_minimo = float(inventario.cantidad_minima)
-                
-                # El "silo" se llena hasta el stock mínimo, luego el exceso
-                # Usamos el stock mínimo como referencia base para el 100%
-                nivel_maximo = max(stock_minimo * 2, stock_actual) if stock_minimo > 0 else max(stock_actual, 1)
-                nivel_llenado = (stock_actual / nivel_maximo * 100) if nivel_maximo > 0 else 0
-                porcentaje_minimo = (stock_minimo / nivel_maximo * 100) if nivel_maximo > 0 else 0
-                
-                resultado.append({
-                    'item_id': item_id,
-                    'item_nombre': item.nombre,
-                    'unidad': inventario.unidad,
-                    'stock_total': stock_actual,
-                    'stock_minimo': stock_minimo,
-                    'stock_disponible': max(0, stock_actual - stock_minimo),
-                    'total_comprado': total_comprado,
-                    'frecuencia_compra': frecuencia_compra,
-                    'ultima_compra': ultima_compra.isoformat() if ultima_compra else None,
-                    'porcentaje_minimo': round(porcentaje_minimo, 1),
-                    'nivel_llenado': round(nivel_llenado, 1),
-                    'estado': 'critico' if stock_actual < stock_minimo * 0.5 else 'bajo' if stock_actual < stock_minimo else 'ok',
-                })
-        
-        return resultado
+            return resultado
+            
+        except Exception as e:
+            logging.error(f"Error crítico en obtener_top_10_items_mas_comprados: {str(e)}")
+            logging.error(traceback.format_exc())
+            # Retornar lista vacía en lugar de lanzar excepción para evitar error 500
+            return []

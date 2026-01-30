@@ -532,10 +532,49 @@ def obtener_dashboard_inventario():
 def obtener_silos_inventario():
     """Obtiene los top 10 items más comprados para visualización tipo silos."""
     try:
+        import logging
+        import traceback
+        
+        # Verificar que la sesión esté activa
+        try:
+            if not db.session.is_active:
+                db.session.rollback()
+        except Exception as session_error:
+            logging.warning(f"Error verificando sesión: {str(session_error)}")
+            try:
+                db.session.expire_all()
+            except:
+                pass
+        
         silos = InventarioService.obtener_top_10_items_mas_comprados(db.session)
+        
+        # Asegurar que siempre retornamos una lista
+        if not isinstance(silos, list):
+            logging.warning("obtener_top_10_items_mas_comprados no retornó una lista, convirtiendo")
+            silos = []
+        
         return success_response(silos)
+    except ValueError as e:
+        import logging
+        logging.error(f"Error de validación en obtener_silos_inventario: {str(e)}")
+        return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
-        return error_response(str(e), 500, 'INTERNAL_ERROR')
+        import logging
+        import traceback
+        error_trace = traceback.format_exc()
+        logging.error(f"Error en obtener_silos_inventario: {str(e)}")
+        logging.error(error_trace)
+        
+        # Asegurar rollback en caso de error
+        try:
+            if db.session.is_active:
+                db.session.rollback()
+        except Exception as rollback_error:
+            logging.error(f"Error al hacer rollback: {str(rollback_error)}")
+        
+        # Retornar lista vacía en lugar de error 500 para evitar que el frontend falle
+        logging.warning("Retornando lista vacía debido a error (ver logs para detalles)")
+        return success_response([])
 
 # ========== RUTAS DE REQUERIMIENTOS ==========
 
