@@ -160,52 +160,102 @@ class InventarioService:
         Returns:
             Lista de diccionarios con información completa del inventario
         """
-        inventarios = db.query(Inventario).all()
-        resultado = []
+        import logging
+        import traceback
         
-        for inv in inventarios:
-            item_dict = inv.to_dict()
+        try:
+            inventarios = db.query(Inventario).all()
+            resultado = []
             
-            # Obtener último ingreso (factura aprobada más reciente con este item)
-            from models.factura import EstadoFactura, TipoFactura
-            from models.requerimiento import EstadoRequerimiento
+            for inv in inventarios:
+                try:
+                    item_dict = inv.to_dict()
+                    
+                    # Obtener último ingreso (factura aprobada más reciente con este item)
+                    from models.factura import EstadoFactura, TipoFactura
+                    from models.requerimiento import EstadoRequerimiento
+                    
+                    try:
+                        ultimo_ingreso = db.query(FacturaItem).join(Factura).filter(
+                            FacturaItem.item_id == inv.item_id,
+                            Factura.estado == EstadoFactura.APROBADA,
+                            Factura.tipo == TipoFactura.PROVEEDOR,
+                            FacturaItem.cantidad_aprobada.isnot(None)
+                        ).order_by(desc(Factura.fecha_aprobacion)).first()
+                    except Exception as query_error:
+                        logging.warning(f"Error consultando último ingreso para item_id={inv.item_id}: {str(query_error)}")
+                        ultimo_ingreso = None
+                    
+                    # Obtener último egreso (requerimiento entregado más reciente con este item)
+                    try:
+                        ultimo_egreso = db.query(RequerimientoItem).join(Requerimiento).filter(
+                            RequerimientoItem.item_id == inv.item_id,
+                            Requerimiento.estado == EstadoRequerimiento.ENTREGADO,
+                            RequerimientoItem.cantidad_entregada.isnot(None)
+                        ).order_by(desc(Requerimiento.fecha)).first()
+                    except Exception as query_error:
+                        logging.warning(f"Error consultando último egreso para item_id={inv.item_id}: {str(query_error)}")
+                        ultimo_egreso = None
+                    
+                    # Calcular stock disponible (cantidad_actual - cantidad_minima)
+                    try:
+                        cantidad_actual = float(inv.cantidad_actual) if inv.cantidad_actual is not None else 0.0
+                        cantidad_minima = float(inv.cantidad_minima) if inv.cantidad_minima is not None else 0.0
+                        stock_disponible = max(0, cantidad_actual - cantidad_minima)
+                    except Exception as calc_error:
+                        logging.warning(f"Error calculando stock disponible para item_id={inv.item_id}: {str(calc_error)}")
+                        stock_disponible = 0.0
             
-            ultimo_ingreso = db.query(FacturaItem).join(Factura).filter(
-                FacturaItem.item_id == inv.item_id,
-                Factura.estado == EstadoFactura.APROBADA,
-                Factura.tipo == TipoFactura.PROVEEDOR,
-                FacturaItem.cantidad_aprobada.isnot(None)
-            ).order_by(desc(Factura.fecha_aprobacion)).first()
+            # Manejar último ingreso con validaciones seguras
+            try:
+                if ultimo_ingreso and ultimo_ingreso.factura:
+                    item_dict['ultimo_ingreso'] = {
+                        'fecha': ultimo_ingreso.factura.fecha_aprobacion.isoformat() if ultimo_ingreso.factura.fecha_aprobacion else None,
+                        'cantidad': float(ultimo_ingreso.cantidad_aprobada) if ultimo_ingreso.cantidad_aprobada is not None else None,
+                        'factura_numero': ultimo_ingreso.factura.numero_factura if ultimo_ingreso.factura.numero_factura else None,
+                        'proveedor': ultimo_ingreso.factura.proveedor.nombre if ultimo_ingreso.factura.proveedor else None,
+                    }
+                else:
+                    item_dict['ultimo_ingreso'] = None
+            except Exception as e:
+                import logging
+                logging.warning(f"Error procesando último ingreso para inventario item_id={inv.item_id}: {str(e)}")
+                item_dict['ultimo_ingreso'] = None
             
-            # Obtener último egreso (requerimiento entregado más reciente con este item)
-            ultimo_egreso = db.query(RequerimientoItem).join(Requerimiento).filter(
-                RequerimientoItem.item_id == inv.item_id,
-                Requerimiento.estado == EstadoRequerimiento.ENTREGADO,
-                RequerimientoItem.cantidad_entregada.isnot(None)
-            ).order_by(desc(Requerimiento.fecha)).first()
+            # Manejar último egreso con validaciones seguras
+            try:
+                if ultimo_egreso and ultimo_egreso.requerimiento:
+                    item_dict['ultimo_egreso'] = {
+                        'fecha': ultimo_egreso.requerimiento.fecha.isoformat() if ultimo_egreso.requerimiento.fecha else None,
+                        'cantidad': float(ultimo_egreso.cantidad_entregada) if ultimo_egreso.cantidad_entregada is not None else None,
+                        'requerimiento_id': ultimo_egreso.requerimiento_id if ultimo_egreso.requerimiento_id else None,
+                    }
+                else:
+                    item_dict['ultimo_egreso'] = None
+            except Exception as e:
+                import logging
+                logging.warning(f"Error procesando último egreso para inventario item_id={inv.item_id}: {str(e)}")
+                item_dict['ultimo_egreso'] = None
             
-            # Calcular stock disponible (cantidad_actual - cantidad_minima)
-            stock_disponible = max(0, float(inv.cantidad_actual) - float(inv.cantidad_minima))
+                    item_dict['stock_disponible'] = stock_disponible
+                    try:
+                        item_dict['stock_seguridad'] = float(inv.cantidad_minima) if inv.cantidad_minima is not None else 0.0
+                    except Exception:
+                        item_dict['stock_seguridad'] = 0.0
+                    
+                    resultado.append(item_dict)
+                except Exception as item_error:
+                    logging.error(f"Error procesando inventario item_id={inv.item_id}: {str(item_error)}")
+                    logging.error(traceback.format_exc())
+                    # Continuar con el siguiente item
+                    continue
             
-            item_dict['ultimo_ingreso'] = {
-                'fecha': ultimo_ingreso.factura.fecha_aprobacion.isoformat() if ultimo_ingreso and ultimo_ingreso.factura.fecha_aprobacion else None,
-                'cantidad': float(ultimo_ingreso.cantidad_aprobada) if ultimo_ingreso and ultimo_ingreso.cantidad_aprobada else None,
-                'factura_numero': ultimo_ingreso.factura.numero_factura if ultimo_ingreso else None,
-                'proveedor': ultimo_ingreso.factura.proveedor.nombre if ultimo_ingreso and ultimo_ingreso.factura.proveedor else None,
-            } if ultimo_ingreso else None
-            
-            item_dict['ultimo_egreso'] = {
-                'fecha': ultimo_egreso.requerimiento.fecha.isoformat() if ultimo_egreso and ultimo_egreso.requerimiento.fecha else None,
-                'cantidad': float(ultimo_egreso.cantidad_entregada) if ultimo_egreso and ultimo_egreso.cantidad_entregada else None,
-                'requerimiento_id': ultimo_egreso.requerimiento_id if ultimo_egreso else None,
-            } if ultimo_egreso else None
-            
-            item_dict['stock_disponible'] = stock_disponible
-            item_dict['stock_seguridad'] = float(inv.cantidad_minima)
-            
-            resultado.append(item_dict)
-        
-        return resultado
+            return resultado
+        except Exception as e:
+            logging.error(f"Error crítico en obtener_inventario_completo_con_movimientos: {str(e)}")
+            logging.error(traceback.format_exc())
+            # Retornar lista vacía en lugar de lanzar excepción
+            return []
     
     @staticmethod
     def obtener_resumen_dashboard(db: Session) -> Dict:

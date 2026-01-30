@@ -134,6 +134,14 @@ export default function Dashboard() {
     staleTime: 30000,
   })
 
+  // Mermas tendencia por categoría
+  const [categoriaSeleccionada, setCategoriaSeleccionada] = useState('MATERIA_PRIMA')
+  const { data: mermasTendenciaCategoria, isLoading: mermasTendenciaCategoriaLoading } = useQuery({
+    queryKey: ['mermas-tendencia-categoria', fechaInicio, fechaFin, categoriaSeleccionada],
+    queryFn: () => api.get(`/reportes/kpis/mermas-tendencia-categoria?categoria=${categoriaSeleccionada}&fecha_inicio=${fechaInicio}&fecha_fin=${fechaFin}`).then(extractData),
+    staleTime: 30000,
+  })
+
   // Datos legacy para compatibilidad
   const { data: stockBajoResponse } = useQuery({
     queryKey: ['stock-bajo'],
@@ -157,6 +165,19 @@ export default function Dashboard() {
   const costoCharolaEstadisticas = costoCharolaServicio?.estadisticas || {}
   const mermasTolerableSeries = mermasTolerable?.series || []
   const mermasTolerableEstadisticas = mermasTolerable?.estadisticas || {}
+  const mermasTendenciaCategoriaSeries = mermasTendenciaCategoria?.series || []
+  const mermasTendenciaCategoriaEstadisticas = mermasTendenciaCategoria?.estadisticas || {}
+  const categoriaActual = mermasTendenciaCategoria?.categoria || categoriaSeleccionada
+
+  // Categorías disponibles
+  const categoriasAlimentos = [
+    { value: 'MATERIA_PRIMA', label: 'Materia Prima' },
+    { value: 'INSUMO', label: 'Insumo' },
+    { value: 'PRODUCTO_TERMINADO', label: 'Producto Terminado' },
+    { value: 'BEBIDA', label: 'Bebida' },
+    { value: 'LIMPIEZA', label: 'Limpieza' },
+    { value: 'OTROS', label: 'Otros' }
+  ]
 
   // Datos para gráficos de donut
   const facturasPorEstado = facturasChart?.por_estado || []
@@ -359,6 +380,185 @@ export default function Dashboard() {
           <p className="text-3xl font-bold mb-1">{kpis.inventario?.items_stock_bajo || 0}</p>
           <p className="text-xs text-slate-500">Items críticos</p>
         </div>
+      </div>
+
+      {/* Gráfico Comparativo de Charolas - PRIMERO Y DESTACADO */}
+      <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-6 rounded-xl border border-slate-700 shadow-xl">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-2xl font-bold flex items-center gap-3 mb-2">
+              <Calendar size={28} className="text-cyan-400" />
+              Charolas Programadas vs Servidas
+            </h2>
+            {charolasEstadisticas.eficiencia_promedio && (
+              <p className="text-slate-400 text-sm">
+                Eficiencia promedio: <span className="font-bold text-cyan-400">{charolasEstadisticas.eficiencia_promedio}%</span>
+                {' | '}
+                Total Programadas: <span className="font-semibold">{charolasEstadisticas.total_programadas || 0}</span>
+                {' | '}
+                Total Servidas: <span className="font-semibold">{charolasEstadisticas.total_servidas || 0}</span>
+              </p>
+            )}
+          </div>
+        </div>
+        {charolasComparacionLoading ? (
+          <div className="h-96 flex items-center justify-center">
+            <LoadingSpinner />
+          </div>
+        ) : charolasComparacionSeries.length > 0 ? (
+          <ResponsiveContainer width="100%" height={450}>
+            <ComposedChart 
+              data={charolasComparacionSeries}
+              margin={{ top: 20, right: 30, left: 20, bottom: 80 }}
+            >
+              <defs>
+                <linearGradient id="colorProgramadas" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={COLORS.blue} stopOpacity={0.9} />
+                  <stop offset="50%" stopColor={COLORS.blue} stopOpacity={0.6} />
+                  <stop offset="95%" stopColor={COLORS.blue} stopOpacity={0.1} />
+                </linearGradient>
+                <linearGradient id="colorServidas" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={COLORS.green} stopOpacity={0.9} />
+                  <stop offset="50%" stopColor={COLORS.green} stopOpacity={0.6} />
+                  <stop offset="95%" stopColor={COLORS.green} stopOpacity={0.1} />
+                </linearGradient>
+                <filter id="areaShadow">
+                  <feDropShadow dx="0" dy="3" stdDeviation="4" floodOpacity="0.25"/>
+                </filter>
+              </defs>
+              <CartesianGrid 
+                strokeDasharray="3 3" 
+                stroke="#374151" 
+                opacity={0.2}
+                vertical={false}
+              />
+              <XAxis
+                dataKey="fecha"
+                stroke="#9ca3af"
+                tick={{ fill: '#9ca3af', fontSize: 11 }}
+                tickFormatter={(value) => format(new Date(value), 'dd/MM', { locale: es })}
+                tickLine={{ stroke: '#4b5563' }}
+                axisLine={{ stroke: '#4b5563' }}
+              />
+              <YAxis 
+                stroke="#9ca3af"
+                tick={{ fill: '#9ca3af', fontSize: 11 }}
+                tickLine={{ stroke: '#4b5563' }}
+                axisLine={{ stroke: '#4b5563' }}
+              />
+              <Tooltip
+                content={({ active, payload, label }) => {
+                  if (active && payload && payload.length) {
+                    const programadas = payload.find(p => p.dataKey === 'programadas')?.value || 0
+                    const servidas = payload.find(p => p.dataKey === 'servidas')?.value || 0
+                    const diferencia = programadas - servidas
+                    const eficiencia = programadas > 0 ? ((servidas / programadas) * 100).toFixed(1) : 0
+                    
+                    return (
+                      <div className="bg-gradient-to-br from-slate-800 via-slate-800 to-slate-900 border-2 border-slate-600 rounded-xl p-5 shadow-2xl backdrop-blur-md min-w-[260px]">
+                        <div className="border-b-2 border-slate-600 pb-3 mb-3">
+                          <p className="text-slate-100 font-bold text-base">
+                            {label ? format(new Date(label), 'EEEE, dd MMM yyyy', { locale: es }) : ''}
+                          </p>
+                        </div>
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between gap-4 p-2 rounded-lg bg-blue-500/10">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-3.5 h-3.5 rounded-full bg-blue-500 shadow-lg" />
+                              <span className="text-sm font-semibold text-slate-300">Programadas</span>
+                            </div>
+                            <span className="text-lg font-bold text-blue-400">{programadas}</span>
+                          </div>
+                          <div className="flex items-center justify-between gap-4 p-2 rounded-lg bg-green-500/10">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-3.5 h-3.5 rounded-full bg-green-500 shadow-lg" />
+                              <span className="text-sm font-semibold text-slate-300">Servidas</span>
+                            </div>
+                            <span className="text-lg font-bold text-green-400">{servidas}</span>
+                          </div>
+                          <div className="border-t-2 border-slate-600 pt-3 mt-3 space-y-2">
+                            <div className="flex items-center justify-between gap-4">
+                              <span className="text-xs text-slate-400 font-medium">Diferencia:</span>
+                              <span className={`font-bold text-sm ${diferencia >= 0 ? 'text-yellow-400' : 'text-red-400'}`}>
+                                {diferencia >= 0 ? '+' : ''}{diferencia}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between gap-4">
+                              <span className="text-xs text-slate-400 font-medium">Eficiencia:</span>
+                              <span className={`font-bold text-sm ${eficiencia >= 90 ? 'text-green-400' : eficiencia >= 80 ? 'text-yellow-400' : 'text-red-400'}`}>
+                                {eficiencia}%
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  }
+                  return null
+                }}
+                cursor={{ stroke: COLORS.blue, strokeWidth: 2, strokeDasharray: '5 5' }}
+                animationDuration={200}
+              />
+              <Legend
+                wrapperStyle={{ paddingTop: '30px', paddingBottom: '10px' }}
+                iconType="circle"
+                iconSize={12}
+                formatter={(value) => (
+                  <span className="text-slate-300 text-sm font-semibold">
+                    {value === 'programadas' ? 'Programadas' : 'Servidas'}
+                  </span>
+                )}
+              />
+              <Area
+                type="monotone"
+                dataKey="programadas"
+                stroke={COLORS.blue}
+                strokeWidth={4}
+                fillOpacity={1}
+                fill="url(#colorProgramadas)"
+                name="programadas"
+                dot={{ fill: COLORS.blue, r: 5, strokeWidth: 2, stroke: '#fff' }}
+                activeDot={{ r: 8, strokeWidth: 3, stroke: '#fff', fill: COLORS.blue }}
+                animationDuration={1200}
+                animationEasing="ease-out"
+                filter="url(#areaShadow)"
+              />
+              <Area
+                type="monotone"
+                dataKey="servidas"
+                stroke={COLORS.green}
+                strokeWidth={4}
+                fillOpacity={1}
+                fill="url(#colorServidas)"
+                name="servidas"
+                dot={{ fill: COLORS.green, r: 5, strokeWidth: 2, stroke: '#fff' }}
+                activeDot={{ r: 8, strokeWidth: 3, stroke: '#fff', fill: COLORS.green }}
+                animationDuration={1200}
+                animationEasing="ease-out"
+                animationBegin={200}
+                filter="url(#areaShadow)"
+              />
+              <ReferenceLine 
+                y={charolasEstadisticas.total_programadas ? Math.round(charolasEstadisticas.total_programadas / (charolasComparacionSeries.length || 1)) : 0} 
+                stroke={COLORS.blue} 
+                strokeDasharray="5 5" 
+                strokeOpacity={0.5}
+                label={{ value: "Promedio Programadas", position: "right", fill: COLORS.blue, fontSize: 10 }}
+              />
+              <Brush 
+                dataKey="fecha"
+                height={40}
+                stroke={COLORS.blue}
+                fill="#1e293b"
+                tickFormatter={(value) => format(new Date(value), 'dd/MM', { locale: es })}
+              />
+            </ComposedChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="h-96 flex items-center justify-center text-slate-400">
+            No hay datos disponibles
+          </div>
+        )}
       </div>
 
       {/* Gráficos principales */}
@@ -722,185 +922,6 @@ export default function Dashboard() {
             </div>
           )}
         </div>
-      </div>
-
-      {/* Gráfico Comparativo de Charolas - Destacado */}
-      <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-6 rounded-xl border border-slate-700 shadow-xl">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-2xl font-bold flex items-center gap-3 mb-2">
-              <Calendar size={28} className="text-cyan-400" />
-              Charolas Programadas vs Servidas
-            </h2>
-            {charolasEstadisticas.eficiencia_promedio && (
-              <p className="text-slate-400 text-sm">
-                Eficiencia promedio: <span className="font-bold text-cyan-400">{charolasEstadisticas.eficiencia_promedio}%</span>
-                {' | '}
-                Total Programadas: <span className="font-semibold">{charolasEstadisticas.total_programadas || 0}</span>
-                {' | '}
-                Total Servidas: <span className="font-semibold">{charolasEstadisticas.total_servidas || 0}</span>
-              </p>
-            )}
-          </div>
-        </div>
-        {charolasComparacionLoading ? (
-          <div className="h-96 flex items-center justify-center">
-            <LoadingSpinner />
-          </div>
-        ) : charolasComparacionSeries.length > 0 ? (
-          <ResponsiveContainer width="100%" height={450}>
-            <ComposedChart 
-              data={charolasComparacionSeries}
-              margin={{ top: 20, right: 30, left: 20, bottom: 80 }}
-            >
-              <defs>
-                <linearGradient id="colorProgramadas" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={COLORS.blue} stopOpacity={0.9} />
-                  <stop offset="50%" stopColor={COLORS.blue} stopOpacity={0.6} />
-                  <stop offset="95%" stopColor={COLORS.blue} stopOpacity={0.1} />
-                </linearGradient>
-                <linearGradient id="colorServidas" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={COLORS.green} stopOpacity={0.9} />
-                  <stop offset="50%" stopColor={COLORS.green} stopOpacity={0.6} />
-                  <stop offset="95%" stopColor={COLORS.green} stopOpacity={0.1} />
-                </linearGradient>
-                <filter id="areaShadow">
-                  <feDropShadow dx="0" dy="3" stdDeviation="4" floodOpacity="0.25"/>
-                </filter>
-              </defs>
-              <CartesianGrid 
-                strokeDasharray="3 3" 
-                stroke="#374151" 
-                opacity={0.2}
-                vertical={false}
-              />
-              <XAxis
-                dataKey="fecha"
-                stroke="#9ca3af"
-                tick={{ fill: '#9ca3af', fontSize: 11 }}
-                tickFormatter={(value) => format(new Date(value), 'dd/MM', { locale: es })}
-                tickLine={{ stroke: '#4b5563' }}
-                axisLine={{ stroke: '#4b5563' }}
-              />
-              <YAxis 
-                stroke="#9ca3af"
-                tick={{ fill: '#9ca3af', fontSize: 11 }}
-                tickLine={{ stroke: '#4b5563' }}
-                axisLine={{ stroke: '#4b5563' }}
-              />
-              <Tooltip
-                content={({ active, payload, label }) => {
-                  if (active && payload && payload.length) {
-                    const programadas = payload.find(p => p.dataKey === 'programadas')?.value || 0
-                    const servidas = payload.find(p => p.dataKey === 'servidas')?.value || 0
-                    const diferencia = programadas - servidas
-                    const eficiencia = programadas > 0 ? ((servidas / programadas) * 100).toFixed(1) : 0
-                    
-                    return (
-                      <div className="bg-gradient-to-br from-slate-800 via-slate-800 to-slate-900 border-2 border-slate-600 rounded-xl p-5 shadow-2xl backdrop-blur-md min-w-[260px]">
-                        <div className="border-b-2 border-slate-600 pb-3 mb-3">
-                          <p className="text-slate-100 font-bold text-base">
-                            {label ? format(new Date(label), 'EEEE, dd MMM yyyy', { locale: es }) : ''}
-                          </p>
-                        </div>
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between gap-4 p-2 rounded-lg bg-blue-500/10">
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-3.5 h-3.5 rounded-full bg-blue-500 shadow-lg" />
-                              <span className="text-sm font-semibold text-slate-300">Programadas</span>
-                            </div>
-                            <span className="text-lg font-bold text-blue-400">{programadas}</span>
-                          </div>
-                          <div className="flex items-center justify-between gap-4 p-2 rounded-lg bg-green-500/10">
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-3.5 h-3.5 rounded-full bg-green-500 shadow-lg" />
-                              <span className="text-sm font-semibold text-slate-300">Servidas</span>
-                            </div>
-                            <span className="text-lg font-bold text-green-400">{servidas}</span>
-                          </div>
-                          <div className="border-t-2 border-slate-600 pt-3 mt-3 space-y-2">
-                            <div className="flex items-center justify-between gap-4">
-                              <span className="text-xs text-slate-400 font-medium">Diferencia:</span>
-                              <span className={`font-bold text-sm ${diferencia >= 0 ? 'text-yellow-400' : 'text-red-400'}`}>
-                                {diferencia >= 0 ? '+' : ''}{diferencia}
-                              </span>
-                            </div>
-                            <div className="flex items-center justify-between gap-4">
-                              <span className="text-xs text-slate-400 font-medium">Eficiencia:</span>
-                              <span className={`font-bold text-sm ${eficiencia >= 90 ? 'text-green-400' : eficiencia >= 80 ? 'text-yellow-400' : 'text-red-400'}`}>
-                                {eficiencia}%
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  }
-                  return null
-                }}
-                cursor={{ stroke: COLORS.blue, strokeWidth: 2, strokeDasharray: '5 5' }}
-                animationDuration={200}
-              />
-              <Legend
-                wrapperStyle={{ paddingTop: '30px', paddingBottom: '10px' }}
-                iconType="circle"
-                iconSize={12}
-                formatter={(value) => (
-                  <span className="text-slate-300 text-sm font-semibold">
-                    {value === 'programadas' ? 'Programadas' : 'Servidas'}
-                  </span>
-                )}
-              />
-              <Area
-                type="monotone"
-                dataKey="programadas"
-                stroke={COLORS.blue}
-                strokeWidth={4}
-                fillOpacity={1}
-                fill="url(#colorProgramadas)"
-                name="programadas"
-                dot={{ fill: COLORS.blue, r: 5, strokeWidth: 2, stroke: '#fff' }}
-                activeDot={{ r: 8, strokeWidth: 3, stroke: '#fff', fill: COLORS.blue }}
-                animationDuration={1200}
-                animationEasing="ease-out"
-                filter="url(#areaShadow)"
-              />
-              <Area
-                type="monotone"
-                dataKey="servidas"
-                stroke={COLORS.green}
-                strokeWidth={4}
-                fillOpacity={1}
-                fill="url(#colorServidas)"
-                name="servidas"
-                dot={{ fill: COLORS.green, r: 5, strokeWidth: 2, stroke: '#fff' }}
-                activeDot={{ r: 8, strokeWidth: 3, stroke: '#fff', fill: COLORS.green }}
-                animationDuration={1200}
-                animationEasing="ease-out"
-                animationBegin={200}
-                filter="url(#areaShadow)"
-              />
-              <ReferenceLine 
-                y={charolasEstadisticas.total_programadas ? Math.round(charolasEstadisticas.total_programadas / (charolasComparacionSeries.length || 1)) : 0} 
-                stroke={COLORS.blue} 
-                strokeDasharray="5 5" 
-                strokeOpacity={0.5}
-                label={{ value: "Promedio Programadas", position: "right", fill: COLORS.blue, fontSize: 10 }}
-              />
-              <Brush 
-                dataKey="fecha"
-                height={40}
-                stroke={COLORS.blue}
-                fill="#1e293b"
-                tickFormatter={(value) => format(new Date(value), 'dd/MM', { locale: es })}
-              />
-            </ComposedChart>
-          </ResponsiveContainer>
-        ) : (
-          <div className="h-96 flex items-center justify-center text-slate-400">
-            No hay datos disponibles
-          </div>
-        )}
       </div>
 
       {/* Gráfico de Mermas - Destacado */}
@@ -1581,6 +1602,213 @@ export default function Dashboard() {
                 tickFormatter={(value) => format(new Date(value), 'dd/MM', { locale: es })}
               />
             </ComposedChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="h-96 flex items-center justify-center text-slate-400">
+            No hay datos disponibles
+          </div>
+        )}
+      </div>
+
+      {/* Gráfico de Tendencia de Mermas por Categoría */}
+      <div className="bg-gradient-to-br from-slate-800 to-slate-900 p-6 rounded-xl border border-slate-700 shadow-xl">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-2xl font-bold flex items-center gap-3 mb-2">
+              <TrendingUp size={28} className="text-orange-400" />
+              Tendencia de Mermas por Categoría
+            </h2>
+            {mermasTendenciaCategoriaEstadisticas.promedio_merma_real !== undefined && (
+              <p className="text-slate-400 text-sm">
+                Promedio Real: <span className="font-bold text-red-400">{mermasTendenciaCategoriaEstadisticas.promedio_merma_real?.toFixed(2) || 0}</span>
+                {' | '}
+                Promedio Máximo: <span className="font-semibold text-cyan-400">{mermasTendenciaCategoriaEstadisticas.promedio_merma_maxima?.toFixed(2) || 0}</span>
+                {' | '}
+                Días Excedidos: <span className={`font-semibold ${mermasTendenciaCategoriaEstadisticas.dias_excedidos > 0 ? 'text-red-400' : 'text-green-400'}`}>
+                  {mermasTendenciaCategoriaEstadisticas.dias_excedidos || 0} ({(mermasTendenciaCategoriaEstadisticas.porcentaje_dias_excedidos || 0).toFixed(1)}%)
+                </span>
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <label className="text-sm text-slate-300 font-semibold">Categoría:</label>
+            <select
+              value={categoriaSeleccionada}
+              onChange={(e) => setCategoriaSeleccionada(e.target.value)}
+              className="bg-slate-700 border border-slate-600 rounded-lg px-4 py-2 text-slate-200 font-medium focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all"
+            >
+              {categoriasAlimentos.map((cat) => (
+                <option key={cat.value} value={cat.value}>
+                  {cat.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        {mermasTendenciaCategoriaLoading ? (
+          <div className="h-96 flex items-center justify-center">
+            <LoadingSpinner />
+          </div>
+        ) : mermasTendenciaCategoriaSeries.length > 0 ? (
+          <ResponsiveContainer width="100%" height={450}>
+            <LineChart 
+              data={mermasTendenciaCategoriaSeries}
+              margin={{ top: 20, right: 30, left: 20, bottom: 80 }}
+            >
+              <defs>
+                <linearGradient id="colorMermaReal" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={COLORS.red} stopOpacity={0.9} />
+                  <stop offset="50%" stopColor={COLORS.red} stopOpacity={0.6} />
+                  <stop offset="95%" stopColor={COLORS.red} stopOpacity={0.1} />
+                </linearGradient>
+                <linearGradient id="colorMermaMaxima" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={COLORS.cyan} stopOpacity={0.9} />
+                  <stop offset="50%" stopColor={COLORS.cyan} stopOpacity={0.6} />
+                  <stop offset="95%" stopColor={COLORS.cyan} stopOpacity={0.1} />
+                </linearGradient>
+                <filter id="lineShadow">
+                  <feDropShadow dx="0" dy="3" stdDeviation="4" floodOpacity="0.25"/>
+                </filter>
+              </defs>
+              <CartesianGrid 
+                strokeDasharray="3 3" 
+                stroke="#374151" 
+                opacity={0.2}
+                vertical={false}
+              />
+              <XAxis
+                dataKey="fecha"
+                stroke="#9ca3af"
+                tick={{ fill: '#9ca3af', fontSize: 11 }}
+                tickFormatter={(value) => format(new Date(value), 'dd/MM', { locale: es })}
+                tickLine={{ stroke: '#4b5563' }}
+                axisLine={{ stroke: '#4b5563' }}
+              />
+              <YAxis 
+                stroke="#9ca3af"
+                tick={{ fill: '#9ca3af', fontSize: 11 }}
+                tickLine={{ stroke: '#4b5563' }}
+                axisLine={{ stroke: '#4b5563' }}
+                label={{ value: 'Cantidad', angle: -90, position: 'insideLeft', fill: '#9ca3af', fontSize: 12 }}
+              />
+              <Tooltip
+                content={({ active, payload, label }) => {
+                  if (active && payload && payload.length) {
+                    const mermaReal = payload.find(p => p.dataKey === 'merma_real')?.value || 0
+                    const mermaMaxima = payload.find(p => p.dataKey === 'merma_maxima_aceptada')?.value || 0
+                    const diferencia = mermaReal - mermaMaxima
+                    const porcentajeUso = mermaMaxima > 0 ? ((mermaReal / mermaMaxima) * 100).toFixed(1) : 0
+                    const excede = diferencia > 0
+                    
+                    return (
+                      <div className="bg-gradient-to-br from-slate-800 via-slate-800 to-slate-900 border-2 border-slate-600 rounded-xl p-5 shadow-2xl backdrop-blur-md min-w-[280px]">
+                        <div className="border-b-2 border-slate-600 pb-3 mb-3">
+                          <p className="text-slate-100 font-bold text-base">
+                            {label ? format(new Date(label), 'EEEE, dd MMM yyyy', { locale: es }) : ''}
+                          </p>
+                          <p className="text-xs text-slate-400 mt-1 capitalize">
+                            Categoría: {categoriasAlimentos.find(c => c.value === categoriaActual)?.label || categoriaActual}
+                          </p>
+                        </div>
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between gap-4 p-2 rounded-lg bg-red-500/10">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-3.5 h-3.5 rounded-full bg-red-500 shadow-lg" />
+                              <span className="text-sm font-semibold text-slate-300">Merma Real</span>
+                            </div>
+                            <span className="text-lg font-bold text-red-400">{mermaReal.toFixed(2)}</span>
+                          </div>
+                          <div className="flex items-center justify-between gap-4 p-2 rounded-lg bg-cyan-500/10">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-3.5 h-3.5 rounded-full bg-cyan-500 shadow-lg" />
+                              <span className="text-sm font-semibold text-slate-300">Máxima Aceptada</span>
+                            </div>
+                            <span className="text-lg font-bold text-cyan-400">{mermaMaxima.toFixed(2)}</span>
+                          </div>
+                          <div className="border-t-2 border-slate-600 pt-3 mt-3 space-y-2">
+                            <div className="flex items-center justify-between gap-4">
+                              <span className="text-xs text-slate-400 font-medium">Diferencia:</span>
+                              <span className={`font-bold text-sm ${excede ? 'text-red-400' : 'text-green-400'}`}>
+                                {excede ? '+' : ''}{diferencia.toFixed(2)}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between gap-4">
+                              <span className="text-xs text-slate-400 font-medium">% Uso:</span>
+                              <span className={`font-bold text-sm ${porcentajeUso >= 100 ? 'text-red-400' : porcentajeUso >= 90 ? 'text-yellow-400' : 'text-green-400'}`}>
+                                {porcentajeUso}%
+                              </span>
+                            </div>
+                            {excede && (
+                              <div className="mt-2 p-2 bg-red-500/20 border border-red-500/50 rounded-lg">
+                                <p className="text-xs text-red-400 font-semibold flex items-center gap-1">
+                                  <AlertTriangle size={12} />
+                                  Límite excedido
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  }
+                  return null
+                }}
+                cursor={{ stroke: COLORS.red, strokeWidth: 2, strokeDasharray: '5 5' }}
+                animationDuration={200}
+              />
+              <Legend
+                wrapperStyle={{ paddingTop: '30px', paddingBottom: '10px' }}
+                iconType="line"
+                iconSize={16}
+                formatter={(value) => (
+                  <span className="text-slate-300 text-sm font-semibold">
+                    {value === 'merma_real' ? 'Merma Real' : 'Merma Máxima Aceptada'}
+                  </span>
+                )}
+              />
+              <Line
+                type="monotone"
+                dataKey="merma_real"
+                stroke={COLORS.red}
+                strokeWidth={4}
+                dot={{ fill: COLORS.red, r: 5, strokeWidth: 2, stroke: '#fff' }}
+                activeDot={{ r: 8, strokeWidth: 3, stroke: '#fff', fill: COLORS.red }}
+                name="merma_real"
+                animationDuration={1200}
+                animationEasing="ease-out"
+                filter="url(#lineShadow)"
+              />
+              <Line
+                type="monotone"
+                dataKey="merma_maxima_aceptada"
+                stroke={COLORS.cyan}
+                strokeWidth={3}
+                strokeDasharray="8 4"
+                dot={{ fill: COLORS.cyan, r: 4, strokeWidth: 2, stroke: '#fff' }}
+                activeDot={{ r: 7, strokeWidth: 3, stroke: '#fff', fill: COLORS.cyan }}
+                name="merma_maxima_aceptada"
+                animationDuration={1200}
+                animationEasing="ease-out"
+                animationBegin={200}
+                filter="url(#lineShadow)"
+              />
+              <ReferenceArea
+                y1={0}
+                y2={mermasTendenciaCategoriaSeries.reduce((max, item) => Math.max(max, item.merma_maxima_aceptada || 0), 0)}
+                fill={COLORS.cyan}
+                fillOpacity={0.05}
+                stroke={COLORS.cyan}
+                strokeDasharray="3 3"
+                strokeOpacity={0.3}
+              />
+              <Brush 
+                dataKey="fecha"
+                height={40}
+                stroke={COLORS.red}
+                fill="#1e293b"
+                tickFormatter={(value) => format(new Date(value), 'dd/MM', { locale: es })}
+              />
+            </LineChart>
           </ResponsiveContainer>
         ) : (
           <div className="h-96 flex items-center justify-center text-slate-400">

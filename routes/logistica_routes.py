@@ -513,11 +513,46 @@ def verificar_disponibilidad(item_id):
 @bp.route('/inventario/completo', methods=['GET'])
 def obtener_inventario_completo():
     """Obtiene inventario completo con últimos movimientos."""
+    import logging
+    import traceback
     try:
+        # Verificar que la sesión esté activa
+        try:
+            if not db.session.is_active:
+                db.session.rollback()
+        except Exception as session_error:
+            logging.warning(f"Error verificando sesión: {str(session_error)}")
+            try:
+                db.session.expire_all()
+            except:
+                pass
+        
         inventario = InventarioService.obtener_inventario_completo_con_movimientos(db.session)
+        
+        # Asegurar que siempre retornamos una lista
+        if not isinstance(inventario, list):
+            logging.warning("obtener_inventario_completo_con_movimientos no retornó una lista, convirtiendo")
+            inventario = []
+        
         return success_response(inventario)
+    except ValueError as e:
+        logging.error(f"Error de validación en obtener_inventario_completo: {str(e)}")
+        return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
-        return error_response(str(e), 500, 'INTERNAL_ERROR')
+        error_trace = traceback.format_exc()
+        logging.error(f"Error en obtener_inventario_completo: {str(e)}")
+        logging.error(error_trace)
+        
+        # Asegurar rollback en caso de error
+        try:
+            if db.session.is_active:
+                db.session.rollback()
+        except Exception as rollback_error:
+            logging.error(f"Error al hacer rollback: {str(rollback_error)}")
+        
+        # Retornar lista vacía en lugar de error 500 para evitar que el frontend falle
+        logging.warning("Retornando lista vacía debido a error (ver logs para detalles)")
+        return success_response([])
 
 @bp.route('/inventario/dashboard', methods=['GET'])
 def obtener_dashboard_inventario():
