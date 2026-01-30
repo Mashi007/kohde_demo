@@ -219,6 +219,21 @@ def crear_programacion():
         if datos['fecha_hasta'] < datos['fecha_desde']:
             return error_response('fecha_hasta debe ser mayor o igual a fecha_desde', 400, 'VALIDATION_ERROR')
     
+    # Asegurar que 'fecha' tenga un valor (usar fecha_desde como fallback)
+    # Esto es necesario porque la columna 'fecha' tiene NOT NULL en la BD
+    if 'fecha' not in datos or datos['fecha'] is None:
+        if datos.get('fecha_desde'):
+            # Asegurar que fecha_desde esté convertido a date si viene como string
+            if isinstance(datos['fecha_desde'], str):
+                datos['fecha'] = parse_date(datos['fecha_desde'])
+            else:
+                datos['fecha'] = datos['fecha_desde']
+        else:
+            return error_response('Se requiere fecha_desde o fecha para crear la programación', 400, 'VALIDATION_ERROR')
+    elif isinstance(datos['fecha'], str):
+        # Si fecha viene como string, convertirla a date
+        datos['fecha'] = parse_date(datos['fecha'])
+    
     # Convertir tiempo_comida string a nombre del enum (mayúsculas) si viene como string
     if 'tiempo_comida' in datos and isinstance(datos['tiempo_comida'], str):
         from models.programacion import TiempoComida
@@ -299,6 +314,13 @@ def actualizar_programacion(programacion_id):
     if datos.get('fecha_desde') and datos.get('fecha_hasta'):
         if datos['fecha_hasta'] < datos['fecha_desde']:
             return error_response('fecha_hasta debe ser mayor o igual a fecha_desde', 400, 'VALIDATION_ERROR')
+    
+    # Asegurar que 'fecha' tenga un valor si no viene (usar fecha_desde como fallback)
+    # Esto es necesario porque la columna 'fecha' tiene NOT NULL en la BD
+    if 'fecha' not in datos or datos['fecha'] is None:
+        if datos.get('fecha_desde'):
+            datos['fecha'] = datos['fecha_desde']
+        # Si no hay fecha_desde, el servicio manejará el fallback usando la programación existente
     
     programacion = ProgramacionMenuService.actualizar_programacion(
         db.session,

@@ -4,6 +4,7 @@ Modelos de Receta y RecetaIngrediente.
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Numeric, ForeignKey, TypeDecorator
 from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
 import enum
 
 from models import db
@@ -47,6 +48,19 @@ class TipoRecetaEnum(TypeDecorator):
             except KeyError:
                 raise ValueError(f"'{value}' no es un valor válido para TipoReceta. Valores válidos: {valores_validos}")
         return value
+    
+    def literal_processor(self, dialect):
+        """Procesador literal para evitar el cast a VARCHAR."""
+        def process(value):
+            if isinstance(value, TipoReceta):
+                return f"'{value.value}'::tiporeceta"
+            if isinstance(value, str):
+                valor_lower = value.lower().strip()
+                valores_validos = [e.value for e in TipoReceta]
+                if valor_lower in valores_validos:
+                    return f"'{valor_lower}'::tiporeceta"
+            return f"'{value}'::tiporeceta"
+        return process
     
     def process_result_value(self, value, dialect):
         """Convierte el VALOR del enum (minúsculas) de PostgreSQL a objeto Enum."""

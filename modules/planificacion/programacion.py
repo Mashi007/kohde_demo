@@ -41,6 +41,14 @@ class ProgramacionMenuService:
             if datos_programacion['fecha_hasta'] < datos_programacion['fecha_desde']:
                 raise ValueError('fecha_hasta debe ser mayor o igual a fecha_desde')
         
+        # Asegurar que 'fecha' tenga un valor (usar fecha_desde como fallback)
+        # Esto es necesario porque la columna 'fecha' tiene NOT NULL en la BD
+        if 'fecha' not in datos_programacion or datos_programacion['fecha'] is None:
+            if 'fecha_desde' in datos_programacion and datos_programacion['fecha_desde']:
+                datos_programacion['fecha'] = datos_programacion['fecha_desde']
+            else:
+                raise ValueError('Se requiere fecha_desde o fecha para crear la programación')
+        
         programacion = ProgramacionMenu(**datos_programacion)
         
         db.add(programacion)
@@ -96,6 +104,14 @@ class ProgramacionMenuService:
         if datos.get('fecha_desde') and datos.get('fecha_hasta'):
             if datos['fecha_hasta'] < datos['fecha_desde']:
                 raise ValueError('fecha_hasta debe ser mayor o igual a fecha_desde')
+        
+        # Asegurar que 'fecha' tenga un valor si no viene (usar fecha_desde como fallback)
+        # Esto es necesario porque la columna 'fecha' tiene NOT NULL en la BD
+        if 'fecha' not in datos or datos['fecha'] is None:
+            if 'fecha_desde' in datos and datos['fecha_desde']:
+                datos['fecha'] = datos['fecha_desde']
+            elif programacion.fecha_desde:
+                datos['fecha'] = programacion.fecha_desde
         
         # Actualizar campos básicos
         for key, value in datos.items():

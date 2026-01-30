@@ -59,6 +59,8 @@ export default function ProgramacionForm({ programacion, fecha, tiempoComida, on
   const calcularTotales = () => {
     let caloriasTotales = 0
     let costoTotal = 0
+    let caloriasPorCharola = 0
+    let costoPorCharola = 0
     let totalRecetas = formData.recetas.length
     const cantidadPorReceta = formData.charolas_planificadas || 0
     let totalPorciones = cantidadPorReceta * totalRecetas
@@ -66,12 +68,14 @@ export default function ProgramacionForm({ programacion, fecha, tiempoComida, on
     formData.recetas.forEach(recetaProg => {
       const receta = recetasDisponibles?.find(r => r.id === recetaProg.receta_id)
       if (receta) {
-        // Usar charolas_planificadas como cantidad para cada receta
+        // Calcular para el total de charolas
         if (receta.calorias_por_porcion) {
           caloriasTotales += receta.calorias_por_porcion * cantidadPorReceta
+          caloriasPorCharola += receta.calorias_por_porcion
         }
         if (receta.costo_por_porcion) {
           costoTotal += receta.costo_por_porcion * cantidadPorReceta
+          costoPorCharola += receta.costo_por_porcion
         }
       }
     })
@@ -79,8 +83,11 @@ export default function ProgramacionForm({ programacion, fecha, tiempoComida, on
     return {
       caloriasTotales: Math.round(caloriasTotales * 100) / 100,
       costoTotal: Math.round(costoTotal * 100) / 100,
+      caloriasPorCharola: Math.round(caloriasPorCharola * 100) / 100,
+      costoPorCharola: Math.round(costoPorCharola * 100) / 100,
       totalRecetas,
       totalPorciones,
+      porcionesPorCharola: totalRecetas, // Cada charola tiene una porción de cada receta
     }
   }
   
@@ -377,18 +384,28 @@ export default function ProgramacionForm({ programacion, fecha, tiempoComida, on
                       </div>
                       
                       {receta && (
-                        <div className="text-xs text-slate-400 min-w-[150px] text-right">
-                          <div className="mb-1">
-                            <span className="text-slate-500">Porciones: </span>
-                            <span className="font-semibold">{formData.charolas_planificadas || 0}</span>
-                          </div>
-                          <div className="mb-1">
-                            <span className="text-slate-500">Calorías: </span>
-                            <span className="font-semibold">{Math.round((receta.calorias_por_porcion || 0) * (formData.charolas_planificadas || 0))}</span>
+                        <div className="text-xs text-slate-400 min-w-[200px] text-right">
+                          <div className="mb-2 pb-2 border-b border-slate-600">
+                            <div className="text-slate-500 text-[10px] mb-1">Total ({formData.charolas_planificadas || 0} charolas)</div>
+                            <div className="mb-1">
+                              <span className="text-slate-500">Calorías: </span>
+                              <span className="font-semibold text-purple-300">{Math.round((receta.calorias_por_porcion || 0) * (formData.charolas_planificadas || 0)).toLocaleString()} kcal</span>
+                            </div>
+                            <div>
+                              <span className="text-slate-500">Costo: </span>
+                              <span className="font-semibold text-purple-300">${((receta.costo_por_porcion || 0) * (formData.charolas_planificadas || 0)).toFixed(2)}</span>
+                            </div>
                           </div>
                           <div>
-                            <span className="text-slate-500">Costo: </span>
-                            <span className="font-semibold">${((receta.costo_por_porcion || 0) * (formData.charolas_planificadas || 0)).toFixed(2)}</span>
+                            <div className="text-slate-500 text-[10px] mb-1">Por charola (1)</div>
+                            <div className="mb-1">
+                              <span className="text-slate-500">Calorías: </span>
+                              <span className="font-semibold text-green-300">{Math.round(receta.calorias_por_porcion || 0)} kcal</span>
+                            </div>
+                            <div>
+                              <span className="text-slate-500">Costo: </span>
+                              <span className="font-semibold text-green-300">${(receta.costo_por_porcion || 0).toFixed(2)}</span>
+                            </div>
                           </div>
                         </div>
                       )}
@@ -410,26 +427,60 @@ export default function ProgramacionForm({ programacion, fecha, tiempoComida, on
           {/* Resumen del Servicio */}
           {totales.totalRecetas > 0 && (
             <div className="p-4 bg-purple-600/10 border border-purple-500/50 rounded-lg">
-              <div className="flex items-center gap-2 mb-3">
+              <div className="flex items-center gap-2 mb-4">
                 <Calculator className="w-5 h-5 text-purple-400" />
                 <h3 className="font-semibold text-purple-300">Resumen del Servicio</h3>
               </div>
-              <div className="grid grid-cols-4 gap-4 text-sm">
-                <div>
-                  <div className="text-slate-400">Total Recetas</div>
-                  <div className="text-lg font-semibold">{totales.totalRecetas}</div>
+              
+              {/* Total para todas las charolas */}
+              <div className="mb-4 pb-4 border-b border-purple-500/30">
+                <div className="text-xs text-purple-300/70 mb-2 font-medium">
+                  Total para {formData.charolas_planificadas || 0} charolas programadas
                 </div>
-                <div>
-                  <div className="text-slate-400">Total Porciones</div>
-                  <div className="text-lg font-semibold">{totales.totalPorciones}</div>
+                <div className="grid grid-cols-4 gap-4 text-sm">
+                  <div>
+                    <div className="text-slate-400 text-xs">Total Recetas</div>
+                    <div className="text-lg font-semibold">{totales.totalRecetas}</div>
+                  </div>
+                  <div>
+                    <div className="text-slate-400 text-xs">Total Porciones</div>
+                    <div className="text-lg font-semibold">{totales.totalPorciones.toLocaleString()}</div>
+                  </div>
+                  <div>
+                    <div className="text-slate-400 text-xs">Calorías Totales</div>
+                    <div className="text-lg font-semibold text-purple-300">{totales.caloriasTotales.toLocaleString()} kcal</div>
+                  </div>
+                  <div>
+                    <div className="text-slate-400 text-xs">Costo Total</div>
+                    <div className="text-lg font-semibold text-purple-300">${totales.costoTotal.toFixed(2)}</div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-slate-400">Calorías Totales</div>
-                  <div className="text-lg font-semibold">{totales.caloriasTotales.toLocaleString()} kcal</div>
+              </div>
+              
+              {/* Por charola individual */}
+              <div>
+                <div className="text-xs text-purple-300/70 mb-2 font-medium">
+                  Por charola individual (1 charola)
                 </div>
-                <div>
-                  <div className="text-slate-400">Costo Total</div>
-                  <div className="text-lg font-semibold">${totales.costoTotal.toFixed(2)}</div>
+                <div className="grid grid-cols-4 gap-4 text-sm">
+                  <div>
+                    <div className="text-slate-400 text-xs">Porciones</div>
+                    <div className="text-lg font-semibold">{totales.porcionesPorCharola}</div>
+                  </div>
+                  <div>
+                    <div className="text-slate-400 text-xs">Calorías</div>
+                    <div className="text-lg font-semibold text-green-300">{totales.caloriasPorCharola.toLocaleString()} kcal</div>
+                  </div>
+                  <div>
+                    <div className="text-slate-400 text-xs">Costo</div>
+                    <div className="text-lg font-semibold text-green-300">${totales.costoPorCharola.toFixed(2)}</div>
+                  </div>
+                  <div>
+                    <div className="text-slate-400 text-xs">Costo por porción</div>
+                    <div className="text-lg font-semibold text-slate-300">
+                      ${totales.porcionesPorCharola > 0 ? (totales.costoPorCharola / totales.porcionesPorCharola).toFixed(2) : '0.00'}
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

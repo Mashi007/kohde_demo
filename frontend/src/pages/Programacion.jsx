@@ -305,28 +305,72 @@ function ProgramacionCard({ programacion, onEdit, onVerNecesidades }) {
       </div>
       
       {/* Resumen */}
-      <div className="flex items-center justify-between pt-3 border-t border-slate-700">
-        <div className="flex items-center gap-4 text-sm">
-          <div>
-            <span className="text-slate-400">Calorías: </span>
-            <span className="font-semibold">{Math.round(programacion.calorias_totales || 0).toLocaleString()} kcal</span>
+      <div className="pt-3 border-t border-slate-700">
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex-1">
+            {/* Total para todas las charolas */}
+            <div className="mb-2">
+              <div className="text-xs text-slate-500 mb-1">
+                Total para {programacion.charolas_planificadas || 0} charolas
+              </div>
+              <div className="flex items-center gap-4 text-sm">
+                <div>
+                  <span className="text-slate-400">Calorías: </span>
+                  <span className="font-semibold text-purple-300">{Math.round(programacion.calorias_totales || 0).toLocaleString()} kcal</span>
+                </div>
+                <div>
+                  <span className="text-slate-400">Costo: </span>
+                  <span className="font-semibold text-purple-300">${(programacion.costo_total || 0).toFixed(2)}</span>
+                </div>
+                <div>
+                  <span className="text-slate-400">Porciones: </span>
+                  <span className="font-semibold">{programacion.total_porciones || 0}</span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Por charola individual */}
+            {programacion.charolas_planificadas > 0 && (
+              <div>
+                <div className="text-xs text-slate-500 mb-1">
+                  Por charola individual (1 charola)
+                </div>
+                <div className="flex items-center gap-4 text-sm">
+                  <div>
+                    <span className="text-slate-400">Calorías: </span>
+                    <span className="font-semibold text-green-300">
+                      {Math.round((programacion.calorias_totales || 0) / (programacion.charolas_planificadas || 1)).toLocaleString()} kcal
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">Costo: </span>
+                    <span className="font-semibold text-green-300">
+                      ${((programacion.costo_total || 0) / (programacion.charolas_planificadas || 1)).toFixed(2)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400">Porciones: </span>
+                    <span className="font-semibold">
+                      {programacion.total_recetas || 0}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-          <div>
-            <span className="text-slate-400">Costo: </span>
-            <span className="font-semibold">${(programacion.costo_total || 0).toFixed(2)}</span>
-          </div>
+          
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onVerNecesidades(programacion)
+            }}
+            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm flex items-center gap-2 transition-colors ml-4"
+            title="Ver necesidades de inventario"
+          >
+            <Package className="w-4 h-4" />
+            Necesidades
+          </button>
         </div>
-        <button
-          onClick={(e) => {
-            e.stopPropagation()
-            onVerNecesidades(programacion)
-          }}
-          className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm flex items-center gap-2 transition-colors"
-          title="Ver necesidades de inventario"
-        >
-          <Package className="w-4 h-4" />
-          Necesidades
-        </button>
       </div>
     </div>
   )
