@@ -250,11 +250,15 @@ export default function Chat() {
       </div>
 
       {/* Área de chat */}
-      <div className="flex-1 flex flex-col bg-slate-900 h-full overflow-hidden">
+      <div className="flex-1 flex flex-col bg-slate-900 h-full overflow-hidden relative">
         {conversacionActual ? (
           <div className="flex-1 flex flex-col h-full min-h-0 overflow-hidden">
-            {/* Mensajes */}
-            <div ref={messagesContainerRef} className="flex-1 overflow-y-auto overflow-x-hidden p-6 space-y-4 min-h-0 scroll-smooth chat-scrollbar" style={{ scrollBehavior: 'smooth' }}>
+            {/* Mensajes - con padding-bottom para que no quede oculto por el input */}
+            <div 
+              ref={messagesContainerRef} 
+              className="flex-1 overflow-y-auto overflow-x-hidden p-6 pb-24 space-y-4 min-h-0 scroll-smooth chat-scrollbar" 
+              style={{ scrollBehavior: 'smooth' }}
+            >
               {cargandoMensajes ? (
                 <div className="text-center py-8 text-slate-400">Cargando mensajes...</div>
               ) : mensajes?.length === 0 ? (
@@ -312,26 +316,29 @@ export default function Chat() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Input de mensaje */}
-            <form onSubmit={enviarMensaje} className="p-4 border-t border-slate-700">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={mensaje}
-                  onChange={(e) => setMensaje(e.target.value)}
-                  placeholder="Escribe tu mensaje..."
-                  className="flex-1 px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg focus:outline-none focus:border-purple-500 text-white"
-                  disabled={enviarMensajeMutation.isPending}
-                />
-                <button
-                  type="submit"
-                  disabled={!mensaje.trim() || enviarMensajeMutation.isPending}
-                  className="bg-purple-600 hover:bg-purple-700 px-6 py-3 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                  <Send size={20} />
-                </button>
-              </div>
-            </form>
+            {/* Input de mensaje - Fijo en la parte inferior, siempre visible */}
+            <div className="absolute bottom-0 left-0 right-0 bg-slate-900 border-t border-slate-700 z-50">
+              <form onSubmit={enviarMensaje} className="p-4">
+                <div className="flex gap-2 items-center">
+                  <input
+                    type="text"
+                    value={mensaje}
+                    onChange={(e) => setMensaje(e.target.value)}
+                    placeholder="Escribe tu mensaje..."
+                    className="flex-1 px-4 py-3 bg-slate-800 border border-slate-700 rounded-lg focus:outline-none focus:border-purple-500 focus:ring-2 focus:ring-purple-500/50 text-white placeholder-slate-400 transition-all"
+                    disabled={enviarMensajeMutation.isPending}
+                    autoFocus
+                  />
+                  <button
+                    type="submit"
+                    disabled={!mensaje.trim() || enviarMensajeMutation.isPending}
+                    className="bg-purple-600 hover:bg-purple-700 active:bg-purple-800 px-6 py-3 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 transition-all shadow-lg hover:shadow-purple-500/20"
+                  >
+                    <Send size={20} />
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         ) : (
           <div className="flex-1 flex items-center justify-center">
