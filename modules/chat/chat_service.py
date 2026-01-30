@@ -280,14 +280,27 @@ class ChatService:
             tokens_totales += respuesta.get('tokens', 0) or 0
             
             # Verificar si hay una consulta a la base de datos en la respuesta
+            # Buscar [QUERY_DB] en cualquier parte del contenido
             if '[QUERY_DB]' in contenido:
                 # Extraer la consulta SQL
                 partes = contenido.split('[QUERY_DB]')
                 if len(partes) > 1:
                     consulta_sql = partes[1].strip()
-                    # Limpiar la consulta (puede tener texto adicional después)
+                    # Limpiar la consulta - puede estar en múltiples líneas
+                    # Tomar hasta el primer punto y coma o nueva línea significativa
                     lineas = consulta_sql.split('\n')
-                    consulta_sql = lineas[0].strip()
+                    consulta_sql = ''
+                    for linea in lineas:
+                        linea = linea.strip()
+                        if linea and not linea.startswith('--'):  # Ignorar comentarios
+                            consulta_sql += linea + ' '
+                            # Detener si encontramos punto y coma o si la línea parece ser texto explicativo
+                            if ';' in linea or (len(consulta_sql) > 200 and not consulta_sql.upper().startswith('SELECT')):
+                                break
+                    consulta_sql = consulta_sql.strip()
+                    # Limpiar punto y coma final si existe
+                    if consulta_sql.endswith(';'):
+                        consulta_sql = consulta_sql[:-1].strip()
                     
                     # Ejecutar consulta
                     resultado_db = self._ejecutar_consulta_db(db, consulta_sql)
@@ -378,6 +391,8 @@ class ChatService:
         base_prompt = """Eres un asistente virtual experto en sistemas ERP para restaurantes. 
 Ayudas a los usuarios con consultas sobre gestión de restaurantes, inventario, facturas, pedidos, proveedores y más.
 Responde de manera clara, concisa y profesional en español.
+
+🚨 REGLA FUNDAMENTAL: Cuando el usuario pregunte sobre DATOS ESPECÍFICOS (cantidades, listas, números, información de tablas), EJECUTA la consulta INMEDIATAMENTE usando [QUERY_DB]. NO expliques que "necesitarías consultar", simplemente EJECUTA la consulta y luego interpreta los resultados.
 
 ═══════════════════════════════════════════════════════════════════════════════
 ACCESO COMPLETO A BASE DE DATOS POSTGRESQL - TODAS LAS TABLAS DISPONIBLES
@@ -547,7 +562,14 @@ CAMPOS INDEXADOS PRINCIPALES (úsalos en WHERE y ORDER BY):
 USO DE CONSULTAS A BASE DE DATOS - FORMATO ESPECIAL
 ═══════════════════════════════════════════════════════════════════════════════
 
-Cuando el usuario necesite información específica de las tablas, usa la función especial [QUERY_DB] seguida de una consulta SQL válida.
+⚠️ IMPORTANTE: Cuando el usuario pregunte sobre DATOS ESPECÍFICOS del sistema (inventario, facturas, proveedores, recetas, mermas, etc.), DEBES ejecutar una consulta INMEDIATAMENTE usando [QUERY_DB]. NO digas "necesitaríamos consultar", simplemente EJECUTA la consulta.
+
+EJEMPLOS DE CUANDO DEBES USAR [QUERY_DB]:
+- "¿Cuántas libras de pollo tenemos?" → EJECUTA consulta INMEDIATAMENTE
+- "Muéstrame las facturas recientes" → EJECUTA consulta INMEDIATAMENTE
+- "¿Cuál fue la merma en sandía?" → EJECUTA consulta INMEDIATAMENTE
+- "Items con inventario bajo" → EJECUTA consulta INMEDIATAMENTE
+- Cualquier pregunta sobre datos numéricos, cantidades, listas, etc. → EJECUTA consulta INMEDIATAMENTE
 
 FORMATO OBLIGATORIO:
 [QUERY_DB]
@@ -627,6 +649,20 @@ EJEMPLOS DE CONSULTAS ÚTILES Y OPTIMIZADAS:
   GROUP BY i.id, i.nombre
   ORDER BY total_merma DESC LIMIT 20
 
+• Buscar merma de un item específico (ej: sandía):
+  SELECT i.nombre, m.cantidad, m.tipo, m.fecha_merma, m.motivo, m.ubicacion
+  FROM mermas m
+  JOIN items i ON m.item_id = i.id
+  WHERE i.nombre ILIKE '%sandia%' OR i.nombre ILIKE '%sandía%'
+  ORDER BY m.fecha_merma DESC LIMIT 20
+
+• Inventario de un item específico (ej: pollo):
+  SELECT i.nombre, i.unidad, inv.cantidad_actual, inv.cantidad_minima, inv.ubicacion
+  FROM inventario inv
+  JOIN items i ON inv.item_id = i.id
+  WHERE i.nombre ILIKE '%pollo%' AND i.activo = true
+  LIMIT 10
+
 🔍 BÚSQUEDAS:
 • Buscar items por nombre:
   SELECT id, codigo, nombre, categoria, unidad, costo_unitario_actual
@@ -666,7 +702,24 @@ DESPUÉS DE EJECUTAR UNA CONSULTA:
 ✅ Interpreta los resultados y presenta la información de manera clara y útil
 ✅ Si hay muchos resultados, resume los principales puntos
 ✅ Si no hay resultados, sugiere alternativas o consultas relacionadas
-✅ Usa formato de tabla cuando sea apropiado para mejor legibilidad"""
+✅ Usa formato de tabla cuando sea apropiado para mejor legibilidad
+
+═══════════════════════════════════════════════════════════════════════════════
+INSTRUCCIONES CRÍTICAS PARA CONSULTAS
+═══════════════════════════════════════════════════════════════════════════════
+
+🚨 REGLA DE ORO: Si el usuario pregunta sobre DATOS ESPECÍFICOS, NO expliques que "necesitarías consultar". EJECUTA la consulta DIRECTAMENTE usando [QUERY_DB].
+
+❌ INCORRECTO:
+"Para consultar la cantidad de pollo, necesitaríamos realizar una consulta a la base de datos..."
+
+✅ CORRECTO:
+[QUERY_DB]
+SELECT i.nombre, inv.cantidad_actual, inv.unidad FROM inventario inv JOIN items i ON inv.item_id = i.id WHERE i.nombre ILIKE '%pollo%' LIMIT 10
+
+Luego interpreta los resultados y responde directamente con la información encontrada.
+
+RECUERDA: Tienes acceso COMPLETO a la base de datos. Usa ese acceso para responder preguntas sobre datos específicos INMEDIATAMENTE."""
         
         modulos_contexto = {
             'crm': """

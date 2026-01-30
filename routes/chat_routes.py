@@ -88,7 +88,8 @@ def eliminar_conversacion(conversacion_id):
             return error_response('Conversación no encontrada', 404, 'NOT_FOUND')
         
         db.session.commit()
-        return success_response(None, message='Conversación eliminada correctamente')
+        # Retornar un objeto con éxito explícito para que el frontend lo interprete correctamente
+        return success_response({'eliminada': True, 'id': conversacion_id}, message='Conversación eliminada correctamente')
     except ValueError as e:
         return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
