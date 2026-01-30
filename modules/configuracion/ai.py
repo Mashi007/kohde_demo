@@ -14,8 +14,8 @@ class AIConfigService:
     
     @classmethod
     def obtener_api_key(cls) -> str:
-        """Obtiene la API key, priorizando la de memoria sobre la de entorno."""
-        return cls._token_en_memoria or Config.OPENAI_API_KEY
+        """Obtiene la API key, priorizando la de memoria sobre OpenRouter y luego OpenAI."""
+        return cls._token_en_memoria or Config.OPENROUTER_API_KEY or Config.OPENAI_API_KEY
     
     @classmethod
     def obtener_modelo(cls) -> str:
@@ -25,7 +25,7 @@ class AIConfigService:
     @classmethod
     def obtener_base_url(cls) -> str:
         """Obtiene la base URL, priorizando la de memoria sobre la de entorno."""
-        return cls._base_url_en_memoria or Config.OPENAI_BASE_URL
+        return cls._base_url_en_memoria or Config.OPENAI_BASE_URL or 'https://openrouter.ai/api/v1'
     
     @classmethod
     def actualizar_token(cls, api_key: str, modelo: Optional[str] = None, base_url: Optional[str] = None) -> Dict:
@@ -46,12 +46,12 @@ class AIConfigService:
                 'error': 'La API key no puede estar vacía'
             }
         
-        # Validar formato básico del token (debe empezar con sk-)
+        # Validar formato básico del token (puede ser OpenAI sk- o OpenRouter sk-or-v1-)
         api_key_limpia = api_key.strip()
-        if not api_key_limpia.startswith('sk-'):
+        if not (api_key_limpia.startswith('sk-') or api_key_limpia.startswith('sk-or-v1-')):
             return {
                 'exito': False,
-                'error': 'El formato del token no es válido. Debe empezar con "sk-"'
+                'error': 'El formato del token no es válido. Debe empezar con "sk-" (OpenAI) o "sk-or-v1-" (OpenRouter)'
             }
         
         if len(api_key_limpia) < 20:
@@ -87,6 +87,10 @@ class AIConfigService:
         modelo = AIConfigService.obtener_modelo()
         base_url = AIConfigService.obtener_base_url()
         
+        # Detectar si es OpenRouter o OpenAI
+        es_openrouter = base_url and ('openrouter.ai' in base_url.lower())
+        proveedor = 'OpenRouter' if es_openrouter else ('OpenAI' if base_url else 'No configurado')
+        
         return {
             'openai_api_key_configured': bool(api_key),
             'openai_api_key_preview': (
@@ -96,6 +100,8 @@ class AIConfigService:
             ),
             'openai_model': modelo,
             'openai_base_url': base_url,
+            'proveedor': proveedor,
+            'es_openrouter': es_openrouter,
             'estado': 'configurado' if api_key else 'no_configurado',
             'token_en_memoria': AIConfigService._token_en_memoria is not None
         }
@@ -113,8 +119,8 @@ class AIConfigService:
         if not config['openai_api_key_configured']:
             return {
                 'valido': False,
-                'mensaje': 'API Key de OpenAI no configurada',
-                'detalles': 'Por favor, ingresa el token de OpenAI o configura OPENAI_API_KEY en las variables de entorno'
+                'mensaje': 'API Key no configurada',
+                'detalles': 'Por favor, ingresa el token de OpenRouter/OpenAI o configura OPENROUTER_API_KEY/OPENAI_API_KEY en las variables de entorno'
             }
         
         # Intentar una llamada de prueba simple
@@ -129,6 +135,13 @@ class AIConfigService:
                 "Content-Type": "application/json"
             }
             
+            # Agregar headers específicos de OpenRouter si es necesario
+            if base_url and 'openrouter.ai' in base_url:
+                if Config.OPENROUTER_HTTP_REFERER:
+                    headers["HTTP-Referer"] = Config.OPENROUTER_HTTP_REFERER
+                if Config.OPENROUTER_X_TITLE:
+                    headers["X-Title"] = Config.OPENROUTER_X_TITLE
+            
             # Llamada simple para verificar la API key
             response = requests.get(
                 f"{base_url}/models",
@@ -137,10 +150,11 @@ class AIConfigService:
             )
             
             if response.status_code == 200:
+                proveedor = 'OpenRouter' if base_url and 'openrouter.ai' in base_url else 'OpenAI'
                 return {
                     'valido': True,
-                    'mensaje': 'Configuración de AI válida',
-                    'detalles': 'La API key de OpenAI está funcionando correctamente'
+                    'mensaje': f'Configuración de AI válida ({proveedor})',
+                    'detalles': f'La API key está funcionando correctamente con {proveedor}'
                 }
             else:
                 return {
@@ -183,6 +197,13 @@ class AIConfigService:
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json"
             }
+            
+            # Agregar headers específicos de OpenRouter si es necesario
+            if base_url and 'openrouter.ai' in base_url:
+                if Config.OPENROUTER_HTTP_REFERER:
+                    headers["HTTP-Referer"] = Config.OPENROUTER_HTTP_REFERER
+                if Config.OPENROUTER_X_TITLE:
+                    headers["X-Title"] = Config.OPENROUTER_X_TITLE
             
             data = {
                 "model": modelo,

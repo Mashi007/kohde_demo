@@ -78,10 +78,16 @@ class Config:
     EMAIL_FROM = os.getenv('EMAIL_FROM', 'noreply@restaurantes.com')
     EMAIL_NOTIFICACIONES_PEDIDOS = os.getenv('EMAIL_NOTIFICACIONES_PEDIDOS', 'a3b7x9q@gmail.com')
     
-    # OpenAI / Chat AI
+    # OpenAI / Chat AI / OpenRouter
+    # Por defecto usa OpenRouter para acceso a múltiples modelos
     OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
-    OPENAI_MODEL = os.getenv('OPENAI_MODEL', 'gpt-3.5-turbo')
-    OPENAI_BASE_URL = os.getenv('OPENAI_BASE_URL', 'https://api.openai.com/v1')
+    OPENAI_MODEL = os.getenv('OPENAI_MODEL', 'openai/gpt-3.5-turbo')  # Formato OpenRouter: provider/model
+    OPENAI_BASE_URL = os.getenv('OPENAI_BASE_URL', 'https://openrouter.ai/api/v1')
+    
+    # OpenRouter específico
+    OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY', '')
+    OPENROUTER_HTTP_REFERER = os.getenv('OPENROUTER_HTTP_REFERER', 'https://github.com/tu-usuario/kohde_demo')  # Opcional pero recomendado
+    OPENROUTER_X_TITLE = os.getenv('OPENROUTER_X_TITLE', 'Kohde ERP Restaurantes')  # Opcional
     
     # Almacenamiento de imágenes
     UPLOAD_FOLDER = BASE_DIR / 'uploads' / 'facturas'

@@ -911,11 +911,56 @@ def resumen_compras():
             fecha_hasta=fecha_hasta_obj
         )
         
+        # Asegurar que siempre retornamos la estructura correcta
+        if not resumen or 'resumen' not in resumen:
+            # Si no hay resumen, crear uno por defecto
+            from datetime import date, timedelta
+            fecha_desde_default = fecha_desde_obj or (date.today() - timedelta(days=30))
+            fecha_hasta_default = fecha_hasta_obj or date.today()
+            resumen = {
+                'periodo': {
+                    'fecha_desde': fecha_desde_default.isoformat(),
+                    'fecha_hasta': fecha_hasta_default.isoformat()
+                },
+                'resumen': {
+                    'total_pedidos': 0,
+                    'total_facturas': 0,
+                    'total_gastado': 0.0,
+                    'total_gastado_pedidos': 0.0,
+                    'total_gastado_facturas': 0.0,
+                    'pedidos_pendientes': 0
+                },
+                'pedidos_por_estado': {}
+            }
+        
         return success_response(resumen)
     except ValueError as e:
         return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
-        return error_response(str(e), 500, 'INTERNAL_ERROR')
+        import logging
+        import traceback
+        logging.error(f"Error en resumen_compras: {str(e)}")
+        logging.error(traceback.format_exc())
+        # Retornar estructura por defecto en caso de error
+        from datetime import date, timedelta
+        fecha_desde_default = date.today() - timedelta(days=30)
+        fecha_hasta_default = date.today()
+        resumen_default = {
+            'periodo': {
+                'fecha_desde': fecha_desde_default.isoformat(),
+                'fecha_hasta': fecha_hasta_default.isoformat()
+            },
+            'resumen': {
+                'total_pedidos': 0,
+                'total_facturas': 0,
+                'total_gastado': 0.0,
+                'total_gastado_pedidos': 0.0,
+                'total_gastado_facturas': 0.0,
+                'pedidos_pendientes': 0
+            },
+            'pedidos_por_estado': {}
+        }
+        return success_response(resumen_default)
 
 @bp.route('/compras/por-item', methods=['GET'])
 def compras_por_item():

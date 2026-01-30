@@ -100,23 +100,26 @@ class ComprasStatsService:
             PedidoCompra.estado == EstadoPedido.BORRADOR
         ).count()
         
+        # Asegurar que siempre retornamos la estructura completa
+        pedidos_por_estado_dict = {}
+        for estado, cantidad in pedidos_por_estado:
+            estado_key = estado.value if isinstance(estado, EstadoPedido) else str(estado)
+            pedidos_por_estado_dict[estado_key] = cantidad
+        
         return {
             'periodo': {
                 'fecha_desde': fecha_desde.isoformat(),
                 'fecha_hasta': fecha_hasta.isoformat()
             },
             'resumen': {
-                'total_pedidos': total_pedidos,
-                'total_facturas': total_facturas,
-                'total_gastado': total_gastado,
-                'total_gastado_pedidos': float(total_gastado_pedidos),
-                'total_gastado_facturas': float(total_gastado_facturas),
-                'pedidos_pendientes': pedidos_pendientes
+                'total_pedidos': total_pedidos or 0,
+                'total_facturas': total_facturas or 0,
+                'total_gastado': float(total_gastado) if total_gastado else 0.0,
+                'total_gastado_pedidos': float(total_gastado_pedidos) if total_gastado_pedidos else 0.0,
+                'total_gastado_facturas': float(total_gastado_facturas) if total_gastado_facturas else 0.0,
+                'pedidos_pendientes': pedidos_pendientes or 0
             },
-            'pedidos_por_estado': {
-                estado.value if isinstance(estado, EstadoPedido) else estado: cantidad
-                for estado, cantidad in pedidos_por_estado
-            }
+            'pedidos_por_estado': pedidos_por_estado_dict
         }
     
     @staticmethod
