@@ -45,6 +45,9 @@ services:
         value: 18.x
       - key: PORT
         sync: false
+      # URL del backend API
+      - key: VITE_API_URL
+        value: https://kohde-demo-ewhi.onrender.com/api
 
   # PostgreSQL Database
   - type: pgsql
