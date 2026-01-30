@@ -28,17 +28,7 @@ class ChatService:
             'base_url': AIConfigService.obtener_base_url()
         }
     
-    def _obtener_cliente_openai(self):
-        """Obtiene el cliente de OpenAI."""
-        try:
-            import openai
-            if self.api_key:
-                openai.api_key = self.api_key
-                if self.base_url != "https://api.openai.com/v1":
-                    openai.api_base = self.base_url
-            return openai
-        except ImportError:
-            raise Exception("OpenAI no está instalado. Ejecuta: pip install openai")
+    # Método obsoleto eliminado - ahora se usa _llamar_openai que obtiene credenciales dinámicamente
     
     def crear_conversacion(
         self,
@@ -791,13 +781,30 @@ Puedes consultar charolas servidas, mermas, análisis de pérdidas, etc.""",
         Returns:
             True si se eliminó correctamente
         """
-        conversacion = self.obtener_conversacion(db, conversacion_id)
-        if not conversacion:
-            return False
-        
-        conversacion.activa = False
-        db.commit()
-        return True
+        try:
+            conversacion = self.obtener_conversacion(db, conversacion_id)
+            if not conversacion:
+                import logging
+                logging.warning(f"Conversación {conversacion_id} no encontrada para eliminar")
+                return False
+            
+            # Verificar si ya está inactiva
+            if not conversacion.activa:
+                import logging
+                logging.info(f"Conversación {conversacion_id} ya estaba inactiva")
+                return True  # Considerar éxito si ya estaba eliminada
+            
+            conversacion.activa = False
+            # No hacer commit aquí, dejar que la ruta lo maneje con @handle_db_transaction
+            db.flush()  # Solo hacer flush para asegurar que los cambios estén en la sesión
+            
+            import logging
+            logging.info(f"Conversación {conversacion_id} marcada como inactiva correctamente")
+            return True
+        except Exception as e:
+            import logging
+            logging.error(f"Error al eliminar conversación {conversacion_id}: {str(e)}", exc_info=True)
+            raise  # Re-lanzar para que la ruta maneje el error
 
 # Instancia global del servicio
 chat_service = ChatService()
