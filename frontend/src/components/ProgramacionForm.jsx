@@ -11,9 +11,8 @@ export default function ProgramacionForm({ programacion, fecha, tiempoComida, on
   const [formData, setFormData] = useState({
     fecha_desde: programacion?.fecha_desde || programacion?.fecha || fecha || new Date().toISOString().split('T')[0],
     fecha_hasta: programacion?.fecha_hasta || programacion?.fecha || fecha || new Date().toISOString().split('T')[0],
-    tiempo_comida: tiempoComida || TIEMPO_COMIDA_VALUES.DESAYUNO,
+    tiempo_comida: tiempoComida || TIEMPO_COMIDA_VALUES.ALMUERZO, // Cambiar a ALMUERZO porque es el tipo más común
     ubicacion: programacion?.ubicacion || 'restaurante_A',
-    personas_estimadas: programacion?.personas_estimadas || 0,
     charolas_planificadas: programacion?.charolas_planificadas || 0,
     recetas: programacion?.items?.map(item => ({
       receta_id: item.receta_id,
@@ -22,9 +21,9 @@ export default function ProgramacionForm({ programacion, fecha, tiempoComida, on
   })
   
   // Cargar recetas disponibles según el tipo de servicio
-  const { data: recetasDisponiblesResponse, isLoading: cargandoRecetas } = useQuery({
+  const { data: recetasDisponiblesResponse, isLoading: cargandoRecetas, error: errorRecetas } = useQuery({
     queryKey: ['recetas', formData.tiempo_comida],
-    queryFn: () => {
+    queryFn: async () => {
       // Mapear tiempo_comida a tipo de receta
       const tipoMap = {
         [TIEMPO_COMIDA_VALUES.DESAYUNO]: TIEMPO_COMIDA_VALUES.DESAYUNO,
@@ -32,12 +31,28 @@ export default function ProgramacionForm({ programacion, fecha, tiempoComida, on
         [TIEMPO_COMIDA_VALUES.CENA]: TIEMPO_COMIDA_VALUES.ALMUERZO, // Las cenas usan recetas de tipo almuerzo
       }
       const tipo = tipoMap[formData.tiempo_comida] || TIEMPO_COMIDA_DEFAULT
-      return api.get(`/planificacion/recetas?tipo=${tipo}&activa=true`).then(extractData)
+      try {
+        const response = await api.get(`/planificacion/recetas?tipo=${tipo}&activa=true`)
+        return extractData(response)
+      } catch (error) {
+        console.error('Error al cargar recetas:', error)
+        toast.error(`Error al cargar recetas: ${error.response?.data?.error || error.message}`)
+        return [] // Retornar array vacío en caso de error
+      }
     },
+    retry: 2, // Reintentar 2 veces en caso de error
   })
 
   // Asegurar que recetasDisponibles sea un array
   const recetasDisponibles = Array.isArray(recetasDisponiblesResponse) ? recetasDisponiblesResponse : []
+  
+  // Debug: Log para verificar que las recetas se cargan
+  useEffect(() => {
+    console.log('Recetas disponibles:', recetasDisponibles)
+    console.log('Tiempo comida seleccionado:', formData.tiempo_comida)
+    console.log('Cargando recetas:', cargandoRecetas)
+    console.log('Error recetas:', errorRecetas)
+  }, [recetasDisponibles, formData.tiempo_comida, cargandoRecetas, errorRecetas])
   
   // Calcular totales del servicio
   const calcularTotales = () => {
@@ -71,19 +86,33 @@ export default function ProgramacionForm({ programacion, fecha, tiempoComida, on
   const totales = calcularTotales()
   
   const agregarReceta = () => {
-    if (recetasDisponibles && recetasDisponibles.length > 0) {
-      const primeraReceta = recetasDisponibles[0]
-      setFormData({
-        ...formData,
-        recetas: [
-          ...formData.recetas,
-          {
-            receta_id: primeraReceta.id,
-            cantidad_porciones: 1,
-          },
-        ],
-      })
+    if (cargandoRecetas) {
+      toast.info('Cargando recetas, por favor espera...')
+      return
     }
+    
+    if (errorRecetas) {
+      toast.error('Error al cargar recetas. Por favor, intenta nuevamente.')
+      return
+    }
+    
+    if (!recetasDisponibles || recetasDisponibles.length === 0) {
+      toast.error('No hay recetas disponibles para este tipo de servicio')
+      return
+    }
+    
+    const primeraReceta = recetasDisponibles[0]
+    setFormData({
+      ...formData,
+      recetas: [
+        ...formData.recetas,
+        {
+          receta_id: primeraReceta.id,
+          cantidad_porciones: 1,
+        },
+      ],
+    })
+    toast.success(`Receta "${primeraReceta.nombre}" agregada`)
   }
   
   const eliminarReceta = (index) => {
@@ -237,12 +266,12 @@ export default function ProgramacionForm({ programacion, fecha, tiempoComida, on
             </div>
             
             <div>
-              <label className="block text-sm font-medium mb-2">Personas Estimadas</label>
+              <label className="block text-sm font-medium mb-2">Charolas Programadas</label>
               <input
                 type="number"
                 min="0"
-                value={formData.personas_estimadas}
-                onChange={(e) => setFormData({ ...formData, personas_estimadas: parseInt(e.target.value) || 0 })}
+                value={formData.charolas_planificadas}
+                onChange={(e) => setFormData({ ...formData, charolas_planificadas: parseInt(e.target.value) || 0 })}
                 className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg focus:outline-none focus:border-purple-500"
               />
             </div>
@@ -255,8 +284,9 @@ export default function ProgramacionForm({ programacion, fecha, tiempoComida, on
               <button
                 type="button"
                 onClick={agregarReceta}
-                disabled={!recetasDisponibles || recetasDisponibles.length === 0}
-                className="flex items-center gap-2 px-3 py-1 bg-purple-600 hover:bg-purple-700 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={cargandoRecetas || !recetasDisponibles || recetasDisponibles.length === 0}
+                className="flex items-center gap-2 px-3 py-1 bg-purple-600 hover:bg-purple-700 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                title={cargandoRecetas ? 'Cargando recetas...' : (!recetasDisponibles || recetasDisponibles.length === 0) ? 'No hay recetas disponibles' : 'Agregar receta al menú'}
               >
                 <Plus className="w-4 h-4" />
                 Agregar Receta
@@ -265,6 +295,23 @@ export default function ProgramacionForm({ programacion, fecha, tiempoComida, on
             
             {cargandoRecetas ? (
               <div className="text-center py-8 text-slate-400">Cargando recetas...</div>
+            ) : errorRecetas ? (
+              <div className="text-center py-8 text-red-400 border border-red-500/50 rounded-lg bg-red-500/10">
+                <p className="mb-2">Error al cargar recetas</p>
+                <p className="text-sm text-slate-400">{errorRecetas.response?.data?.error || errorRecetas.message}</p>
+                <button
+                  type="button"
+                  onClick={() => queryClient.invalidateQueries(['recetas', formData.tiempo_comida])}
+                  className="mt-3 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded text-sm"
+                >
+                  Reintentar
+                </button>
+              </div>
+            ) : recetasDisponibles.length === 0 ? (
+              <div className="text-center py-8 text-yellow-400 border border-yellow-500/50 rounded-lg bg-yellow-500/10">
+                <p>No hay recetas disponibles para este tipo de servicio</p>
+                <p className="text-sm text-slate-400 mt-2">Verifica que existan recetas activas del tipo "{formData.tiempo_comida}"</p>
+              </div>
             ) : formData.recetas.length === 0 ? (
               <div className="text-center py-8 text-slate-400 border border-slate-700 rounded-lg">
                 No hay recetas agregadas. Haz clic en "Agregar Receta" para comenzar.

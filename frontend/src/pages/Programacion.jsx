@@ -278,9 +278,9 @@ function ProgramacionCard({ programacion, onEdit, onVerNecesidades }) {
             </div>
           </div>
         </div>
-        {programacion.personas_estimadas > 0 && (
+        {programacion.charolas_planificadas > 0 && (
           <div className="text-sm text-slate-400">
-            {programacion.personas_estimadas} personas
+            {programacion.charolas_planificadas} charolas
           </div>
         )}
       </div>

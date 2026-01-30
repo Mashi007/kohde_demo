@@ -19,14 +19,27 @@ class ProgramacionMenu(db.Model):
     __tablename__ = 'programacion_menu'
     
     id = Column(Integer, primary_key=True)
-    fecha_desde = Column(Date, nullable=False)  # Fecha de inicio del rango
-    fecha_hasta = Column(Date, nullable=False)  # Fecha de fin del rango
+    # Compatibilidad: mantener fecha para bases de datos antiguas
+    fecha = Column(Date, nullable=True)  # Mantener para compatibilidad hacia atrás
+    # Nuevas columnas para rango de fechas (pueden ser NULL si la migración no se ha ejecutado)
+    fecha_desde = Column(Date, nullable=True)  # Fecha de inicio del rango
+    fecha_hasta = Column(Date, nullable=True)  # Fecha de fin del rango
     tiempo_comida = Column(Enum(TiempoComida), nullable=False)
     ubicacion = Column(String(100), nullable=False)  # restaurante_A, restaurante_B, etc.
     personas_estimadas = Column(Integer, nullable=False, default=0)
     charolas_planificadas = Column(Integer, nullable=False, default=0)  # Charolas planificadas para este servicio
     charolas_producidas = Column(Integer, nullable=False, default=0)  # Charolas producidas realmente
     fecha_creacion = Column(DateTime, default=datetime.utcnow, nullable=False)
+    
+    @property
+    def fecha_desde_effective(self):
+        """Retorna fecha_desde si existe, sino fecha como fallback."""
+        return self.fecha_desde if self.fecha_desde is not None else self.fecha
+    
+    @property
+    def fecha_hasta_effective(self):
+        """Retorna fecha_hasta si existe, sino fecha como fallback."""
+        return self.fecha_hasta if self.fecha_hasta is not None else self.fecha
     
     # Relaciones
     items = relationship('ProgramacionMenuItem', back_populates='programacion', cascade='all, delete-orphan')
@@ -36,11 +49,13 @@ class ProgramacionMenu(db.Model):
     def to_dict(self):
         """Convierte el modelo a diccionario."""
         totales = self.calcular_totales_servicio()
+        fecha_desde_eff = self.fecha_desde_effective
+        fecha_hasta_eff = self.fecha_hasta_effective
         return {
             'id': self.id,
-            'fecha_desde': self.fecha_desde.isoformat() if self.fecha_desde else None,
-            'fecha_hasta': self.fecha_hasta.isoformat() if self.fecha_hasta else None,
-            'fecha': self.fecha_desde.isoformat() if self.fecha_desde else None,  # Compatibilidad hacia atrás
+            'fecha_desde': fecha_desde_eff.isoformat() if fecha_desde_eff else None,
+            'fecha_hasta': fecha_hasta_eff.isoformat() if fecha_hasta_eff else None,
+            'fecha': fecha_desde_eff.isoformat() if fecha_desde_eff else None,  # Compatibilidad hacia atrás
             'tiempo_comida': self.tiempo_comida.value if self.tiempo_comida else None,
             'ubicacion': self.ubicacion,
             'personas_estimadas': self.personas_estimadas,

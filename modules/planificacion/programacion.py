@@ -231,12 +231,15 @@ class ProgramacionMenuService:
         query = db.query(ProgramacionMenu)
         
         # Filtrar por rango de fechas: programaciones que se solapen con el rango solicitado
+        # Compatibilidad: usar fecha si fecha_desde/fecha_hasta no existen en la base de datos
         # Una programación se solapa si: fecha_desde <= fecha_hasta_solicitada AND fecha_hasta >= fecha_desde_solicitada
-        if fecha_desde:
-            query = query.filter(ProgramacionMenu.fecha_hasta >= fecha_desde)
         
+        # Por ahora, usar solo fecha hasta que se ejecute la migración
+        # TODO: Cambiar a usar fecha_desde/fecha_hasta después de ejecutar la migración
+        if fecha_desde:
+            query = query.filter(ProgramacionMenu.fecha >= fecha_desde)
         if fecha_hasta:
-            query = query.filter(ProgramacionMenu.fecha_desde <= fecha_hasta)
+            query = query.filter(ProgramacionMenu.fecha <= fecha_hasta)
         
         if ubicacion:
             query = query.filter(ProgramacionMenu.ubicacion == ubicacion)
@@ -248,7 +251,8 @@ class ProgramacionMenuService:
             except KeyError:
                 pass  # Ignorar si el valor no es válido
         
-        return query.order_by(ProgramacionMenu.fecha_desde.desc(), ProgramacionMenu.tiempo_comida).offset(skip).limit(limit).all()
+        # Ordenar por fecha (usar fecha_desde después de la migración)
+        return query.order_by(ProgramacionMenu.fecha.desc(), ProgramacionMenu.tiempo_comida).offset(skip).limit(limit).all()
     
     @staticmethod
     def generar_pedidos_inteligentes(

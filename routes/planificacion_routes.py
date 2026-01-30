@@ -160,7 +160,11 @@ def listar_programaciones():
     except ValueError as e:
         return error_response(str(e), 400, 'VALIDATION_ERROR')
     except Exception as e:
-        return error_response(str(e), 500, 'INTERNAL_ERROR')
+        import logging
+        import traceback
+        error_trace = traceback.format_exc()
+        logging.error(f"Error en listar_programaciones: {str(e)}\n{error_trace}", exc_info=True)
+        return error_response(f"Error al listar programaciones: {str(e)}", 500, 'INTERNAL_ERROR')
 
 @bp.route('/programacion', methods=['POST'])
 @handle_db_transaction
