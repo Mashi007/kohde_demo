@@ -8,16 +8,32 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app import create_app
 from modules.configuracion.ai import AIConfigService
 
-# Token de OpenRouter proporcionado
-OPENROUTER_TOKEN = "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"
-OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-OPENROUTER_MODEL = "openai/gpt-3.5-turbo"  # Puedes cambiar esto según tus necesidades
+# ⚠️ IMPORTANTE: NO hardcodees tokens aquí. Usa variables de entorno.
+# Este script ahora lee las variables de entorno o las solicita al usuario.
+import os
+
+# Leer desde variables de entorno o solicitar al usuario
+OPENROUTER_TOKEN = os.getenv('OPENROUTER_API_KEY', '').strip()
+OPENROUTER_BASE_URL = os.getenv('OPENAI_BASE_URL', 'https://openrouter.ai/api/v1')
+OPENROUTER_MODEL = os.getenv('OPENAI_MODEL', 'openai/gpt-3.5-turbo')
 
 def configurar_openrouter():
     """Configura OpenRouter en el sistema."""
     print("=" * 60)
     print("CONFIGURACIÓN DE OPENROUTER")
     print("=" * 60)
+    
+    # Verificar si hay token
+    if not OPENROUTER_TOKEN:
+        print("\n⚠️  No se encontró OPENROUTER_API_KEY en variables de entorno.")
+        print("\nPor favor, proporciona tu token de OpenRouter:")
+        print("1. Ve a https://openrouter.ai/keys")
+        print("2. Crea un nuevo token")
+        print("3. Ejecuta este script con:")
+        print("   OPENROUTER_API_KEY=tu-token-aqui python scripts/configurar_openrouter.py")
+        print("\nO configura la variable en tu .env:")
+        print("   OPENROUTER_API_KEY=tu-token-aqui")
+        return False
     
     print(f"\n🔑 Token: {OPENROUTER_TOKEN[:20]}...{OPENROUTER_TOKEN[-10:]}")
     print(f"🌐 Base URL: {OPENROUTER_BASE_URL}")

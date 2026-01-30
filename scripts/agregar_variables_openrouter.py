@@ -4,17 +4,14 @@ Script para agregar variables de OpenRouter al archivo .env
 import os
 from pathlib import Path
 
-# Variables de OpenRouter
-VARIABLES_OPENROUTER = """
-# ========== CONFIGURACIÓN OPENROUTER AI ==========
-OPENROUTER_API_KEY=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
-OPENAI_BASE_URL=https://openrouter.ai/api/v1
-OPENAI_MODEL=openai/gpt-3.5-turbo
-
-# Opcional pero recomendado por OpenRouter
-OPENROUTER_HTTP_REFERER=https://github.com/tu-usuario/kohde_demo
-OPENROUTER_X_TITLE=Kohde ERP Restaurantes
-"""
+# ⚠️ IMPORTANTE: NO hardcodees tokens aquí. Este script ahora solicita el token al usuario.
+# Variables de OpenRouter (valores por defecto, el token se solicitará)
+VARIABLES_OPENROUTER_DEFAULTS = {
+    'OPENAI_BASE_URL': 'https://openrouter.ai/api/v1',
+    'OPENAI_MODEL': 'openai/gpt-3.5-turbo',
+    'OPENROUTER_HTTP_REFERER': 'https://github.com/Mashi007/kohde_demo.git',
+    'OPENROUTER_X_TITLE': 'Kohde ERP Restaurantes'
+}
 
 def agregar_variables_al_env():
     """Agrega las variables de OpenRouter al archivo .env"""
@@ -43,13 +40,23 @@ def agregar_variables_al_env():
     else:
         print(f"\n📄 Creando nuevo archivo .env: {env_file}")
     
+    # Solicitar token si no está en variables de entorno
+    openrouter_token = os.getenv('OPENROUTER_API_KEY', '').strip()
+    
+    if not openrouter_token:
+        print("\n⚠️  No se encontró OPENROUTER_API_KEY en variables de entorno.")
+        print("\nPor favor, proporciona tu token de OpenRouter:")
+        print("1. Ve a https://openrouter.ai/keys")
+        print("2. Crea un nuevo token")
+        print("3. Ingresa el token aquí (o configura OPENROUTER_API_KEY en tu entorno)")
+        print("\nO ejecuta este script con:")
+        print("   OPENROUTER_API_KEY=tu-token-aqui python scripts/agregar_variables_openrouter.py")
+        return
+    
     # Verificar qué variables ya existen
     variables_openrouter = {
-        'OPENROUTER_API_KEY': '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',
-        'OPENAI_BASE_URL': 'https://openrouter.ai/api/v1',
-        'OPENAI_MODEL': 'openai/gpt-3.5-turbo',
-        'OPENROUTER_HTTP_REFERER': 'https://github.com/Mashi007/kohde_demo.git',
-        'OPENROUTER_X_TITLE': 'Kohde ERP Restaurantes'
+        'OPENROUTER_API_KEY': openrouter_token,
+        **VARIABLES_OPENROUTER_DEFAULTS
     }
     
     variables_a_agregar = []
