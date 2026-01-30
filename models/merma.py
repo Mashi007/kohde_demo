@@ -4,6 +4,8 @@ Modelo de Merma (Pérdidas/Desperdicios).
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, DateTime, Numeric, ForeignKey, Text, Enum
 from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
+from sqlalchemy.types import TypeDecorator, String as SQLString
 import enum
 
 from models import db
@@ -16,6 +18,48 @@ class TipoMerma(enum.Enum):
     SERVICIO = 'servicio'
     OTRO = 'otro'
 
+class TipoMermaEnum(TypeDecorator):
+    """TypeDecorator para manejar el enum tipomerma de PostgreSQL."""
+    impl = SQLString(20)
+    cache_ok = True
+    
+    def load_dialect_impl(self, dialect):
+        if dialect.name == 'postgresql':
+            return dialect.type_descriptor(
+                PG_ENUM('tipomerma', values=['VENCIMIENTO', 'DETERIORO', 'PREPARACION', 'SERVICIO', 'OTRO'],
+                       name='tipomerma', create_type=False)
+            )
+        return dialect.type_descriptor(SQLString(20))
+    
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        if isinstance(value, TipoMerma):
+            return value.name
+        if isinstance(value, str):
+            valor_upper = value.upper().strip()
+            try:
+                tipo_enum = TipoMerma[valor_upper]
+                return tipo_enum.name
+            except KeyError:
+                for tipo in TipoMerma:
+                    if tipo.value.lower() == value.lower():
+                        return tipo.name
+                raise ValueError(f"'{value}' no es un valor válido para TipoMerma")
+        return value
+    
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        if isinstance(value, TipoMerma):
+            return value
+        if isinstance(value, str):
+            try:
+                return TipoMerma[value.upper().strip()]
+            except KeyError:
+                return TipoMerma.OTRO
+        return TipoMerma.OTRO
+
 class Merma(db.Model):
     """Modelo de merma (pérdida/desperdicio)."""
     __tablename__ = 'mermas'
@@ -23,7 +67,7 @@ class Merma(db.Model):
     id = Column(Integer, primary_key=True)
     item_id = Column(Integer, ForeignKey('items.id'), nullable=False)
     fecha_merma = Column(DateTime, nullable=False, default=datetime.utcnow)
-    tipo = Column(Enum(TipoMerma), nullable=False, default=TipoMerma.OTRO)
+    tipo = Column(TipoMermaEnum(), nullable=False, default=TipoMerma.OTRO)
     cantidad = Column(Numeric(10, 2), nullable=False)
     unidad = Column(String(20), nullable=False)
     costo_unitario = Column(Numeric(10, 2), nullable=False)

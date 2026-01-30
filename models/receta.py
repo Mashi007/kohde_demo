@@ -26,10 +26,15 @@ class TipoRecetaEnum(TypeDecorator):
         super().__init__(length=20)
     
     def load_dialect_impl(self, dialect):
-        """Cargar la implementación del dialecto - usar String para PostgreSQL también."""
-        # Siempre usar String, nunca PG_ENUM, para evitar validación incorrecta
-        # El process_result_value manejará la conversión de strings a enums
-        # IMPORTANTE: No usar PG_ENUM aquí porque intenta validar por nombre, no por valor
+        """Cargar la implementación del dialecto - usar PG_ENUM para PostgreSQL."""
+        # Para PostgreSQL, usar PG_ENUM para que SQLAlchemy haga el cast correcto
+        if dialect.name == 'postgresql':
+            # Crear el tipo ENUM de PostgreSQL con los valores correctos (minúsculas)
+            return dialect.type_descriptor(
+                PG_ENUM('tiporeceta', values=['desayuno', 'almuerzo', 'cena'], 
+                       name='tiporeceta', create_type=False)
+            )
+        # Para otros dialectos, usar String
         return dialect.type_descriptor(String(20))
     
     def coerce_compared_value(self, op, value):

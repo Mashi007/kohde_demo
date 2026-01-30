@@ -5,6 +5,8 @@ Pedidos internos: transferencia de bodega a cocina.
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, DateTime, Text, Numeric, ForeignKey, Enum
 from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
+from sqlalchemy.types import TypeDecorator, String as SQLString
 import enum
 
 from models import db
@@ -15,6 +17,50 @@ class EstadoPedidoInterno(enum.Enum):
     ENTREGADO = 'entregado'  # Entregado a cocina
     CANCELADO = 'cancelado'  # Cancelado antes de entregar
 
+class EstadoPedidoInternoEnum(TypeDecorator):
+    """TypeDecorator para manejar el enum estadopedidointerno de PostgreSQL."""
+    impl = SQLString(20)
+    cache_ok = True
+    
+    def load_dialect_impl(self, dialect):
+        if dialect.name == 'postgresql':
+            # PostgreSQL tiene valores en minúsculas: 'pendiente', 'entregado', 'cancelado'
+            return dialect.type_descriptor(
+                PG_ENUM('estadopedidointerno', values=['pendiente', 'entregado', 'cancelado'],
+                       name='estadopedidointerno', create_type=False)
+            )
+        return dialect.type_descriptor(SQLString(20))
+    
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        if isinstance(value, EstadoPedidoInterno):
+            return value.value.lower()  # 'pendiente', 'entregado', 'cancelado'
+        if isinstance(value, str):
+            valor_lower = value.lower().strip()
+            try:
+                estado_enum = EstadoPedidoInterno[valor_lower.upper()]
+                return estado_enum.value.lower()
+            except KeyError:
+                for estado in EstadoPedidoInterno:
+                    if estado.value.lower() == valor_lower:
+                        return estado.value.lower()
+                raise ValueError(f"'{value}' no es un valor válido para EstadoPedidoInterno")
+        return value
+    
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        if isinstance(value, EstadoPedidoInterno):
+            return value
+        if isinstance(value, str):
+            valor_lower = value.lower().strip()
+            for estado in EstadoPedidoInterno:
+                if estado.value.lower() == valor_lower:
+                    return estado
+            return EstadoPedidoInterno.PENDIENTE
+        return EstadoPedidoInterno.PENDIENTE
+
 class PedidoInterno(db.Model):
     """Modelo de pedido interno (bodega → cocina)."""
     __tablename__ = 'pedidos_internos'
@@ -22,7 +68,7 @@ class PedidoInterno(db.Model):
     id = Column(Integer, primary_key=True)
     fecha_pedido = Column(DateTime, default=datetime.utcnow, nullable=False)
     fecha_entrega = Column(DateTime, nullable=True)  # Fecha en que se entregó realmente
-    estado = Column(Enum(EstadoPedidoInterno), default=EstadoPedidoInterno.PENDIENTE, nullable=False)
+    estado = Column(EstadoPedidoInternoEnum(), default=EstadoPedidoInterno.PENDIENTE, nullable=False)
     
     # Quien entrega (responsable de bodega)
     entregado_por_id = Column(Integer, nullable=False)  # usuario_id del responsable de bodega

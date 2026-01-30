@@ -4,6 +4,8 @@ Modelo de Chat AI (Conversaciones y Mensajes).
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Enum
 from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
+from sqlalchemy.types import TypeDecorator, String as SQLString
 import enum
 
 from models import db
@@ -13,6 +15,48 @@ class TipoMensaje(enum.Enum):
     USUARIO = 'usuario'
     ASISTENTE = 'asistente'
     SISTEMA = 'sistema'
+
+class TipoMensajeEnum(TypeDecorator):
+    """TypeDecorator para manejar el enum tipomensaje de PostgreSQL."""
+    impl = SQLString(20)
+    cache_ok = True
+    
+    def load_dialect_impl(self, dialect):
+        if dialect.name == 'postgresql':
+            return dialect.type_descriptor(
+                PG_ENUM('tipomensaje', values=['USUARIO', 'ASISTENTE', 'SISTEMA'],
+                       name='tipomensaje', create_type=False)
+            )
+        return dialect.type_descriptor(SQLString(20))
+    
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        if isinstance(value, TipoMensaje):
+            return value.name
+        if isinstance(value, str):
+            valor_upper = value.upper().strip()
+            try:
+                tipo_enum = TipoMensaje[valor_upper]
+                return tipo_enum.name
+            except KeyError:
+                for tipo in TipoMensaje:
+                    if tipo.value.lower() == value.lower():
+                        return tipo.name
+                raise ValueError(f"'{value}' no es un valor válido para TipoMensaje")
+        return value
+    
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        if isinstance(value, TipoMensaje):
+            return value
+        if isinstance(value, str):
+            try:
+                return TipoMensaje[value.upper().strip()]
+            except KeyError:
+                return TipoMensaje.USUARIO
+        return TipoMensaje.USUARIO
 
 class Conversacion(db.Model):
     """Modelo de conversación de chat."""
@@ -51,7 +95,7 @@ class Mensaje(db.Model):
     
     id = Column(Integer, primary_key=True)
     conversacion_id = Column(Integer, ForeignKey('conversaciones.id'), nullable=False)
-    tipo = Column(Enum(TipoMensaje), nullable=False, default=TipoMensaje.USUARIO)
+    tipo = Column(TipoMensajeEnum(), nullable=False, default=TipoMensaje.USUARIO)
     contenido = Column(Text, nullable=False)
     tokens_usados = Column(Integer, nullable=True)  # Tokens usados en la respuesta del AI
     fecha_envio = Column(DateTime, default=datetime.utcnow, nullable=False)

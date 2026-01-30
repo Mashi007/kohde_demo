@@ -4,6 +4,8 @@ Modelos de Requerimiento y RequerimientoItem.
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, DateTime, Numeric, ForeignKey, Enum, Time
 from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
+from sqlalchemy.types import TypeDecorator, String as SQLString
 import enum
 
 from models import db
@@ -14,6 +16,49 @@ class EstadoRequerimiento(enum.Enum):
     ENTREGADO = 'entregado'
     CANCELADO = 'cancelado'
 
+class EstadoRequerimientoEnum(TypeDecorator):
+    """TypeDecorator para manejar el enum estadorequerimiento de PostgreSQL."""
+    impl = SQLString(20)
+    cache_ok = True
+    
+    def load_dialect_impl(self, dialect):
+        if dialect.name == 'postgresql':
+            # PostgreSQL tiene valores en MAYÚSCULAS: 'PENDIENTE', 'ENTREGADO', 'CANCELADO'
+            return dialect.type_descriptor(
+                PG_ENUM('estadorequerimiento', values=['PENDIENTE', 'ENTREGADO', 'CANCELADO'],
+                       name='estadorequerimiento', create_type=False)
+            )
+        return dialect.type_descriptor(SQLString(20))
+    
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        if isinstance(value, EstadoRequerimiento):
+            return value.name  # 'PENDIENTE', 'ENTREGADO', 'CANCELADO'
+        if isinstance(value, str):
+            valor_upper = value.upper().strip()
+            try:
+                estado_enum = EstadoRequerimiento[valor_upper]
+                return estado_enum.name
+            except KeyError:
+                for estado in EstadoRequerimiento:
+                    if estado.value.lower() == value.lower():
+                        return estado.name
+                raise ValueError(f"'{value}' no es un valor válido para EstadoRequerimiento")
+        return value
+    
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        if isinstance(value, EstadoRequerimiento):
+            return value
+        if isinstance(value, str):
+            try:
+                return EstadoRequerimiento[value.upper().strip()]
+            except KeyError:
+                return EstadoRequerimiento.PENDIENTE
+        return EstadoRequerimiento.PENDIENTE
+
 class Requerimiento(db.Model):
     """Modelo de requerimiento (salida de bodega)."""
     __tablename__ = 'requerimientos'
@@ -22,7 +67,7 @@ class Requerimiento(db.Model):
     solicitante = Column(Integer, nullable=False)  # usuario_id
     receptor = Column(Integer, nullable=False)  # usuario_id
     fecha = Column(DateTime, default=datetime.utcnow, nullable=False)
-    estado = Column(Enum(EstadoRequerimiento), default=EstadoRequerimiento.PENDIENTE, nullable=False)
+    estado = Column(EstadoRequerimientoEnum(), default=EstadoRequerimiento.PENDIENTE, nullable=False)
     observaciones = Column(String(500), nullable=True)
     
     # Relaciones

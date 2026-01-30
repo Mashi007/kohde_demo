@@ -4,6 +4,8 @@ Modelo de Ticket (Sistema de servicio al cliente).
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Enum
 from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
+from sqlalchemy.types import TypeDecorator, String as SQLString
 import enum
 
 from models import db
@@ -29,17 +31,143 @@ class PrioridadTicket(enum.Enum):
     ALTA = 'alta'
     URGENTE = 'urgente'
 
+class TipoTicketEnum(TypeDecorator):
+    """TypeDecorator para manejar el enum tipoticket de PostgreSQL."""
+    impl = SQLString(20)
+    cache_ok = True
+    
+    def load_dialect_impl(self, dialect):
+        if dialect.name == 'postgresql':
+            return dialect.type_descriptor(
+                PG_ENUM('tipoticket', values=['QUEJA', 'CONSULTA', 'SUGERENCIA', 'RECLAMO'],
+                       name='tipoticket', create_type=False)
+            )
+        return dialect.type_descriptor(SQLString(20))
+    
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        if isinstance(value, TipoTicket):
+            return value.name
+        if isinstance(value, str):
+            valor_upper = value.upper().strip()
+            try:
+                tipo_enum = TipoTicket[valor_upper]
+                return tipo_enum.name
+            except KeyError:
+                for tipo in TipoTicket:
+                    if tipo.value.lower() == value.lower():
+                        return tipo.name
+                raise ValueError(f"'{value}' no es un valor válido para TipoTicket")
+        return value
+    
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        if isinstance(value, TipoTicket):
+            return value
+        if isinstance(value, str):
+            try:
+                return TipoTicket[value.upper().strip()]
+            except KeyError:
+                return TipoTicket.CONSULTA
+        return TipoTicket.CONSULTA
+
+class EstadoTicketEnum(TypeDecorator):
+    """TypeDecorator para manejar el enum estadoticket de PostgreSQL."""
+    impl = SQLString(20)
+    cache_ok = True
+    
+    def load_dialect_impl(self, dialect):
+        if dialect.name == 'postgresql':
+            return dialect.type_descriptor(
+                PG_ENUM('estadoticket', values=['ABIERTO', 'EN_PROCESO', 'RESUELTO', 'CERRADO'],
+                       name='estadoticket', create_type=False)
+            )
+        return dialect.type_descriptor(SQLString(20))
+    
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        if isinstance(value, EstadoTicket):
+            return value.name
+        if isinstance(value, str):
+            valor_upper = value.upper().strip().replace(' ', '_')
+            try:
+                estado_enum = EstadoTicket[valor_upper]
+                return estado_enum.name
+            except KeyError:
+                for estado in EstadoTicket:
+                    if estado.value.lower() == value.lower().replace(' ', '_'):
+                        return estado.name
+                raise ValueError(f"'{value}' no es un valor válido para EstadoTicket")
+        return value
+    
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        if isinstance(value, EstadoTicket):
+            return value
+        if isinstance(value, str):
+            try:
+                return EstadoTicket[value.upper().strip()]
+            except KeyError:
+                return EstadoTicket.ABIERTO
+        return EstadoTicket.ABIERTO
+
+class PrioridadTicketEnum(TypeDecorator):
+    """TypeDecorator para manejar el enum prioridadticket de PostgreSQL."""
+    impl = SQLString(20)
+    cache_ok = True
+    
+    def load_dialect_impl(self, dialect):
+        if dialect.name == 'postgresql':
+            return dialect.type_descriptor(
+                PG_ENUM('prioridadticket', values=['BAJA', 'MEDIA', 'ALTA', 'URGENTE'],
+                       name='prioridadticket', create_type=False)
+            )
+        return dialect.type_descriptor(SQLString(20))
+    
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        if isinstance(value, PrioridadTicket):
+            return value.name
+        if isinstance(value, str):
+            valor_upper = value.upper().strip()
+            try:
+                prioridad_enum = PrioridadTicket[valor_upper]
+                return prioridad_enum.name
+            except KeyError:
+                for prioridad in PrioridadTicket:
+                    if prioridad.value.lower() == value.lower():
+                        return prioridad.name
+                raise ValueError(f"'{value}' no es un valor válido para PrioridadTicket")
+        return value
+    
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        if isinstance(value, PrioridadTicket):
+            return value
+        if isinstance(value, str):
+            try:
+                return PrioridadTicket[value.upper().strip()]
+            except KeyError:
+                return PrioridadTicket.MEDIA
+        return PrioridadTicket.MEDIA
+
 class Ticket(db.Model):
     """Modelo de ticket."""
     __tablename__ = 'tickets'
     
     id = Column(Integer, primary_key=True)
     cliente_id = Column(Integer, nullable=True)  # Removida FK, ahora opcional
-    tipo = Column(Enum(TipoTicket), nullable=False)
+    tipo = Column(TipoTicketEnum(), nullable=False)
     asunto = Column(String(200), nullable=False)
     descripcion = Column(Text, nullable=False)
-    estado = Column(Enum(EstadoTicket), default=EstadoTicket.ABIERTO, nullable=False)
-    prioridad = Column(Enum(PrioridadTicket), default=PrioridadTicket.MEDIA, nullable=False)
+    estado = Column(EstadoTicketEnum(), default=EstadoTicket.ABIERTO, nullable=False)
+    prioridad = Column(PrioridadTicketEnum(), default=PrioridadTicket.MEDIA, nullable=False)
     asignado_a = Column(Integer, nullable=True)  # usuario_id
     fecha_creacion = Column(DateTime, default=datetime.utcnow, nullable=False)
     fecha_resolucion = Column(DateTime, nullable=True)

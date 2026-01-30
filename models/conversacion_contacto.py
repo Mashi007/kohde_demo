@@ -5,6 +5,8 @@ Historial de conversaciones por email y WhatsApp con contactos.
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey, Enum as SQLEnum
 from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
+from sqlalchemy.types import TypeDecorator, String as SQLString
 import enum
 
 from models import db
@@ -19,14 +21,98 @@ class DireccionMensaje(enum.Enum):
     ENVIADO = 'enviado'  # Mensaje enviado por nosotros
     RECIBIDO = 'recibido'  # Mensaje recibido (futuro)
 
+class TipoMensajeContactoEnum(TypeDecorator):
+    """TypeDecorator para manejar el enum tipomensajecontacto de PostgreSQL."""
+    impl = SQLString(20)
+    cache_ok = True
+    
+    def load_dialect_impl(self, dialect):
+        if dialect.name == 'postgresql':
+            return dialect.type_descriptor(
+                PG_ENUM('tipomensajecontacto', values=['EMAIL', 'WHATSAPP'],
+                       name='tipomensajecontacto', create_type=False)
+            )
+        return dialect.type_descriptor(SQLString(20))
+    
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        if isinstance(value, TipoMensajeContacto):
+            return value.name
+        if isinstance(value, str):
+            valor_upper = value.upper().strip()
+            try:
+                tipo_enum = TipoMensajeContacto[valor_upper]
+                return tipo_enum.name
+            except KeyError:
+                for tipo in TipoMensajeContacto:
+                    if tipo.value.lower() == value.lower():
+                        return tipo.name
+                raise ValueError(f"'{value}' no es un valor válido para TipoMensajeContacto")
+        return value
+    
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        if isinstance(value, TipoMensajeContacto):
+            return value
+        if isinstance(value, str):
+            try:
+                return TipoMensajeContacto[value.upper().strip()]
+            except KeyError:
+                return TipoMensajeContacto.EMAIL
+        return TipoMensajeContacto.EMAIL
+
+class DireccionMensajeEnum(TypeDecorator):
+    """TypeDecorator para manejar el enum direccionmensaje de PostgreSQL."""
+    impl = SQLString(20)
+    cache_ok = True
+    
+    def load_dialect_impl(self, dialect):
+        if dialect.name == 'postgresql':
+            return dialect.type_descriptor(
+                PG_ENUM('direccionmensaje', values=['ENVIADO', 'RECIBIDO'],
+                       name='direccionmensaje', create_type=False)
+            )
+        return dialect.type_descriptor(SQLString(20))
+    
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return None
+        if isinstance(value, DireccionMensaje):
+            return value.name
+        if isinstance(value, str):
+            valor_upper = value.upper().strip()
+            try:
+                direccion_enum = DireccionMensaje[valor_upper]
+                return direccion_enum.name
+            except KeyError:
+                for direccion in DireccionMensaje:
+                    if direccion.value.lower() == value.lower():
+                        return direccion.name
+                raise ValueError(f"'{value}' no es un valor válido para DireccionMensaje")
+        return value
+    
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return None
+        if isinstance(value, DireccionMensaje):
+            return value
+        if isinstance(value, str):
+            try:
+                return DireccionMensaje[value.upper().strip()]
+            except KeyError:
+                return DireccionMensaje.ENVIADO
+        return DireccionMensaje.ENVIADO
+
 class ConversacionContacto(db.Model):
     """Modelo de conversación con un contacto."""
     __tablename__ = 'conversaciones_contactos'
     
     id = Column(Integer, primary_key=True)
     contacto_id = Column(Integer, ForeignKey('contactos.id', ondelete='CASCADE'), nullable=False)
-    tipo_mensaje = Column(SQLEnum(TipoMensajeContacto), nullable=False)  # email o whatsapp
-    direccion = Column(SQLEnum(DireccionMensaje), nullable=False, default=DireccionMensaje.ENVIADO)
+    tipo_mensaje = Column(TipoMensajeContactoEnum(), nullable=False)  # email o whatsapp
+    direccion = Column(DireccionMensajeEnum(), nullable=False, default=DireccionMensaje.ENVIADO)
     
     # Contenido del mensaje
     asunto = Column(String(500), nullable=True)  # Solo para emails

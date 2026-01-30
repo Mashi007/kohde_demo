@@ -4,6 +4,8 @@ Modelos de Factura y FacturaItem.
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Numeric, ForeignKey, Enum, JSON
 from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
+from sqlalchemy.types import TypeDecorator, String as SQLString
 import enum
 
 from models import db
@@ -20,13 +22,107 @@ class EstadoFactura(enum.Enum):
     APROBADA = 'aprobada'
     RECHAZADA = 'rechazada'
 
+class TipoFacturaEnum(TypeDecorator):
+    """TypeDecorator para manejar el enum tipofactura de PostgreSQL."""
+    impl = SQLString(20)
+    cache_ok = True
+    
+    def load_dialect_impl(self, dialect):
+        """Cargar la implementación del dialecto - usar PG_ENUM para PostgreSQL."""
+        if dialect.name == 'postgresql':
+            # PostgreSQL tiene valores en MAYÚSCULAS: 'CLIENTE', 'PROVEEDOR'
+            return dialect.type_descriptor(
+                PG_ENUM('tipofactura', values=['CLIENTE', 'PROVEEDOR'],
+                       name='tipofactura', create_type=False)
+            )
+        return dialect.type_descriptor(SQLString(20))
+    
+    def process_bind_param(self, value, dialect):
+        """Convierte el enum a su NOMBRE (mayúsculas) antes de insertar en PostgreSQL."""
+        if value is None:
+            return None
+        if isinstance(value, TipoFactura):
+            return value.name  # 'CLIENTE' o 'PROVEEDOR'
+        if isinstance(value, str):
+            valor_upper = value.upper().strip()
+            try:
+                tipo_enum = TipoFactura[valor_upper]
+                return tipo_enum.name
+            except KeyError:
+                # Fallback: buscar por valor
+                for tipo in TipoFactura:
+                    if tipo.value.lower() == value.lower():
+                        return tipo.name
+                raise ValueError(f"'{value}' no es un valor válido para TipoFactura")
+        return value
+    
+    def process_result_value(self, value, dialect):
+        """Convierte el NOMBRE (mayúsculas) de PostgreSQL a objeto Enum."""
+        if value is None:
+            return None
+        if isinstance(value, TipoFactura):
+            return value
+        if isinstance(value, str):
+            try:
+                return TipoFactura[value.upper().strip()]
+            except KeyError:
+                return TipoFactura.CLIENTE  # Valor por defecto
+        return TipoFactura.CLIENTE
+
+class EstadoFacturaEnum(TypeDecorator):
+    """TypeDecorator para manejar el enum estadofactura de PostgreSQL."""
+    impl = SQLString(20)
+    cache_ok = True
+    
+    def load_dialect_impl(self, dialect):
+        """Cargar la implementación del dialecto - usar PG_ENUM para PostgreSQL."""
+        if dialect.name == 'postgresql':
+            # PostgreSQL tiene valores en MAYÚSCULAS: 'PENDIENTE', 'PARCIAL', 'APROBADA', 'RECHAZADA'
+            return dialect.type_descriptor(
+                PG_ENUM('estadofactura', values=['PENDIENTE', 'PARCIAL', 'APROBADA', 'RECHAZADA'],
+                       name='estadofactura', create_type=False)
+            )
+        return dialect.type_descriptor(SQLString(20))
+    
+    def process_bind_param(self, value, dialect):
+        """Convierte el enum a su NOMBRE (mayúsculas) antes de insertar en PostgreSQL."""
+        if value is None:
+            return None
+        if isinstance(value, EstadoFactura):
+            return value.name  # 'PENDIENTE', 'PARCIAL', etc.
+        if isinstance(value, str):
+            valor_upper = value.upper().strip()
+            try:
+                estado_enum = EstadoFactura[valor_upper]
+                return estado_enum.name
+            except KeyError:
+                # Fallback: buscar por valor
+                for estado in EstadoFactura:
+                    if estado.value.lower() == value.lower():
+                        return estado.name
+                raise ValueError(f"'{value}' no es un valor válido para EstadoFactura")
+        return value
+    
+    def process_result_value(self, value, dialect):
+        """Convierte el NOMBRE (mayúsculas) de PostgreSQL a objeto Enum."""
+        if value is None:
+            return None
+        if isinstance(value, EstadoFactura):
+            return value
+        if isinstance(value, str):
+            try:
+                return EstadoFactura[value.upper().strip()]
+            except KeyError:
+                return EstadoFactura.PENDIENTE  # Valor por defecto
+        return EstadoFactura.PENDIENTE
+
 class Factura(db.Model):
     """Modelo de factura."""
     __tablename__ = 'facturas'
     
     id = Column(Integer, primary_key=True)
     numero_factura = Column(String(50), nullable=False)
-    tipo = Column(Enum(TipoFactura), nullable=False)
+    tipo = Column(TipoFacturaEnum(), nullable=False)
     # FK flexible: puede ser cliente_id o proveedor_id según el tipo
     # Nota: cliente_id mantenido para compatibilidad pero sin FK (tabla clientes removida)
     cliente_id = Column(Integer, nullable=True)  # Sin FK, tabla clientes no existe
@@ -36,7 +132,7 @@ class Factura(db.Model):
     subtotal = Column(Numeric(10, 2), nullable=False)
     iva = Column(Numeric(10, 2), nullable=False, default=0)
     total = Column(Numeric(10, 2), nullable=False)
-    estado = Column(Enum(EstadoFactura), default=EstadoFactura.PENDIENTE, nullable=False)
+    estado = Column(EstadoFacturaEnum(), default=EstadoFactura.PENDIENTE, nullable=False)
     imagen_url = Column(String(500), nullable=True)  # URL de la imagen de la factura
     items_json = Column(JSON, nullable=True)  # Datos extraídos por OCR
     aprobado_por = Column(Integer, nullable=True)  # usuario_id

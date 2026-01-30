@@ -4,6 +4,8 @@ Modelos de PedidoCompra y PedidoCompraItem.
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, Numeric, ForeignKey, Enum
 from sqlalchemy.orm import relationship
+from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
+from sqlalchemy.types import TypeDecorator, String as SQLString
 import enum
 
 from models import db
@@ -15,6 +17,53 @@ class EstadoPedido(enum.Enum):
     RECIBIDO = 'recibido'
     CANCELADO = 'cancelado'
 
+class EstadoPedidoEnum(TypeDecorator):
+    """TypeDecorator para manejar el enum estadopedido de PostgreSQL."""
+    impl = SQLString(20)
+    cache_ok = True
+    
+    def load_dialect_impl(self, dialect):
+        """Cargar la implementación del dialecto - usar PG_ENUM para PostgreSQL."""
+        if dialect.name == 'postgresql':
+            # PostgreSQL tiene valores en MAYÚSCULAS: 'BORRADOR', 'ENVIADO', 'RECIBIDO', 'CANCELADO'
+            return dialect.type_descriptor(
+                PG_ENUM('estadopedido', values=['BORRADOR', 'ENVIADO', 'RECIBIDO', 'CANCELADO'],
+                       name='estadopedido', create_type=False)
+            )
+        return dialect.type_descriptor(SQLString(20))
+    
+    def process_bind_param(self, value, dialect):
+        """Convierte el enum a su NOMBRE (mayúsculas) antes de insertar en PostgreSQL."""
+        if value is None:
+            return None
+        if isinstance(value, EstadoPedido):
+            return value.name  # 'BORRADOR', 'ENVIADO', etc.
+        if isinstance(value, str):
+            valor_upper = value.upper().strip()
+            try:
+                estado_enum = EstadoPedido[valor_upper]
+                return estado_enum.name
+            except KeyError:
+                # Fallback: buscar por valor
+                for estado in EstadoPedido:
+                    if estado.value.lower() == value.lower():
+                        return estado.name
+                raise ValueError(f"'{value}' no es un valor válido para EstadoPedido")
+        return value
+    
+    def process_result_value(self, value, dialect):
+        """Convierte el NOMBRE (mayúsculas) de PostgreSQL a objeto Enum."""
+        if value is None:
+            return None
+        if isinstance(value, EstadoPedido):
+            return value
+        if isinstance(value, str):
+            try:
+                return EstadoPedido[value.upper().strip()]
+            except KeyError:
+                return EstadoPedido.BORRADOR  # Valor por defecto
+        return EstadoPedido.BORRADOR
+
 class PedidoCompra(db.Model):
     """Modelo de pedido de compra."""
     __tablename__ = 'pedidos_compra'
@@ -23,7 +72,7 @@ class PedidoCompra(db.Model):
     proveedor_id = Column(Integer, ForeignKey('proveedores.id', ondelete='RESTRICT'), nullable=False)
     fecha_pedido = Column(DateTime, default=datetime.utcnow, nullable=False)
     fecha_entrega_esperada = Column(DateTime, nullable=True)
-    estado = Column(Enum(EstadoPedido), default=EstadoPedido.BORRADOR, nullable=False)
+    estado = Column(EstadoPedidoEnum(), default=EstadoPedido.BORRADOR, nullable=False)
     total = Column(Numeric(10, 2), nullable=False, default=0)
     creado_por = Column(Integer, nullable=True)  # usuario_id
     observaciones = Column(Text, nullable=True)
