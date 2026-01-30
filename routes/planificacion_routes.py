@@ -4,6 +4,7 @@ Rutas API para módulo de Planificación.
 from flask import Blueprint, request, jsonify
 from datetime import datetime
 from models import db
+from models.programacion import ProgramacionMenu, ProgramacionMenuItem
 from modules.planificacion.recetas import RecetaService
 from modules.planificacion.programacion import ProgramacionMenuService
 from modules.crm.tickets_automaticos import TicketsAutomaticosService
@@ -403,6 +404,30 @@ def actualizar_programacion(programacion_id):
     db.session.commit()
     
     return success_response(programacion.to_dict(), message='Programación actualizada correctamente')
+
+@bp.route('/programacion/<int:programacion_id>', methods=['DELETE'])
+@handle_db_transaction
+def eliminar_programacion(programacion_id):
+    """Elimina una programación de menú."""
+    validate_positive_int(programacion_id, 'programacion_id')
+    
+    programacion = db.query(ProgramacionMenu).filter(
+        ProgramacionMenu.id == programacion_id
+    ).first()
+    
+    if not programacion:
+        return error_response('Programación no encontrada', 404, 'NOT_FOUND')
+    
+    # Eliminar items de programación primero (cascade debería hacerlo, pero por seguridad)
+    db.query(ProgramacionMenuItem).filter(
+        ProgramacionMenuItem.programacion_id == programacion_id
+    ).delete()
+    
+    # Eliminar la programación
+    db.delete(programacion)
+    db.session.commit()
+    
+    return success_response(None, message='Programación eliminada correctamente')
 
 @bp.route('/programacion/<int:programacion_id>/necesidades', methods=['GET'])
 def calcular_necesidades(programacion_id):

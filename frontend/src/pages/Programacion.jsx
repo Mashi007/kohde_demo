@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import api, { extractData } from '../config/api'
-import { Calendar, Plus, Filter, UtensilsCrossed, Package } from 'lucide-react'
+import { Calendar, Plus, Filter, UtensilsCrossed, Package, Edit, Trash2 } from 'lucide-react'
+import { toast } from 'react-hot-toast'
 import CalendarioProgramacion from '../components/CalendarioProgramacion'
 import ProgramacionForm from '../components/ProgramacionForm'
 import NecesidadesProgramacion from '../components/NecesidadesProgramacion'
@@ -15,6 +16,19 @@ export default function Programacion() {
   const [programacionEditando, setProgramacionEditando] = useState(null)
   const [programacionNecesidades, setProgramacionNecesidades] = useState(null)
   const [filtroServicio, setFiltroServicio] = useState('')
+  const queryClient = useQueryClient()
+  
+  // Mutación para eliminar programación
+  const deleteMutation = useMutation({
+    mutationFn: (id) => api.delete(`/planificacion/programacion/${id}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['programaciones'])
+      toast.success('Programación eliminada correctamente')
+    },
+    onError: (error) => {
+      toast.error(error.response?.data?.error || 'Error al eliminar programación')
+    }
+  })
   
   // Cargar programaciones
   const { data: programaciones, isLoading } = useQuery({
@@ -78,6 +92,13 @@ export default function Programacion() {
   
   const handleVerNecesidades = (programacion) => {
     setProgramacionNecesidades(programacion.id)
+  }
+  
+  const handleEliminarProgramacion = (programacion, e) => {
+    e.stopPropagation()
+    if (window.confirm(`¿Estás seguro de eliminar la programación de ${programacion.ubicacion}?`)) {
+      deleteMutation.mutate(programacion.id)
+    }
   }
   
   const handleFechaSeleccionada = (fecha) => {
@@ -229,7 +250,7 @@ export default function Programacion() {
   )
 }
 
-function ProgramacionCard({ programacion, onEdit, onVerNecesidades }) {
+function ProgramacionCard({ programacion, onEdit, onDelete, onVerNecesidades }) {
   const getServicioBadge = (servicio) => {
     const badges = {
       desayuno: 'bg-yellow-600/20 text-yellow-300 border-yellow-500/50',
@@ -278,26 +299,63 @@ function ProgramacionCard({ programacion, onEdit, onVerNecesidades }) {
             </div>
           </div>
         </div>
-        {programacion.charolas_planificadas > 0 && (
-          <div className="text-sm text-slate-400">
-            {programacion.charolas_planificadas} charolas
+        <div className="flex items-center gap-2">
+          {/* Botones de acción */}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                onEdit(programacion)
+              }}
+              className="p-1.5 text-blue-400 hover:text-blue-300 hover:bg-blue-600/20 rounded transition-colors"
+              title="Editar programación"
+            >
+              <Edit className="w-4 h-4" />
+            </button>
+            <button
+              onClick={(e) => onDelete(programacion, e)}
+              className="p-1.5 text-red-400 hover:text-red-300 hover:bg-red-600/20 rounded transition-colors"
+              title="Eliminar programación"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
           </div>
-        )}
+        </div>
       </div>
       
-      {/* Recetas */}
-      <div className="mb-3">
-        <div className="text-xs text-slate-400 mb-1">
-          {programacion.total_recetas} receta{programacion.total_recetas !== 1 ? 's' : ''} • {programacion.total_porciones} porciones
+      {/* Resumen principal: Recetas, Porciones, Charolas */}
+      <div className="mb-3 p-3 bg-slate-700/50 rounded-lg">
+        {/* Resumen destacado */}
+        <div className="flex items-center gap-4 text-sm font-semibold mb-2">
+          <span className="text-white">
+            {programacion.total_recetas || programacion.items?.length || 0} receta{(programacion.total_recetas || programacion.items?.length || 0) !== 1 ? 's' : ''}
+          </span>
+          <span className="text-slate-300">•</span>
+          <span className="text-white">
+            {programacion.total_porciones || 0} porciones
+          </span>
+          <span className="text-slate-300">•</span>
+          <span className="text-purple-300">
+            {programacion.charolas_planificadas || 0} charolas
+          </span>
         </div>
+        
+        {/* Explicación: En cada charola hay X recetas, por tanto Y porciones */}
+        {programacion.charolas_planificadas > 0 && programacion.items?.length > 0 && (
+          <div className="text-xs text-slate-400 mb-2 italic">
+            En cada charola hay {programacion.items.length} receta{programacion.items.length !== 1 ? 's' : ''}, por tanto {Math.round((programacion.total_porciones || 0) / programacion.charolas_planificadas)} porción{Math.round((programacion.total_porciones || 0) / programacion.charolas_planificadas) !== 1 ? 'es' : ''}
+          </div>
+        )}
+        
+        {/* Lista de recetas */}
         <div className="flex flex-wrap gap-2">
           {programacion.items?.slice(0, 3).map((item, idx) => (
-            <span key={idx} className="text-xs px-2 py-1 bg-slate-700 rounded">
+            <span key={idx} className="text-xs px-2 py-1 bg-slate-600 rounded">
               {item.receta?.nombre} ({item.cantidad_porciones}x)
             </span>
           ))}
           {programacion.items?.length > 3 && (
-            <span className="text-xs px-2 py-1 bg-slate-700 rounded text-slate-400">
+            <span className="text-xs px-2 py-1 bg-slate-600 rounded text-slate-400">
               +{programacion.items.length - 3} más
             </span>
           )}

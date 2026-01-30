@@ -100,7 +100,7 @@ export default function ProgramacionForm({ programacion, fecha, tiempoComida, on
   
   const agregarReceta = () => {
     if (cargandoRecetas) {
-      toast.info('Cargando recetas, por favor espera...')
+      toast('Cargando recetas, por favor espera...', { icon: 'ℹ️' })
       return
     }
     
@@ -117,7 +117,7 @@ export default function ProgramacionForm({ programacion, fecha, tiempoComida, on
     const primeraReceta = recetasDisponibles[0]
     // Verificar que no esté ya agregada
     if (formData.recetas.some(r => r.receta_id === primeraReceta.id)) {
-      toast.info(`La receta "${primeraReceta.nombre}" ya está agregada`)
+      toast(`La receta "${primeraReceta.nombre}" ya está agregada`, { icon: 'ℹ️' })
       return
     }
     
