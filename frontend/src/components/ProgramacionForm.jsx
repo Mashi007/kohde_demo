@@ -22,19 +22,22 @@ export default function ProgramacionForm({ programacion, fecha, tiempoComida, on
   })
   
   // Cargar recetas disponibles según el tipo de servicio
+  // Cargar TODAS las recetas activas, no solo las del tipo específico
   const { data: recetasDisponiblesResponse, isLoading: cargandoRecetas, error: errorRecetas } = useQuery({
-    queryKey: ['recetas', formData.tiempo_comida],
+    queryKey: ['recetas', 'todas', formData.tiempo_comida],
     queryFn: async () => {
-      // Mapear tiempo_comida a tipo de receta
-      const tipoMap = {
-        [TIEMPO_COMIDA_VALUES.DESAYUNO]: TIEMPO_COMIDA_VALUES.DESAYUNO,
-        [TIEMPO_COMIDA_VALUES.ALMUERZO]: TIEMPO_COMIDA_VALUES.ALMUERZO,
-        [TIEMPO_COMIDA_VALUES.CENA]: TIEMPO_COMIDA_VALUES.ALMUERZO, // Las cenas usan recetas de tipo almuerzo
-      }
-      const tipo = tipoMap[formData.tiempo_comida] || TIEMPO_COMIDA_DEFAULT
       try {
-        const response = await api.get(`/planificacion/recetas?tipo=${tipo}&activa=true`)
-        return extractData(response)
+        // Cargar todas las recetas activas, sin filtrar por tipo
+        // Esto permite usar cualquier receta en cualquier servicio
+        const response = await api.get(`/planificacion/recetas?activa=true`)
+        const todasLasRecetas = extractData(response)
+        
+        // Si no hay recetas, retornar array vacío
+        if (!Array.isArray(todasLasRecetas) || todasLasRecetas.length === 0) {
+          return []
+        }
+        
+        return todasLasRecetas
       } catch (error) {
         console.error('Error al cargar recetas:', error)
         toast.error(`Error al cargar recetas: ${error.response?.data?.error || error.message}`)
@@ -49,10 +52,12 @@ export default function ProgramacionForm({ programacion, fecha, tiempoComida, on
   
   // Debug: Log para verificar que las recetas se cargan
   useEffect(() => {
-    console.log('Recetas disponibles:', recetasDisponibles)
-    console.log('Tiempo comida seleccionado:', formData.tiempo_comida)
-    console.log('Cargando recetas:', cargandoRecetas)
-    console.log('Error recetas:', errorRecetas)
+    if (import.meta.env.DEV) {
+      console.log('Recetas disponibles:', recetasDisponibles)
+      console.log('Tiempo comida seleccionado:', formData.tiempo_comida)
+      console.log('Cargando recetas:', cargandoRecetas)
+      console.log('Error recetas:', errorRecetas)
+    }
   }, [recetasDisponibles, formData.tiempo_comida, cargandoRecetas, errorRecetas])
   
   // Calcular totales del servicio usando charolas_planificadas para todas las recetas
@@ -352,8 +357,8 @@ export default function ProgramacionForm({ programacion, fecha, tiempoComida, on
               </div>
             ) : recetasDisponibles.length === 0 ? (
               <div className="text-center py-8 text-yellow-400 border border-yellow-500/50 rounded-lg bg-yellow-500/10">
-                <p>No hay recetas disponibles para este tipo de servicio</p>
-                <p className="text-sm text-slate-400 mt-2">Verifica que existan recetas activas del tipo "{formData.tiempo_comida}"</p>
+                <p>No hay recetas activas disponibles</p>
+                <p className="text-sm text-slate-400 mt-2">Crea recetas activas en la sección de Recetas para poder agregarlas al menú</p>
               </div>
             ) : formData.recetas.length === 0 ? (
               <div className="text-center py-8 text-slate-400 border border-slate-700 rounded-lg">

@@ -17,8 +17,15 @@ class Logger {
   }
 
   info(...args) {
-    if (this.isEnabled) {
-      console.info('[INFO]', ...args)
+    // Info siempre disponible para evitar errores de "is not a function"
+    // Usar try-catch para evitar problemas durante minificación
+    try {
+      if (this.isEnabled) {
+        console.info('[INFO]', ...args)
+      }
+    } catch (e) {
+      // Fallback silencioso si hay algún problema
+      console.log('[INFO]', ...args)
     }
   }
 
@@ -42,5 +49,8 @@ class Logger {
   }
 }
 
+// Crear instancia y exportar tanto como named export como default
 export const logger = new Logger()
+
+// Asegurar que el default export también esté disponible
 export default logger
