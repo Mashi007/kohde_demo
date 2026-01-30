@@ -243,15 +243,38 @@ class Receta(db.Model):
                     if hasattr(ingredientes, '__iter__'):
                         try:
                             # Intentar convertir a lista si es necesario
-                            ingredientes_iterable = list(ingredientes) if not isinstance(ingredientes, list) else ingredientes
-                            ingredientes_list = [ing.to_dict() for ing in ingredientes_iterable if ing is not None]
+                            # Verificar si es un query object o una lista
+                            if hasattr(ingredientes, 'all'):
+                                # Es un query object, ejecutarlo
+                                ingredientes_iterable = ingredientes.all()
+                            elif isinstance(ingredientes, list):
+                                ingredientes_iterable = ingredientes
+                            else:
+                                # Intentar convertir a lista
+                                ingredientes_iterable = list(ingredientes)
+                            
+                            # Procesar cada ingrediente con manejo de errores individual
+                            for ing in ingredientes_iterable:
+                                if ing is not None:
+                                    try:
+                                        ing_dict = ing.to_dict()
+                                        ingredientes_list.append(ing_dict)
+                                    except Exception as ing_error:
+                                        import logging
+                                        logging.warning(f"Error serializando ingrediente {ing.id if hasattr(ing, 'id') else 'N/A'} de receta {self.id}: {str(ing_error)}")
+                                        # Continuar con el siguiente ingrediente
+                                        continue
                         except Exception as e:
                             import logging
+                            import traceback
                             logging.warning(f"Error iterando ingredientes de receta {self.id}: {str(e)}")
+                            logging.debug(traceback.format_exc())
                             ingredientes_list = []
         except Exception as e:
             import logging
+            import traceback
             logging.warning(f"Error procesando ingredientes de receta {self.id}: {str(e)}", exc_info=True)
+            logging.debug(traceback.format_exc())
             ingredientes_list = []
         
         return {
@@ -293,11 +316,29 @@ class RecetaIngrediente(db.Model):
         # Manejar item de manera segura
         item_dict = None
         try:
-            if self.item:
-                item_dict = self.item.to_dict()
+            if hasattr(self, 'item') and self.item:
+                try:
+                    item_dict = self.item.to_dict()
+                except Exception as item_error:
+                    import logging
+                    import traceback
+                    logging.warning(f"Error serializando item {self.item_id} de ingrediente {self.id}: {str(item_error)}")
+                    logging.debug(traceback.format_exc())
+                    # Crear un dict básico del item si falla la serialización completa
+                    try:
+                        item_dict = {
+                            'id': self.item.id if hasattr(self.item, 'id') else self.item_id,
+                            'codigo': self.item.codigo if hasattr(self.item, 'codigo') else None,
+                            'nombre': self.item.nombre if hasattr(self.item, 'nombre') else 'Item no disponible',
+                            'unidad': self.item.unidad if hasattr(self.item, 'unidad') else None,
+                        }
+                    except:
+                        item_dict = None
         except Exception as e:
             import logging
+            import traceback
             logging.warning(f"Error procesando item de ingrediente {self.id}: {str(e)}")
+            logging.debug(traceback.format_exc())
             item_dict = None
         
         return {

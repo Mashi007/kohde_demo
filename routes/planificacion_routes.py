@@ -44,26 +44,58 @@ def listar_recetas():
         for receta in recetas:
             try:
                 # Asegurar que la sesión esté activa antes de convertir
-                if receta not in db.session:
-                    db.session.add(receta)
+                if not db.session.is_active:
+                    try:
+                        db.session.rollback()
+                    except:
+                        pass
+                
+                # Forzar carga de ingredientes si es necesario (evitar lazy loading)
+                try:
+                    _ = receta.ingredientes  # Forzar carga si es necesario
+                    # Si ingredientes es una relación lazy, convertirlo a lista
+                    if hasattr(receta.ingredientes, '__iter__') and not isinstance(receta.ingredientes, list):
+                        try:
+                            _ = list(receta.ingredientes)
+                        except:
+                            pass
+                except Exception:
+                    pass  # Si falla, continuar sin ingredientes
                 
                 receta_dict = receta.to_dict()
                 recetas_dict.append(receta_dict)
             except Exception as e:
                 import logging
+                import traceback
                 logging.error(f"Error al convertir receta {receta.id if hasattr(receta, 'id') else 'N/A'} a dict: {str(e)}", exc_info=True)
+                logging.debug(traceback.format_exc())
+                
                 # Agregar receta básica sin ingredientes si falla la conversión completa
                 try:
+                    # Manejar tipo de manera segura
+                    tipo_value = None
+                    try:
+                        if hasattr(receta, 'tipo') and receta.tipo:
+                            if isinstance(receta.tipo, str):
+                                tipo_value = receta.tipo.lower()
+                            elif hasattr(receta.tipo, 'value'):
+                                tipo_value = receta.tipo.value
+                            else:
+                                tipo_value = str(receta.tipo).lower()
+                    except:
+                        tipo_value = 'almuerzo'  # Valor por defecto
+                    
                     recetas_dict.append({
                         'id': receta.id if hasattr(receta, 'id') else None,
                         'nombre': receta.nombre if hasattr(receta, 'nombre') else 'Error',
-                        'tipo': str(receta.tipo) if hasattr(receta, 'tipo') else None,
+                        'tipo': tipo_value or 'almuerzo',
                         'activa': receta.activa if hasattr(receta, 'activa') else False,
                         'ingredientes': [],
                         'error': f'Error al cargar: {str(e)}'
                     })
-                except:
-                    # Si incluso esto falla, continuar sin agregar esta receta
+                except Exception as e2:
+                    logging.error(f"Error crítico serializando receta básica: {str(e2)}")
+                    # Continuar sin agregar esta receta
                     continue
         
         return paginated_response(recetas_dict, skip=skip, limit=limit)
@@ -74,6 +106,11 @@ def listar_recetas():
         import traceback
         error_trace = traceback.format_exc()
         logging.error(f"Error en listar_recetas: {str(e)}\n{error_trace}", exc_info=True)
+        # Asegurar rollback en caso de error
+        try:
+            db.session.rollback()
+        except:
+            pass
         return error_response(f"Error al listar recetas: {str(e)}", 500, 'INTERNAL_ERROR')
 
 @bp.route('/recetas', methods=['POST'])

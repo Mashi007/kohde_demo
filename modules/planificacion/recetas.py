@@ -111,13 +111,21 @@ class RecetaService:
         # Nota: selectinload para ingredientes (uno a muchos) y joinedload para item (muchos a uno)
         # IMPORTANTE: Usar referencia directa a la clase, no strings
         try:
-            query = db.query(Receta).options(
-                selectinload(Receta.ingredientes).joinedload(RecetaIngrediente.item)
-            )
+            # Verificar que la sesión esté activa
+            if not db.is_active:
+                import logging
+                logging.warning("Sesión de base de datos inactiva, usando query básico")
+                query = db.query(Receta)
+            else:
+                query = db.query(Receta).options(
+                    selectinload(Receta.ingredientes).joinedload(RecetaIngrediente.item)
+                )
         except Exception as e:
             # Si hay un error con el eager loading, usar query básico
             import logging
+            import traceback
             logging.warning(f"Error en eager loading, usando query básico: {str(e)}")
+            logging.debug(traceback.format_exc())
             query = db.query(Receta)
         
         if activa is not None:
@@ -144,9 +152,19 @@ class RecetaService:
                         tipo_enum = None
                 
                 if tipo_enum:
-                    # Comparar directamente con el valor string (PG_ENUM devuelve strings)
-                    # El valor del enum es minúsculas ('almuerzo', 'desayuno', 'cena')
-                    query = query.filter(Receta.tipo == tipo_enum.value)
+                    # PostgreSQL requiere un cast explícito cuando comparamos ENUM con string
+                    # Usar cast() de SQLAlchemy para convertir el valor string al tipo ENUM
+                    from sqlalchemy import cast
+                    from sqlalchemy.dialects.postgresql import ENUM as PG_ENUM
+                    
+                    # Crear el tipo ENUM de PostgreSQL para el cast
+                    tipo_receta_pg = PG_ENUM('tiporeceta', name='tiporeceta', create_type=False)
+                    
+                    # Comparar usando cast: convertir el valor string al tipo ENUM
+                    # Esto genera SQL como: recetas.tipo = CAST('almuerzo' AS tiporeceta)
+                    query = query.filter(
+                        Receta.tipo == cast(tipo_enum.value, tipo_receta_pg)
+                    )
             except (KeyError, AttributeError, Exception) as e:
                 import logging
                 logging.warning(f"Error al filtrar por tipo '{tipo}': {str(e)}", exc_info=True)

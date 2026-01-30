@@ -19,5 +19,6 @@ body {
   box-sizing: border-box;
 }
 
-/* Eliminado: propiedades text-size-adjust que causan errores en algunos navegadores */
-/* El plugin de PostCSS eliminará estas propiedades del CSS generado por Tailwind */
+/* Nota: Las propiedades text-size-adjust están deshabilitadas en tailwind.config.js */
+/* Si aparecen en el CSS generado, pueden causar errores en algunos navegadores */
+/* La configuración de Tailwind (textSizeAdjust: false) debería prevenir esto */

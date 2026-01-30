@@ -209,7 +209,12 @@ class ItemService:
         Returns:
             Lista de items
         """
+        from sqlalchemy.orm import selectinload
+        
         query = db.query(Item)
+        
+        # Usar eager loading para labels para evitar problemas de lazy loading
+        query = query.options(selectinload(Item.labels))
         
         if categoria:
             # Convertir categoria a formato PostgreSQL (valores mixtos)
@@ -344,6 +349,12 @@ class ItemService:
             Costo unitario promedio o None si no hay facturas aprobadas
         """
         try:
+            # Verificar que la sesión esté activa
+            if not db.is_active:
+                import logging
+                logging.warning(f"Sesión de base de datos inactiva para item {item_id}")
+                return None
+            
             # Obtener las últimas 3 facturas aprobadas que contengan este item
             # Usar with_entities para seleccionar solo las columnas necesarias y evitar problemas con columnas faltantes
             facturas_items = db.query(
@@ -369,13 +380,16 @@ class ItemService:
             promedio = sum(precios) / len(precios)
             return round(promedio, 2)
         except Exception as e:
-            # Si hay un error (ej: columna unidad no existe), hacer rollback y retornar None
+            # Si hay un error, hacer rollback y retornar None
             import logging
+            import traceback
             try:
-                db.rollback()
+                if db.is_active:
+                    db.rollback()
             except:
                 pass
             logging.warning(f"Error calculando costo promedio para item {item_id}: {str(e)}")
+            logging.debug(traceback.format_exc())
             return None
     
     @staticmethod

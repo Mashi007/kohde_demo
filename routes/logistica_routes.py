@@ -45,6 +45,8 @@ def listar_items():
         
         activo_bool = None if activo is None else activo.lower() == 'true'
         
+        # Obtener items con eager loading de labels para evitar problemas de lazy loading
+        from sqlalchemy.orm import selectinload
         items = ItemService.listar_items(
             db.session,
             categoria=categoria,
@@ -58,11 +60,17 @@ def listar_items():
         items_con_costo = []
         for item in items:
             try:
+                # Asegurar que las relaciones estén cargadas antes de serializar
+                # Esto evita problemas con sesiones cerradas
+                try:
+                    _ = item.labels  # Forzar carga de labels si es necesario
+                except Exception:
+                    pass  # Si falla, continuar sin labels
+                
                 # Intentar serializar el item primero
                 item_dict = item.to_dict()
                 
                 # Calcular costo promedio (puede retornar None si hay error)
-                # Usar una nueva sesión para evitar problemas con transacciones abortadas
                 try:
                     costo_promedio = ItemService.calcular_costo_unitario_promedio(db.session, item.id)
                     item_dict['costo_unitario_promedio'] = costo_promedio
@@ -83,7 +91,7 @@ def listar_items():
                 logging.error(f"Error procesando item {item.id}: {str(e)}")
                 logging.error(traceback.format_exc())
                 
-                # Intentar agregar el item sin costo promedio
+                # Intentar agregar el item sin costo promedio y sin labels
                 try:
                     # Hacer rollback de la transacción si hay error
                     try:
@@ -91,9 +99,6 @@ def listar_items():
                     except:
                         pass
                     
-                    # Crear un nuevo contexto de sesión para evitar problemas con transacciones abortadas
-                    from sqlalchemy.orm import Session
-                    # Intentar serializar sin labels si hay problema
                     # Manejar categoria que puede ser string (PG_ENUM) o enum
                     categoria_value = None
                     if item.categoria:
@@ -131,7 +136,12 @@ def listar_items():
         import logging
         logging.error(f"Error en listar_items: {str(e)}")
         logging.error(traceback.format_exc())
-        return error_response(str(e), 500, 'INTERNAL_ERROR')
+        # Asegurar rollback en caso de error
+        try:
+            db.session.rollback()
+        except:
+            pass
+        return error_response(f"Error interno del servidor: {str(e)}", 500, 'INTERNAL_ERROR')
 
 @bp.route('/items', methods=['POST'])
 @handle_db_transaction
